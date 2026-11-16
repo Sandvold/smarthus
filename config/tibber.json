@@ -1,1 +1,12 @@
-{"site": "ukjent"}
+{
+ "homes": {
+  "634f3acf": {
+   "name": "Huset i Arendal",
+   "site": "hjem_arendal"
+  },
+  "12edc643": {
+   "name": "Leiligheten i Oslo",
+   "site": "hjem_oslo"
+  }
+ }
+}
