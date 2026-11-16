@@ -16,17 +16,21 @@ select{background:var(--card);color:var(--fg);border:1px solid var(--grid);borde
 .s{color:var(--mut);font-size:13px}
 .badge{display:inline-block;font-size:13px;border-radius:999px;padding:2px 10px;margin-top:6px;border:1px solid currentColor}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.lede{font-size:18px;line-height:1.5;max-width:62ch;margin:0 0 20px}.lede b{font-weight:600}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--mut);margin-bottom:6px}
 .legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
 .chart{position:relative}svg{width:100%;height:240px;display:block;touch-action:pan-y}
 .tip{position:absolute;pointer-events:none;background:#000d;border:1px solid var(--grid);border-radius:8px;padding:6px 10px;font-size:13px;display:none;white-space:nowrap}
 details{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:3px 8px 3px 0}
 </style>
-<header><h1>Smarthus – drivhus</h1>
+<header><h1>Smarthus</h1>
 <label class="s">Periode <select id="range"><option value="24">Siste 24 timer</option><option value="72">Siste 3 dager</option><option value="168" selected>Siste 7 dager</option><option value="336">Siste 14 dager</option></select></label></header>
+<p class="lede" id="lede"></p>
+<h2 style="margin-bottom:2px">Akkurat nå</h2><p class="s" style="margin:0 0 10px">Siste måling per enhet, og laveste og høyeste temperatur siste døgn.</p>
 <div id="cards" class="cards">Laster…</div>
 <section class="c" style="margin-bottom:16px"><h2>Temperatur</h2><div class="legend" id="leg-t"></div><div class="chart" id="ch-t"></div><details><summary>Tabell</summary><div id="tb-t"></div></details></section>
 <section class="c"><h2>Luftfuktighet</h2><div class="legend" id="leg-h"></div><div class="chart" id="ch-h"></div><details><summary>Tabell</summary><div id="tb-h"></div></details></section>
+<details class="s" style="margin-top:16px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Temperaturen fra sensoren leses i tiendedels grader. Døgn regnes de siste 24 timene fra siste måling. Siden oppdateres omtrent hvert 15. minutt.</p></details>
 <script>
 const FROST=0, WARN_NEAR=3, LOW_BATT=30, STALE_MIN=60;
 const PAL=['#7eaddb','#e08363','#93a877','#d8a747','#a97a9b','#b98e5a','#c9c2b3','#8d9aa3'];
@@ -76,7 +80,16 @@ function chart(id,legId,tbId,key,unit,refLine,pad){
  const rows=sets.flatMap(s=>s.pts.slice(-30).reverse().map(p=>({n:s.name,t:p.t,v:p.v}))).sort((a,b)=>b.t-a.t).slice(0,40);
  document.getElementById(tbId).innerHTML='<table><tr><th>Tidspunkt</th><th>Enhet</th><th>Verdi</th></tr>'+rows.map(r=>`<tr><td>${fmt(new Date(r.t))}</td><td>${r.n}</td><td>${nf(r.v,key==='hum'?0:1)} ${unit}</td></tr>`).join('')+'</table>';
 }
-function render(){cards();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
+function lede(){
+ const el=document.getElementById('lede'),S=SERIES();if(!S.length){el.textContent='';return}
+ const info=S.map(s=>{const last=s.rows[s.rows.length-1],since=last.t.getTime()-86400000;
+  const w=s.rows.filter(r=>r.t.getTime()>since&&r.temp!=null).map(r=>r.temp);return{name:s.name,temp:last.temp,min:w.length?Math.min(...w):null}}).filter(i=>i.temp!=null);
+ if(!info.length){el.textContent='';return}
+ const c=info.reduce((a,b)=>b.temp<a.temp?b:a),frost=info.some(i=>i.min!=null&&i.min<=FROST);
+ const who=info.length>1?'Det kaldeste stedet, <b>'+c.name+'</b>,':'<b>'+c.name+'</b>';
+ el.innerHTML=`${who} er nå <b>${nf(c.temp)}</b> °C og var nede i <b>${nf(c.min)}</b> °C det siste døgnet. ${frost?'Minst ett sted hadde frost.':'Ingen steder hadde frost.'}`;
+}
+function render(){lede();cards();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
 fetch('data.json').then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
