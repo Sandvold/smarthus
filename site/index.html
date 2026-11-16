@@ -1,0 +1,23 @@
+<!doctype html><html lang="nb"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smarthus</title>
+<style>body{background:#0f1110;color:#f0efec;font:16px system-ui;margin:0;padding:16px}
+.c{background:#181b1a;border-radius:12px;padding:12px;margin:0 0 16px}h1{font-size:20px}h2{font-size:16px;margin:0 0 4px}
+.n{font-size:32px}.s{color:#9aa39d;font-size:13px}svg{width:100%;height:160px}</style>
+<h1>Smarthus – drivhus</h1><div id="app">Laster…</div>
+<script>
+fetch('data.json').then(r=>r.json()).then(d=>{
+  const by={};d.forEach(x=>(by[x.name]=by[x.name]||[]).push(x));
+  let h='';
+  for(const [name,rows] of Object.entries(by)){
+    const last=rows[rows.length-1],t=rows.map(r=>r.temp).filter(v=>v!=null);
+    const mn=Math.min(...t,0),mx=Math.max(...t,1),w=600,ht=150;
+    const pts=rows.filter(r=>r.temp!=null).map((r,i,a)=>`${i/(a.length-1||1)*w},${ht-(r.temp-mn)/(mx-mn||1)*ht}`).join(' ');
+    const zero=ht-(0-mn)/(mx-mn||1)*ht;
+    h+=`<div class="c"><h2>${name}</h2><div class="n">${last.temp!=null?last.temp.toFixed(1).replace('.',','):'–'} °C</div>
+    <div class="s">Fuktighet ${last.hum??'–'} % · batteri ${last.battery??'–'} % · ${new Date(last.ts).toLocaleString('nb-NO')}</div>
+    <svg viewBox="0 0 ${w} ${ht}" role="img" aria-label="Temperatur siste 14 dager"><line x1="0" x2="${w}" y1="${zero}" y2="${zero}" stroke="#555" stroke-dasharray="4"/>
+    <polyline fill="none" stroke="#7eaddb" stroke-width="2" points="${pts}"/></svg></div>`;
+  }
+  document.getElementById('app').innerHTML=h||'Ingen data ennå';
+});
+</script></html>
