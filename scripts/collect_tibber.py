@@ -8,7 +8,7 @@ if not TOKEN:
     sys.exit(0)
 
 SITE = json.load(open("config/tibber.json")).get("site", "ukjent")
-Q = """{ viewer { homes { id
+Q = """{ viewer { homes { id appNickname features { realTimeConsumptionEnabled }
   consumption(resolution: HOURLY, last: 72) { nodes { from to consumption cost unitPrice } }
   currentSubscription { priceInfo { current { total startsAt } today { total startsAt } tomorrow { total startsAt } } } } } }"""
 
@@ -17,6 +17,9 @@ r = requests.post("https://api.tibber.com/v1-beta/gql", json={"query": Q},
 if r.get("errors"):
     raise RuntimeError("Tibber-feil: " + json.dumps(r["errors"])[:500])
 homes = r["data"]["viewer"]["homes"]
+for i, h in enumerate(homes):
+    n = len(((h.get("consumption") or {}).get("nodes")) or [])
+    print(f"Hjem {i}: id={h['id'][:8]}… navn={h.get('appNickname')!r} pulse={((h.get('features') or {}).get('realTimeConsumptionEnabled'))} timer={n}")
 
 with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
     con.execute("""create table if not exists power_hourly (home_id text not null, site text,
