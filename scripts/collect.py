@@ -2,7 +2,7 @@
 import hashlib, hmac, json, os, time, uuid
 import requests, psycopg
 
-HOST = os.environ.get("TUYA_HOST", "https://openapi.tuyaeu.com")
+HOST = os.environ.get("TUYA_HOST") or "https://openapi.tuyaeu.com"
 CID, SECRET = os.environ["TUYA_ACCESS_ID"], os.environ["TUYA_ACCESS_SECRET"]
 EMPTY_SHA = hashlib.sha256(b"").hexdigest()
 
