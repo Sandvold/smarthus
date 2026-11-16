@@ -1,0 +1,16 @@
+name: Undersøk Adax
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install requests
+      - run: python scripts/probe_adax.py
+        env:
+          ADAX_ACCOUNT_ID: ${{ secrets.ADAX_ACCOUNT_ID }}
+          ADAX_PASSWORD: ${{ secrets.ADAX_PASSWORD }}
