@@ -34,6 +34,7 @@ details{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:col
 <h2 style="font-size:14px;color:var(--mut)">Temperaturer</h2><div class="legend" id="leg-hp"></div><div class="chart" id="ch-hp"></div><details><summary>Tabell</summary><div id="tb-hp"></div></details>
 <h2 style="font-size:14px;color:var(--mut);margin-top:14px">Strøm</h2><div class="legend" id="leg-pw"></div><div class="chart" id="ch-pw"></div><details><summary>Tabell</summary><div id="tb-pw"></div></details>
 <details><summary>Alle verdier fra enheten</summary><div id="hp-all"></div></details></section>
+<section class="c" id="ax" hidden style="margin-top:16px"><h2>Panelovner (Adax)</h2><div id="ax-body"></div></section>
 <section class="c" id="sh" hidden style="margin-top:16px"><h2>Stikk i drivhus (Shelly)</h2><div id="sh-body"></div></section>
 <section class="c" id="pw" hidden style="margin-top:16px"><h2>Strøm (Tibber)</h2><div id="pw-body"></div></section>
 <details class="s" style="margin-top:16px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Temperaturen fra sensoren leses i tiendedels grader. Døgn regnes de siste 24 timene fra siste måling. Siden oppdateres omtrent hvert 15. minutt.</p></details>
@@ -115,7 +116,20 @@ function hp(){
  drawLine('ch-pw','leg-pw','tb-pw',[{name:'Effekt (cur_power)',color:'#d8a747',pts:rows.filter(r=>r.t>since&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5);
  document.getElementById('hp-all').innerHTML='<table>'+Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')+'</table>';
 }
-let PW=null,SH=null;
+let PW=null,SH=null,AX=null;
+function adax(){
+ const sec=document.getElementById('ax'),body=document.getElementById('ax-body');
+ if(!AX||!AX.rooms||!AX.rooms.length){sec.hidden=true;return}
+ sec.hidden=false;body.innerHTML='';
+ const cut=Date.now()-86400000,homes={};AX.rooms.forEach(r=>(homes[r.home||'Adax']=homes[r.home||'Adax']||[]).push(r));
+ Object.entries(homes).forEach(([h,rooms])=>{
+  const t=document.createElement('h2');t.style.cssText='font-size:14px;color:var(--mut);margin:12px 0 6px';t.textContent=h;body.appendChild(t);
+  const box=document.createElement('div');box.className='cards';
+  rooms.forEach(c=>{const last=c.rows[c.rows.length-1],v=c.rows.filter(x=>new Date(x.t).getTime()>=cut&&x.temp!=null).map(x=>x.temp);
+   const d=document.createElement('div');d.className='c';d.style.cssText='margin:0;background:#1f2321';
+   d.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:26px">${last.temp==null?'–':nf(last.temp,1)+' °C'}</div><div class="s">Innstilt ${nf(last.target,1)} °C${last.on?'':' · av'}${v.length?' · 24 t: '+nf(Math.min(...v),1)+'–'+nf(Math.max(...v),1)+' °C':''}</div>`;
+   box.appendChild(d)});
+  body.appendChild(box)})}
 function shelly(){
  const sec=document.getElementById('sh'),body=document.getElementById('sh-body');
  if(!SH||!SH.channels||!SH.channels.length){sec.hidden=true;return}
@@ -159,9 +173,9 @@ function power(){
   bars('cd-'+i,Object.entries(day).slice(-30).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb','#7eaddb');
  });
 }
-function render(){lede();shelly();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
+function render(){lede();shelly();adax();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
-fetch('shelly.json').then(r=>r.ok?r.json():null).catch(()=>null).then(x=>{SH=x;return fetch('power.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PW=p;return fetch('data.json')}).then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
+fetch('adax.json').then(r=>r.ok?r.json():null).catch(()=>null).then(a=>{AX=a;return fetch('shelly.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(x=>{SH=x;return fetch('power.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PW=p;return fetch('data.json')}).then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
 </script>
 </html>

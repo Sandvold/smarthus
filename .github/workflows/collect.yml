@@ -38,6 +38,11 @@ jobs:
           SHELLY_SERVER: ${{ secrets.SHELLY_SERVER }}
           SHELLY_AUTH_KEY: ${{ secrets.SHELLY_AUTH_KEY }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_adax.py
+        env:
+          ADAX_ACCOUNT_ID: ${{ secrets.ADAX_ACCOUNT_ID }}
+          ADAX_PASSWORD: ${{ secrets.ADAX_PASSWORD }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
