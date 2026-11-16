@@ -1,0 +1,28 @@
+name: Aqara
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "code, token eller devices"
+        required: true
+      authcode:
+        description: "Kode fra e-post (kun for token)"
+        required: false
+permissions:
+  contents: read
+jobs:
+  aqara:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install requests "psycopg[binary]"
+      - run: python scripts/aqara.py "${{ inputs.step }}" "${{ inputs.authcode }}"
+        env:
+          AQARA_APP_ID: ${{ secrets.AQARA_APP_ID }}
+          AQARA_KEY_ID: ${{ secrets.AQARA_KEY_ID }}
+          AQARA_APP_KEY: ${{ secrets.AQARA_APP_KEY }}
+          AQARA_ACCOUNT: ${{ secrets.AQARA_ACCOUNT }}
+          AQARA_REGION: ${{ secrets.AQARA_REGION }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
