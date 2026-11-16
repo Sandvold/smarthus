@@ -1,0 +1,18 @@
+name: Undersøk Shelly-enheter
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - run: python scripts/probe_shelly.py
+        env:
+          SHELLY_SERVER: ${{ secrets.SHELLY_SERVER }}
+          SHELLY_AUTH_KEY: ${{ secrets.SHELLY_AUTH_KEY }}
