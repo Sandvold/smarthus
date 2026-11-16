@@ -121,13 +121,15 @@ let PW=null,SH=null,AX=null,GD=null;
 function gardena(){
  const sec=document.getElementById('gd'),body=document.getElementById('gd-body');
  if(!GD||!GD.devices||!GD.devices.length){sec.hidden=true;return}
- sec.hidden=false;body.innerHTML='';const box=document.createElement('div');box.className='cards';
- GD.devices.forEach(c=>{const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
+ sec.hidden=false;body.innerHTML='';const SN={Oslo:'Oslo',Arendal:'Arendal'};
+ const gs={};GD.devices.forEach(c=>(gs[c.site||'Gardena']=gs[c.site||'Gardena']||[]).push(c));
+ Object.entries(gs).forEach(([site,list])=>{const t=document.createElement('h2');t.style.cssText='font-size:14px;color:var(--mut);margin:12px 0 6px';t.textContent=SN[site]||site;body.appendChild(t);const box=document.createElement('div');box.className='cards';
+ list.forEach(c=>{const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
   const main=c.kind==='sensor'?(l.temp==null?'–':nf(l.temp,0)+' °C jord'):(l.act==='CLOSED'?'Ventil lukket':l.act||'–');
   const sub=[c.kind==='sensor'&&l.hum!=null?'Jordfukt '+nf(l.hum,0)+' %':null,l.batt!=null?'Batteri '+l.batt+' %':null,off?'Frakoblet – tallene kan være gamle':null].filter(Boolean).join(' · ');
   const d=document.createElement('div');d.className='c';d.style.cssText='margin:0;background:#1f2321';
   d.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s"${off?' style="color:#d8a747"':''}>${sub}</div>`;box.appendChild(d)});
- body.appendChild(box)}
+ body.appendChild(box)})}
 function adax(){
  const sec=document.getElementById('ax'),body=document.getElementById('ax-body');
  if(!AX||!AX.rooms||!AX.rooms.length){sec.hidden=true;return}
