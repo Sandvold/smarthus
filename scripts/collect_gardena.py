@@ -34,6 +34,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
     rows = con.execute("select device_id,name,kind,ts,soil_hum,soil_temp,activity,battery,link from gardena_readings where ts > now() - interval '14 days' order by ts").fetchall()
 out = {}
 for did, name, kind, ts, sh, st, act, b, link in rows:
+    if not name: continue
     d = out.setdefault(did, {"name": name, "kind": kind, "site": (devs.get(did) or {}).get("site"), "rows": []})
     d["rows"].append({"t": ts.isoformat(), "hum": None if sh is None else float(sh), "temp": None if st is None else float(st), "act": act, "batt": b, "link": link})
 json.dump({"devices": list(out.values())}, open("site/gardena.json", "w"), ensure_ascii=False)
