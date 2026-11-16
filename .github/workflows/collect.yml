@@ -43,6 +43,11 @@ jobs:
           ADAX_ACCOUNT_ID: ${{ secrets.ADAX_ACCOUNT_ID }}
           ADAX_PASSWORD: ${{ secrets.ADAX_PASSWORD }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_gardena.py
+        env:
+          GARDENA_CLIENT_ID: ${{ secrets.GARDENA_CLIENT_ID }}
+          GARDENA_CLIENT_SECRET: ${{ secrets.GARDENA_CLIENT_SECRET }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
