@@ -30,6 +30,10 @@ details{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:col
 <div id="cards" class="cards">Laster…</div>
 <section class="c" style="margin-bottom:16px"><h2>Temperatur</h2><div class="legend" id="leg-t"></div><div class="chart" id="ch-t"></div><details><summary>Tabell</summary><div id="tb-t"></div></details></section>
 <section class="c"><h2>Luftfuktighet</h2><div class="legend" id="leg-h"></div><div class="chart" id="ch-h"></div><details><summary>Tabell</summary><div id="tb-h"></div></details></section>
+<section class="c" id="hp" hidden style="margin-top:16px"><h2 id="hp-title">Varmepumpe</h2><div id="hp-cards" class="cards" style="margin-bottom:8px"></div>
+<h2 style="font-size:14px;color:var(--mut)">Temperaturer</h2><div class="legend" id="leg-hp"></div><div class="chart" id="ch-hp"></div><details><summary>Tabell</summary><div id="tb-hp"></div></details>
+<h2 style="font-size:14px;color:var(--mut);margin-top:14px">Strøm</h2><div class="legend" id="leg-pw"></div><div class="chart" id="ch-pw"></div><details><summary>Tabell</summary><div id="tb-pw"></div></details>
+<details><summary>Alle verdier fra enheten</summary><div id="hp-all"></div></details></section>
 <details class="s" style="margin-top:16px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Temperaturen fra sensoren leses i tiendedels grader. Døgn regnes de siste 24 timene fra siste måling. Siden oppdateres omtrent hvert 15. minutt.</p></details>
 <script>
 const FROST=0, WARN_NEAR=3, LOW_BATT=30, STALE_MIN=60;
@@ -37,7 +41,7 @@ const PAL=['#7eaddb','#e08363','#93a877','#d8a747','#a97a9b','#b98e5a','#c9c2b3'
 const nf=(v,d=1)=>v==null?'–':v.toLocaleString('nb-NO',{minimumFractionDigits:d,maximumFractionDigits:d});
 const fmt=d=>d.toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 let ALL=[],hours=168;
-const SERIES=()=>{const by={};ALL.forEach(r=>{(by[r.name]=by[r.name]||[]).push({t:new Date(r.ts),temp:r.temp,hum:r.hum,batt:r.battery,site:r.site})});
+const SERIES=()=>{const by={};ALL.filter(r=>r.kind!=='heatpump').forEach(r=>{(by[r.name]=by[r.name]||[]).push({t:new Date(r.ts),temp:r.temp,hum:r.hum,batt:r.battery,site:r.site})});
  return Object.entries(by).map(([name,rows],i)=>({name,color:PAL[i%PAL.length],rows}))};
 function cards(){
  const el=document.getElementById('cards');const S=SERIES();if(!S.length){el.textContent='Ingen data ennå';return}
@@ -55,8 +59,12 @@ function cards(){
   <div class="s ${stale?'warn':''}">${stale?'⚠ Ingen ny måling siden ':'Oppdatert '}${fmt(last.t)}</div></div>`}).join('');
 }
 function chart(id,legId,tbId,key,unit,refLine,pad){
- const S=SERIES(),host=document.getElementById(id),since=Date.now()-hours*3600000;
- const sets=S.map(s=>({name:s.name,color:s.color,pts:s.rows.filter(r=>r.t>since&&r[key]!=null).map(r=>({t:r.t.getTime(),v:r[key]}))}));
+ const since=Date.now()-hours*3600000;
+ const sets=SERIES().map(s=>({name:s.name,color:s.color,pts:s.rows.filter(r=>r.t>since&&r[key]!=null).map(r=>({t:r.t.getTime(),v:r[key]}))}));
+ drawLine(id,legId,tbId,sets,key,unit,refLine,pad);
+}
+function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
+ const host=document.getElementById(id);
  document.getElementById(legId).innerHTML=sets.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');
  const all=sets.flatMap(s=>s.pts);
  if(!all.length){host.innerHTML='<div class="s">Ingen målinger i perioden</div>';return}
@@ -65,20 +73,20 @@ function chart(id,legId,tbId,key,unit,refLine,pad){
  let lo=Math.min(...all.map(p=>p.v),...(refLine!=null?[refLine]:[])),hi=Math.max(...all.map(p=>p.v),...(refLine!=null?[refLine]:[]));
  lo-=pad;hi+=pad;if(hi===lo)hi=lo+1;
  const X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b);
- let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,key==='hum'?0:1)}</text>`}
+ let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,(key==='hum'||key==='pw')?0:1)}</text>`}
  for(let i=0;i<=3;i++){const t=t0+(t1-t0)*i/3;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==3?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</text>`}
  if(refLine!=null)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(refLine)}" y2="${Y(refLine)}" stroke="#e08363" stroke-dasharray="4 4"/><text x="${W-m.r}" y="${Y(refLine)-4}" text-anchor="end" fill="#e08363" font-size="11">Frost ${refLine} °C</text>`;
  const lines=sets.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" points="${s.pts.map(p=>X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}"/>`+(s.pts.length===1?`<circle cx="${X(s.pts[0].t)}" cy="${Y(s.pts[0].v)}" r="4" fill="${s.color}"/>`:'')).join('');
- host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${key==='hum'?'Luftfuktighet':'Temperatur'} over tid">${g}${lines}<line id="${id}-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="${id}-tip"></div>`;
+ host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${key==='hum'?'Luftfuktighet':key==='pw'?'Effekt':'Temperatur'} over tid">${g}${lines}<line id="${id}-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="${id}-tip"></div>`;
  const svg=host.querySelector('svg'),xl=document.getElementById(id+'-x'),tip=document.getElementById(id+'-tip');
  const move=e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*W,t=t0+(px-m.l)/(W-m.l-m.r)*(t1-t0);
   const rows=sets.map(s=>{if(!s.pts.length)return null;let b=s.pts[0];s.pts.forEach(p=>{if(Math.abs(p.t-t)<Math.abs(b.t-t))b=p});return{s,b}}).filter(Boolean);
   if(!rows.length)return;const ref=rows[0].b.t;xl.setAttribute('x1',X(ref));xl.setAttribute('x2',X(ref));xl.style.display='';
-  tip.innerHTML=`<div class="s">${fmt(new Date(ref))}</div>`+rows.map(o=>`<div><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${o.s.color};margin-right:6px"></i>${o.s.name}: ${nf(o.b.v,key==='hum'?0:1)} ${unit}</div>`).join('');
+  tip.innerHTML=`<div class="s">${fmt(new Date(ref))}</div>`+rows.map(o=>`<div><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${o.s.color};margin-right:6px"></i>${o.s.name}: ${nf(o.b.v,(key==='hum'||key==='pw')?0:1)} ${unit}</div>`).join('');
   tip.style.display='block';const left=Math.min(Math.max(X(ref)/W*r.width+10,0),r.width-tip.offsetWidth);tip.style.left=left+'px';tip.style.top='8px'};
  svg.addEventListener('pointermove',move);svg.addEventListener('pointerleave',()=>{xl.style.display='none';tip.style.display='none'});
  const rows=sets.flatMap(s=>s.pts.slice(-30).reverse().map(p=>({n:s.name,t:p.t,v:p.v}))).sort((a,b)=>b.t-a.t).slice(0,40);
- document.getElementById(tbId).innerHTML='<table><tr><th>Tidspunkt</th><th>Enhet</th><th>Verdi</th></tr>'+rows.map(r=>`<tr><td>${fmt(new Date(r.t))}</td><td>${r.n}</td><td>${nf(r.v,key==='hum'?0:1)} ${unit}</td></tr>`).join('')+'</table>';
+ document.getElementById(tbId).innerHTML='<table><tr><th>Tidspunkt</th><th>Enhet</th><th>Verdi</th></tr>'+rows.map(r=>`<tr><td>${fmt(new Date(r.t))}</td><td>${r.n}</td><td>${nf(r.v,(key==='hum'||key==='pw')?0:1)} ${unit}</td></tr>`).join('')+'</table>';
 }
 function lede(){
  const el=document.getElementById('lede'),S=SERIES();if(!S.length){el.textContent='';return}
@@ -89,7 +97,23 @@ function lede(){
  const who=info.length>1?'Det kaldeste stedet, <b>'+c.name+'</b>,':'<b>'+c.name+'</b>';
  el.innerHTML=`${who} er nå <b>${nf(c.temp)}</b> °C og var nede i <b>${nf(c.min)}</b> °C det siste døgnet. ${frost?'Minst ett sted hadde frost.':'Ingen steder hadde frost.'}`;
 }
-function render(){lede();cards();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
+const HPT=[['temp_set','Innstilt (temp_set)','#e08363'],['temp_bottom','temp_bottom','#7eaddb'],['temp_top','temp_top','#93a877'],['venting_temp','venting_temp','#d8a747'],['effluent_temp','effluent_temp','#a97a9b'],['around_temp','Ute (around_temp)','#8d9aa3']];
+function hp(){
+ const sec=document.getElementById('hp'),rows=ALL.filter(r=>r.kind==='heatpump').map(r=>({t:new Date(r.ts).getTime(),p:r.props||{},name:r.name}));
+ if(!rows.length){sec.hidden=true;return}
+ sec.hidden=false;const last=rows[rows.length-1],p=last.p,since=Date.now()-hours*3600000;
+ document.getElementById('hp-title').textContent=last.name;
+ const run=p.compressor_state===true,on=p.switch===true,fault=p.fault&&p.fault!==0;
+ const tile=(l,v,u)=>`<div class="c" style="margin:0;background:#1f2321"><div class="s">${l}</div><div class="n" style="font-size:26px">${v==null?'–':nf(v,0)}${v==null?'':' '+u}</div></div>`;
+ document.getElementById('hp-cards').innerHTML=
+  `<div class="c" style="margin:0;background:#1f2321"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
+  +tile('Innstilt temp',p.temp_set,'°C')+tile('temp_bottom',p.temp_bottom,'°C')+tile('temp_top',p.temp_top,'°C')+tile('venting_temp',p.venting_temp,'°C')+tile('Ute',p.around_temp,'°C')+tile('Effekt',p.cur_power,'W')+tile('Total energi (electric_total)',p.electric_total,'');
+ const sets=HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>since&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length);
+ drawLine('ch-hp','leg-hp','tb-hp',sets,'t','°C',null,2);
+ drawLine('ch-pw','leg-pw','tb-pw',[{name:'Effekt (cur_power)',color:'#d8a747',pts:rows.filter(r=>r.t>since&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5);
+ document.getElementById('hp-all').innerHTML='<table>'+Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')+'</table>';
+}
+function render(){lede();cards();hp();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
 fetch('data.json').then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
