@@ -34,6 +34,7 @@ details{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:col
 <h2 style="font-size:14px;color:var(--mut)">Temperaturer</h2><div class="legend" id="leg-hp"></div><div class="chart" id="ch-hp"></div><details><summary>Tabell</summary><div id="tb-hp"></div></details>
 <h2 style="font-size:14px;color:var(--mut);margin-top:14px">Strøm</h2><div class="legend" id="leg-pw"></div><div class="chart" id="ch-pw"></div><details><summary>Tabell</summary><div id="tb-pw"></div></details>
 <details><summary>Alle verdier fra enheten</summary><div id="hp-all"></div></details></section>
+<section class="c" id="hm" hidden style="margin-top:16px"><h2>Klippere, låser og Daikin (Homey)</h2><div id="hm-body"></div></section>
 <section class="c" id="gd" hidden style="margin-top:16px"><h2>Hage og vanning (Gardena)</h2><div id="gd-body"></div></section>
 <section class="c" id="ax" hidden style="margin-top:16px"><h2>Panelovner (Adax)</h2><div id="ax-body"></div></section>
 <section class="c" id="sh" hidden style="margin-top:16px"><h2>Stikk i drivhus (Shelly)</h2><div id="sh-body"></div></section>
@@ -117,7 +118,26 @@ function hp(){
  drawLine('ch-pw','leg-pw','tb-pw',[{name:'Effekt (cur_power)',color:'#d8a747',pts:rows.filter(r=>r.t>since&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5);
  document.getElementById('hp-all').innerHTML='<table>'+Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')+'</table>';
 }
-let PW=null,SH=null,AX=null,GD=null;
+let PW=null,SH=null,AX=null,GD=null,HM=null;
+function homey(){
+ const sec=document.getElementById('hm'),body=document.getElementById('hm-body');
+ if(!HM||!HM.devices||!HM.devices.length){sec.hidden=true;return}
+ sec.hidden=false;body.innerHTML='';
+ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå':m<90?m+' min siden':m<2880?Math.round(m/60)+' t siden':Math.round(m/1440)+' d siden'};
+ const NAME={measure_battery:'Batteri',measure_temperature:'Temperatur',target_temperature:'Innstilt',onoff:'På',locked:'Låst',thermostat_mode:'Modus',lawn_mower_state:'Status',measure_power:'Effekt'};
+ const hs={};HM.devices.forEach(c=>(hs[c.site||'Homey']=hs[c.site||'Homey']||[]).push(c));
+ Object.entries(hs).forEach(([site,list])=>{
+  const t=document.createElement('h2');t.style.cssText='font-size:14px;color:var(--mut);margin:12px 0 6px';t.textContent=site;body.appendChild(t);
+  const box=document.createElement('div');box.className='cards';
+  list.forEach(c=>{const l=c.rows[c.rows.length-1],d=l.d||{},stale=Date.now()-new Date(l.t)>3*3600000||l.av===false;
+   let main='–';
+   if(c.kind==='lock'&&'locked' in d)main=d.locked?'Låst':'Ulåst';
+   else if(c.kind==='daikin'&&d.measure_temperature!=null)main=nf(d.measure_temperature,1)+' °C';
+   else if(c.kind==='mower'){const st=Object.entries(d).find(([k,v])=>typeof v==='string'&&/state|status|mode/i.test(k));main=st?String(st[1]).replace(/_/g,' '):(d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–')}
+   const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!(c.kind==='daikin'&&k==='measure_temperature')).slice(0,6).map(([k,v])=>(NAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
+   const el=document.createElement('div');el.className='c';el.style.cssText='margin:0;background:#1f2321';
+   el.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s">${extra}</div><div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}</div>`;box.appendChild(el)});
+  body.appendChild(box)})}
 function gardena(){
  const sec=document.getElementById('gd'),body=document.getElementById('gd-body');
  if(!GD||!GD.devices||!GD.devices.length){sec.hidden=true;return}
@@ -186,9 +206,9 @@ function power(){
   bars('cd-'+i,Object.entries(day).slice(-30).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb','#7eaddb');
  });
 }
-function render(){lede();shelly();adax();gardena();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
+function render(){lede();shelly();adax();gardena();homey();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
-fetch('gardena.json').then(r=>r.ok?r.json():null).catch(()=>null).then(g=>{GD=g;return fetch('adax.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(a=>{AX=a;return fetch('shelly.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(x=>{SH=x;return fetch('power.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PW=p;return fetch('data.json')}).then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
+fetch('homey.json').then(r=>r.ok?r.json():null).catch(()=>null).then(h=>{HM=h;return fetch('gardena.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(g=>{GD=g;return fetch('adax.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(a=>{AX=a;return fetch('shelly.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(x=>{SH=x;return fetch('power.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PW=p;return fetch('data.json')}).then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
 </script>
 </html>
