@@ -1,23 +1,84 @@
-<!doctype html><html lang="nb"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Smarthus</title>
-<style>body{background:#0f1110;color:#f0efec;font:16px system-ui;margin:0;padding:16px}
-.c{background:#181b1a;border-radius:12px;padding:12px;margin:0 0 16px}h1{font-size:20px}h2{font-size:16px;margin:0 0 4px}
-.n{font-size:32px}.s{color:#9aa39d;font-size:13px}svg{width:100%;height:160px}</style>
-<h1>Smarthus – drivhus</h1><div id="app">Laster…</div>
+<!doctype html>
+<html lang="nb">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smarthus – drivhus</title>
+<style>
+:root{--bg:#0f1110;--card:#181b1a;--fg:#f0efec;--mut:#9aa39d;--grid:#2a2f2d;--warn:#d8a747;--bad:#e08363;--ok:#93a877}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif;margin:0;padding:16px;max-width:1100px;margin-inline:auto}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 8px}
+select{background:var(--card);color:var(--fg);border:1px solid var(--grid);border-radius:8px;padding:8px 10px;font:inherit}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.c{background:var(--card);border-radius:12px;padding:14px}
+.big{font-size:34px;line-height:1.1}
+.s{color:var(--mut);font-size:13px}
+.badge{display:inline-block;font-size:13px;border-radius:999px;padding:2px 10px;margin-top:6px;border:1px solid currentColor}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--mut);margin-bottom:6px}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.chart{position:relative}svg{width:100%;height:240px;display:block;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:#000d;border:1px solid var(--grid);border-radius:8px;padding:6px 10px;font-size:13px;display:none;white-space:nowrap}
+details{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:3px 8px 3px 0}
+</style>
+<header><h1>Smarthus – drivhus</h1>
+<label class="s">Periode <select id="range"><option value="24">Siste 24 timer</option><option value="72">Siste 3 dager</option><option value="168" selected>Siste 7 dager</option><option value="336">Siste 14 dager</option></select></label></header>
+<div id="cards" class="cards">Laster…</div>
+<section class="c" style="margin-bottom:16px"><h2>Temperatur</h2><div class="legend" id="leg-t"></div><div class="chart" id="ch-t"></div><details><summary>Tabell</summary><div id="tb-t"></div></details></section>
+<section class="c"><h2>Luftfuktighet</h2><div class="legend" id="leg-h"></div><div class="chart" id="ch-h"></div><details><summary>Tabell</summary><div id="tb-h"></div></details></section>
 <script>
-fetch('data.json').then(r=>r.json()).then(d=>{
-  const by={};d.forEach(x=>(by[x.name]=by[x.name]||[]).push(x));
-  let h='';
-  for(const [name,rows] of Object.entries(by)){
-    const last=rows[rows.length-1],t=rows.map(r=>r.temp).filter(v=>v!=null);
-    const mn=Math.min(...t,0),mx=Math.max(...t,1),w=600,ht=150;
-    const pts=rows.filter(r=>r.temp!=null).map((r,i,a)=>`${i/(a.length-1||1)*w},${ht-(r.temp-mn)/(mx-mn||1)*ht}`).join(' ');
-    const zero=ht-(0-mn)/(mx-mn||1)*ht;
-    h+=`<div class="c"><h2>${name}</h2><div class="n">${last.temp!=null?last.temp.toFixed(1).replace('.',','):'–'} °C</div>
-    <div class="s">Fuktighet ${last.hum??'–'} % · batteri ${last.battery??'–'} % · ${new Date(last.ts).toLocaleString('nb-NO')}</div>
-    <svg viewBox="0 0 ${w} ${ht}" role="img" aria-label="Temperatur siste 14 dager"><line x1="0" x2="${w}" y1="${zero}" y2="${zero}" stroke="#555" stroke-dasharray="4"/>
-    <polyline fill="none" stroke="#7eaddb" stroke-width="2" points="${pts}"/></svg></div>`;
-  }
-  document.getElementById('app').innerHTML=h||'Ingen data ennå';
-});
-</script></html>
+const FROST=0, WARN_NEAR=3, LOW_BATT=30, STALE_MIN=60;
+const PAL=['#7eaddb','#e08363','#93a877','#d8a747','#a97a9b','#b98e5a','#c9c2b3','#8d9aa3'];
+const nf=(v,d=1)=>v==null?'–':v.toLocaleString('nb-NO',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmt=d=>d.toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+let ALL=[],hours=168;
+const SERIES=()=>{const by={};ALL.forEach(r=>{(by[r.name]=by[r.name]||[]).push({t:new Date(r.ts),temp:r.temp,hum:r.hum,batt:r.battery,site:r.site})});
+ return Object.entries(by).map(([name,rows],i)=>({name,color:PAL[i%PAL.length],rows}))};
+function cards(){
+ const el=document.getElementById('cards');const S=SERIES();if(!S.length){el.textContent='Ingen data ennå';return}
+ el.innerHTML=S.map(s=>{const last=s.rows[s.rows.length-1];
+  const since=Date.now()-86400000,day=s.rows.filter(r=>r.t>since&&r.temp!=null).map(r=>r.temp);
+  const mn=day.length?Math.min(...day):null,mx=day.length?Math.max(...day):null;
+  let cls='ok',txt='✓ Over frost';
+  if(last.temp!=null&&last.temp<=FROST){cls='bad';txt='⚠ Frost'}else if(last.temp!=null&&last.temp<=WARN_NEAR){cls='warn';txt='▲ Nær frost'}
+  const age=(Date.now()-last.t)/60000,stale=age>STALE_MIN;
+  const bt=last.batt!=null&&last.batt<LOW_BATT?` · <span class="warn">⚠ lavt batteri</span>`:'';
+  return `<div class="c"><h2><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};margin-right:6px"></i>${s.name}</h2>
+  <div class="big">${nf(last.temp)} °C</div><span class="badge ${cls}">${txt}</span>
+  <div class="s" style="margin-top:8px">Fuktighet ${nf(last.hum,0)} % · siste døgn ${nf(mn)} til ${nf(mx)} °C</div>
+  <div class="s">Batteri ${nf(last.batt,0)} %${bt}</div>
+  <div class="s ${stale?'warn':''}">${stale?'⚠ Ingen ny måling siden ':'Oppdatert '}${fmt(last.t)}</div></div>`}).join('');
+}
+function chart(id,legId,tbId,key,unit,refLine,pad){
+ const S=SERIES(),host=document.getElementById(id),since=Date.now()-hours*3600000;
+ const sets=S.map(s=>({name:s.name,color:s.color,pts:s.rows.filter(r=>r.t>since&&r[key]!=null).map(r=>({t:r.t.getTime(),v:r[key]}))}));
+ document.getElementById(legId).innerHTML=sets.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');
+ const all=sets.flatMap(s=>s.pts);
+ if(!all.length){host.innerHTML='<div class="s">Ingen målinger i perioden</div>';return}
+ const W=host.clientWidth||600,H=240,m={l:40,r:10,t:10,b:24};
+ let t0=Math.min(...all.map(p=>p.t)),t1=Math.max(...all.map(p=>p.t));if(t1===t0)t1=t0+1;
+ let lo=Math.min(...all.map(p=>p.v),...(refLine!=null?[refLine]:[])),hi=Math.max(...all.map(p=>p.v),...(refLine!=null?[refLine]:[]));
+ lo-=pad;hi+=pad;if(hi===lo)hi=lo+1;
+ const X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b);
+ let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,key==='hum'?0:1)}</text>`}
+ for(let i=0;i<=3;i++){const t=t0+(t1-t0)*i/3;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==3?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</text>`}
+ if(refLine!=null)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(refLine)}" y2="${Y(refLine)}" stroke="#e08363" stroke-dasharray="4 4"/><text x="${W-m.r}" y="${Y(refLine)-4}" text-anchor="end" fill="#e08363" font-size="11">Frost ${refLine} °C</text>`;
+ const lines=sets.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" points="${s.pts.map(p=>X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}"/>`+(s.pts.length===1?`<circle cx="${X(s.pts[0].t)}" cy="${Y(s.pts[0].v)}" r="4" fill="${s.color}"/>`:'')).join('');
+ host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${key==='hum'?'Luftfuktighet':'Temperatur'} over tid">${g}${lines}<line id="${id}-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="${id}-tip"></div>`;
+ const svg=host.querySelector('svg'),xl=document.getElementById(id+'-x'),tip=document.getElementById(id+'-tip');
+ const move=e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*W,t=t0+(px-m.l)/(W-m.l-m.r)*(t1-t0);
+  const rows=sets.map(s=>{if(!s.pts.length)return null;let b=s.pts[0];s.pts.forEach(p=>{if(Math.abs(p.t-t)<Math.abs(b.t-t))b=p});return{s,b}}).filter(Boolean);
+  if(!rows.length)return;const ref=rows[0].b.t;xl.setAttribute('x1',X(ref));xl.setAttribute('x2',X(ref));xl.style.display='';
+  tip.innerHTML=`<div class="s">${fmt(new Date(ref))}</div>`+rows.map(o=>`<div><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${o.s.color};margin-right:6px"></i>${o.s.name}: ${nf(o.b.v,key==='hum'?0:1)} ${unit}</div>`).join('');
+  tip.style.display='block';const left=Math.min(Math.max(X(ref)/W*r.width+10,0),r.width-tip.offsetWidth);tip.style.left=left+'px';tip.style.top='8px'};
+ svg.addEventListener('pointermove',move);svg.addEventListener('pointerleave',()=>{xl.style.display='none';tip.style.display='none'});
+ const rows=sets.flatMap(s=>s.pts.slice(-30).reverse().map(p=>({n:s.name,t:p.t,v:p.v}))).sort((a,b)=>b.t-a.t).slice(0,40);
+ document.getElementById(tbId).innerHTML='<table><tr><th>Tidspunkt</th><th>Enhet</th><th>Verdi</th></tr>'+rows.map(r=>`<tr><td>${fmt(new Date(r.t))}</td><td>${r.n}</td><td>${nf(r.v,key==='hum'?0:1)} ${unit}</td></tr>`).join('')+'</table>';
+}
+function render(){cards();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
+document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
+addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
+fetch('data.json').then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
+</script>
+</html>
