@@ -130,20 +130,19 @@ function power(){
  sec.hidden=false;body.innerHTML='';
  PW.homes.forEach((hm,i)=>{
   if(!hm.hourly||!hm.hourly.length)return;
+  const RATE=1.1; /* kr/kWh, anslag: Norgespris + nett + avgifter */
   const H=hm.hourly.map(r=>({t:new Date(r.from),kwh:r.kwh,cost:r.cost}));
   const tmax=Math.max(...H.map(r=>r.t.getTime()))+3600000,sum=(a,b,k='kwh')=>H.filter(r=>r.t.getTime()>tmax-b*3600000&&r.t.getTime()<=tmax-a*3600000).reduce((x,r)=>x+(r[k]||0),0);
   const k24=sum(0,24),k7=sum(0,168),p7=sum(168,336),c24=sum(0,24,'cost'),ch=p7?Math.round((k7-p7)/p7*100):null;
   const now=Date.now(),cur=(hm.prices||[]).find(p=>{const t=new Date(p.from).getTime();return t<=now&&now<t+3600000});
   const tile=(l,v,u)=>`<div class="c" style="margin:0;background:#1f2321"><div class="s">${l}</div><div class="n" style="font-size:26px">${v==null?'–':v}${v==null?'':' '+u}</div></div>`;
   const d=document.createElement('div');d.style.marginTop='14px';
-  d.innerHTML=`<h2>${hm.name}</h2><div class="cards" style="margin-bottom:8px">`+tile('Siste 24 timer',nf(k24,1),'kWh')+tile('Siste 7 dager',nf(k7,1),'kWh')+tile('Mot forrige 7 dager',ch==null?null:(ch>0?'+':'')+ch,'%')+tile('Pris nå',cur?nf(cur.total,2):null,'kr/kWh')+tile('Kostnad siste 24 t',c24?nf(c24,0):null,'kr')+`</div>
+  d.innerHTML=`<h2>${hm.name}</h2><div class="cards" style="margin-bottom:8px">`+tile('Siste 24 timer',nf(k24,1),'kWh')+tile('Siste 7 dager',nf(k7,1),'kWh')+tile('Mot forrige 7 dager',ch==null?null:(ch>0?'+':'')+ch,'%')+tile('Snitt per døgn (7 d)',nf(k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(k24*RATE,0),'kr')+`</div>
   <h2 style="font-size:14px;color:var(--mut)">Forbruk per døgn (kWh)</h2><div class="chart" id="cd-${i}"></div>
-  <h2 style="font-size:14px;color:var(--mut);margin-top:14px">Pris per time (kr/kWh)</h2><div class="chart" id="cp-${i}"></div>`;
+`;
   body.appendChild(d);
   const day={};H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
   bars('cd-'+i,Object.entries(day).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb','#7eaddb');
-  const pr=(hm.prices||[]).filter(p=>new Date(p.from).getTime()>now-6*3600000);
-  bars('cp-'+i,pr.map(p=>({v:p.total,lab:new Date(p.from).toLocaleTimeString('nb-NO',{hour:'2-digit'}),tip:fmt(new Date(p.from)),hi:cur&&p.from===cur.from})),'kr/kWh',2,'#8d9aa3','#d8a747');
  });
 }
 function render(){lede();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
