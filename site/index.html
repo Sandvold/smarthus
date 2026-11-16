@@ -107,7 +107,7 @@ function hp(){
  const tile=(l,v,u)=>`<div class="c" style="margin:0;background:#1f2321"><div class="s">${l}</div><div class="n" style="font-size:26px">${v==null?'–':nf(v,0)}${v==null?'':' '+u}</div></div>`;
  document.getElementById('hp-cards').innerHTML=
   `<div class="c" style="margin:0;background:#1f2321"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
-  +tile('Innstilt temp',p.temp_set,'°C')+tile('Retur (inn)',p.temp_bottom,'°C')+tile('Ut',p.temp_top,'°C')+tile('Ute',p.around_temp,'°C')+tile('Effekt',p.cur_power,'W')+tile('Total energi',p.electric_total,'');
+  +tile('Innstilt temp',p.temp_set,'°C')+tile('Retur (inn)',p.temp_bottom,'°C')+tile('Ut',p.temp_top,'°C')+tile('Ute',p.around_temp,'°C')+tile('Kompressorstrøm (fase 1/2/3)',p.cur_current,'')+tile('Fase 2',p.b_cur,'')+tile('Fase 3',p.c_cur,'')+tile('Spenning (fase 1)',p.voltage_current,'')+tile('Effekt (fra enheten)',p.cur_power,'W')+tile('Total energi',p.electric_total,'');
  const sets=HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>since&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length);
  drawLine('ch-hp','leg-hp','tb-hp',sets,'t','°C',null,2);
  drawLine('ch-pw','leg-pw','tb-pw',[{name:'Effekt (cur_power)',color:'#d8a747',pts:rows.filter(r=>r.t>since&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5);

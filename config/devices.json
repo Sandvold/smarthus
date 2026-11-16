@@ -1,6 +1,42 @@
 [
-  {"id": "bffb84c5a15afd934aymau", "name": "Termostat drivhuset", "site": "ukjent", "temp_scale": 10},
-  {"id": "bfd14e6aab2c5f419al41c", "name": "Varmepumpe Arendal", "site": "Arendal", "kind": "heatpump",
-   "props": ["switch","mode","work_mode","temp_set","temp_top","temp_bottom","venting_temp","effluent_temp","around_temp","coiler_temp","temp_current",
-             "compressor_state","compressor_strength","defrost_state","fault","cur_power","electric_total","cur_current","voltage_current","power_consumption"]}
+ {
+  "id": "bffb84c5a15afd934aymau",
+  "name": "Termostat drivhuset",
+  "site": "ukjent",
+  "temp_scale": 10
+ },
+ {
+  "id": "bfd14e6aab2c5f419al41c",
+  "name": "Varmepumpe Arendal",
+  "site": "Arendal",
+  "kind": "heatpump",
+  "props": [
+   "switch",
+   "mode",
+   "work_mode",
+   "temp_set",
+   "temp_top",
+   "temp_bottom",
+   "venting_temp",
+   "effluent_temp",
+   "around_temp",
+   "coiler_temp",
+   "temp_current",
+   "compressor_state",
+   "compressor_strength",
+   "defrost_state",
+   "fault",
+   "cur_power",
+   "electric_total",
+   "cur_current",
+   "voltage_current",
+   "power_consumption",
+   "b_cur",
+   "c_cur",
+   "bv",
+   "cv",
+   "eviin",
+   "eviout"
+  ]
+ }
 ]
