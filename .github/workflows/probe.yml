@@ -1,0 +1,24 @@
+name: Undersøk Tuya-enhet
+on:
+  workflow_dispatch:
+    inputs:
+      device_id:
+        description: Tuya enhets-ID
+        required: true
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests "psycopg[binary]"
+      - run: python scripts/probe.py "$DEVICE_ID"
+        env:
+          DEVICE_ID: ${{ inputs.device_id }}
+          TUYA_ACCESS_ID: ${{ secrets.TUYA_ACCESS_ID }}
+          TUYA_ACCESS_SECRET: ${{ secrets.TUYA_ACCESS_SECRET }}
+          TUYA_HOST: ${{ vars.TUYA_HOST }}
