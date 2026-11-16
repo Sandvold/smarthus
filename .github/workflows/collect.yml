@@ -29,6 +29,10 @@ jobs:
           TUYA_ACCESS_SECRET: ${{ secrets.TUYA_ACCESS_SECRET }}
           TUYA_HOST: ${{ vars.TUYA_HOST }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_tibber.py
+        env:
+          TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
