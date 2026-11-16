@@ -34,6 +34,7 @@ details{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:col
 <h2 style="font-size:14px;color:var(--mut)">Temperaturer</h2><div class="legend" id="leg-hp"></div><div class="chart" id="ch-hp"></div><details><summary>Tabell</summary><div id="tb-hp"></div></details>
 <h2 style="font-size:14px;color:var(--mut);margin-top:14px">Strøm</h2><div class="legend" id="leg-pw"></div><div class="chart" id="ch-pw"></div><details><summary>Tabell</summary><div id="tb-pw"></div></details>
 <details><summary>Alle verdier fra enheten</summary><div id="hp-all"></div></details></section>
+<section class="c" id="sh" hidden style="margin-top:16px"><h2>Stikk i drivhus (Shelly)</h2><div id="sh-body"></div></section>
 <section class="c" id="pw" hidden style="margin-top:16px"><h2>Strøm (Tibber)</h2><div id="pw-body"></div></section>
 <details class="s" style="margin-top:16px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Temperaturen fra sensoren leses i tiendedels grader. Døgn regnes de siste 24 timene fra siste måling. Siden oppdateres omtrent hvert 15. minutt.</p></details>
 <script>
@@ -114,7 +115,20 @@ function hp(){
  drawLine('ch-pw','leg-pw','tb-pw',[{name:'Effekt (cur_power)',color:'#d8a747',pts:rows.filter(r=>r.t>since&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5);
  document.getElementById('hp-all').innerHTML='<table>'+Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')+'</table>';
 }
-let PW=null;
+let PW=null,SH=null;
+function shelly(){
+ const sec=document.getElementById('sh'),body=document.getElementById('sh-body');
+ if(!SH||!SH.channels||!SH.channels.length){sec.hidden=true;return}
+ sec.hidden=false;body.innerHTML='';
+ const cut=Date.now()-86400000,box=document.createElement('div');box.className='cards';
+ SH.channels.forEach(c=>{
+  const r=c.rows,last=r[r.length-1],r24=r.filter(x=>new Date(x.t).getTime()>=cut),first=r24[0]||last;
+  const kwh=(last.wh!=null&&first.wh!=null)?Math.max(0,(last.wh-first.wh)/1000):null;
+  const on=r24.filter(x=>x.on).length,share=r24.length?Math.round(on/r24.length*100):null;
+  const d=document.createElement('div');d.className='c';d.style.cssText='margin:0;background:#1f2321';
+  d.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:26px">${last.on?'På':'Av'}${last.w!=null?' · '+nf(last.w,0)+' W':''}</div><div class="s">24 t: ${kwh==null?'–':nf(kwh,2)+' kWh'}${share==null?'':' · på '+share+' % av tiden'}</div>`;
+  box.appendChild(d)});
+ body.appendChild(box)}
 function bars(id,items,unit,dec,color,hi){
  const host=document.getElementById(id);if(!items.length){host.innerHTML='<div class="s">Ingen data</div>';return}
  const W=host.clientWidth||600,H=220,m={l:40,r:6,t:8,b:24},mx=Math.max(...items.map(i=>i.v),0.001)*1.1,bw=(W-m.l-m.r)/items.length;
@@ -145,9 +159,9 @@ function power(){
   bars('cd-'+i,Object.entries(day).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb','#7eaddb');
  });
 }
-function render(){lede();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
+function render(){lede();shelly();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
-fetch('power.json').then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PW=p;return fetch('data.json')}).then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
+fetch('shelly.json').then(r=>r.ok?r.json():null).catch(()=>null).then(x=>{SH=x;return fetch('power.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PW=p;return fetch('data.json')}).then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
 </script>
 </html>

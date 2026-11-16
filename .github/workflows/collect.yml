@@ -33,6 +33,11 @@ jobs:
         env:
           TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_shelly.py
+        env:
+          SHELLY_SERVER: ${{ secrets.SHELLY_SERVER }}
+          SHELLY_AUTH_KEY: ${{ secrets.SHELLY_AUTH_KEY }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
