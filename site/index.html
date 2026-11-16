@@ -152,11 +152,11 @@ function power(){
   const tile=(l,v,u)=>`<div class="c" style="margin:0;background:#1f2321"><div class="s">${l}</div><div class="n" style="font-size:26px">${v==null?'–':v}${v==null?'':' '+u}</div></div>`;
   const d=document.createElement('div');d.style.marginTop='14px';
   d.innerHTML=`<h2>${hm.name}</h2><div class="cards" style="margin-bottom:8px">`+tile('Siste 24 timer',nf(k24,1),'kWh')+tile('Siste 7 dager',nf(k7,1),'kWh')+tile('Mot forrige 7 dager',ch==null?null:(ch>0?'+':'')+ch,'%')+tile('Snitt per døgn (7 d)',nf(k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(k24*RATE,0),'kr')+`</div>
-  <h2 style="font-size:14px;color:var(--mut)">Forbruk per døgn (kWh)</h2><div class="chart" id="cd-${i}"></div>
+  <h2 style="font-size:14px;color:var(--mut)">Forbruk per døgn, siste 30 dager (kWh)</h2><div class="chart" id="cd-${i}"></div>
 `;
   body.appendChild(d);
   const day={};H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
-  bars('cd-'+i,Object.entries(day).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb','#7eaddb');
+  bars('cd-'+i,Object.entries(day).slice(-30).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb','#7eaddb');
  });
 }
 function render(){lede();shelly();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}

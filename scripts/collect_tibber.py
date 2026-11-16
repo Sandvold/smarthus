@@ -15,7 +15,7 @@ def home_cfg(hid, i):
             return c
     return {"name": f"Hjem {i}", "site": f"hjem{i}"}
 Q = """{ viewer { homes { id appNickname features { realTimeConsumptionEnabled }
-  consumption(resolution: HOURLY, last: 72) { nodes { from to consumption cost unitPrice } }
+  consumption(resolution: HOURLY, last: 2000) { nodes { from to consumption cost unitPrice } }
   currentSubscription { priceInfo { current { total startsAt } today { total startsAt } tomorrow { total startsAt } } } } } }"""
 
 r = requests.post("https://api.tibber.com/v1-beta/gql", json={"query": Q},
@@ -50,7 +50,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
                     on conflict (home_id, starts_at) do update set total=excluded.total""",
                     (h["id"], p["startsAt"], p["total"]))
         hourly = con.execute("""select ts_from, kwh, cost from power_hourly where home_id=%s
-            and ts_from > now() - interval '14 days' order by ts_from""", (h["id"],)).fetchall()
+            and ts_from > now() - interval '120 days' order by ts_from""", (h["id"],)).fetchall()
         prices = con.execute("""select starts_at, total from price_hourly where home_id=%s
             and starts_at > now() - interval '2 days' order by starts_at""", (h["id"],)).fetchall()
         out.append({"name": c["name"], "site": c["site"],
