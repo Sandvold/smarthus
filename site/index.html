@@ -97,7 +97,7 @@ function lede(){
  const who=info.length>1?'Det kaldeste stedet, <b>'+c.name+'</b>,':'<b>'+c.name+'</b>';
  el.innerHTML=`${who} er nå <b>${nf(c.temp)}</b> °C og var nede i <b>${nf(c.min)}</b> °C det siste døgnet. ${frost?'Minst ett sted hadde frost.':'Ingen steder hadde frost.'}`;
 }
-const HPT=[['temp_set','Innstilt (temp_set)','#e08363'],['temp_bottom','temp_bottom','#7eaddb'],['temp_top','temp_top','#93a877'],['venting_temp','venting_temp','#d8a747'],['effluent_temp','effluent_temp','#a97a9b'],['around_temp','Ute (around_temp)','#8d9aa3']];
+const HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877'],['around_temp','Ute','#8d9aa3']];
 function hp(){
  const sec=document.getElementById('hp'),rows=ALL.filter(r=>r.kind==='heatpump').map(r=>({t:new Date(r.ts).getTime(),p:r.props||{},name:r.name}));
  if(!rows.length){sec.hidden=true;return}
@@ -107,7 +107,7 @@ function hp(){
  const tile=(l,v,u)=>`<div class="c" style="margin:0;background:#1f2321"><div class="s">${l}</div><div class="n" style="font-size:26px">${v==null?'–':nf(v,0)}${v==null?'':' '+u}</div></div>`;
  document.getElementById('hp-cards').innerHTML=
   `<div class="c" style="margin:0;background:#1f2321"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
-  +tile('Innstilt temp',p.temp_set,'°C')+tile('temp_bottom',p.temp_bottom,'°C')+tile('temp_top',p.temp_top,'°C')+tile('venting_temp',p.venting_temp,'°C')+tile('Ute',p.around_temp,'°C')+tile('Effekt',p.cur_power,'W')+tile('Total energi (electric_total)',p.electric_total,'');
+  +tile('Innstilt temp',p.temp_set,'°C')+tile('Retur (inn)',p.temp_bottom,'°C')+tile('Ut',p.temp_top,'°C')+tile('Ute',p.around_temp,'°C')+tile('Effekt',p.cur_power,'W')+tile('Total energi',p.electric_total,'');
  const sets=HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>since&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length);
  drawLine('ch-hp','leg-hp','tb-hp',sets,'t','°C',null,2);
  drawLine('ch-pw','leg-pw','tb-pw',[{name:'Effekt (cur_power)',color:'#d8a747',pts:rows.filter(r=>r.t>since&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5);
