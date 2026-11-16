@@ -42,3 +42,18 @@ elif cmd == "devices":
     for d in (r.get("result") or {}).get("data", []):
         print(d.get("did"), "|", d.get("deviceName"), "|", d.get("model"), "|", "online" if d.get("state") == 1 else "offline", "| pos:", d.get("positionId"))
     if r.get("code") != 0: show(r)
+
+if cmd == "diag":
+    import itertools
+    for region, kid in itertools.product(["open-sg", "open-ger", "open-usa", "open-kr", "open-ru", "open-cn"], [KEY_ID, KEY_ID.removeprefix("K.")]):
+        URL = f"https://{region}.aqara.com/v3.0/open/api"
+        KEY_ID_USED = kid
+        h = {"Appid": APP_ID, "Keyid": kid, "Nonce": uuid.uuid4().hex, "Time": str(int(time.time() * 1000))}
+        s = "&".join(f"{k}={h[k]}" for k in sorted(h)) + "&" + APP_KEY
+        h["Sign"] = hashlib.md5(s.lower().encode()).hexdigest(); h["Content-Type"] = "application/json"
+        try:
+            r = requests.post(URL, headers=h, json={"intent": "config.auth.getAuthCode", "data": {"account": ACCOUNT, "accountType": 0, "accessTokenValidity": "7d"}}, timeout=20).json()
+        except Exception as e:
+            r = {"err": str(e)[:80]}
+        print(region, "keyid-prefix" if kid == KEY_ID else "keyid-uten-K.", r.get("code"), r.get("messageDetail") or r.get("message") or r.get("err"))
+    print("lengder: appid", len(APP_ID), "keyid", len(KEY_ID), "appkey", len(APP_KEY), "keyid starter K.:", KEY_ID.startswith("K."))
