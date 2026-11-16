@@ -47,6 +47,8 @@ jobs:
         env:
           GARDENA_CLIENT_ID: ${{ secrets.GARDENA_CLIENT_ID }}
           GARDENA_CLIENT_SECRET: ${{ secrets.GARDENA_CLIENT_SECRET }}
+          GARDENA_CLIENT_ID_2: ${{ secrets.GARDENA_CLIENT_ID_2 }}
+          GARDENA_CLIENT_SECRET_2: ${{ secrets.GARDENA_CLIENT_SECRET_2 }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
