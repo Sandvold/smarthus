@@ -1,0 +1,16 @@
+name: Undersøk Gardena
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install requests
+      - run: python scripts/probe_gardena.py
+        env:
+          GARDENA_CLIENT_ID: ${{ secrets.GARDENA_CLIENT_ID }}
+          GARDENA_CLIENT_SECRET: ${{ secrets.GARDENA_CLIENT_SECRET }}
