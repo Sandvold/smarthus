@@ -1,5 +1,5 @@
 """Henter gatewayer og enheter fra Salus Open API (kun lesing) og skriver site/salus.json. Skriver også en kort oversikt over feltene i loggen."""
-import json, os, sys
+import json, os, sys, datetime
 import requests
 
 E, P = (os.environ.get("SALUS_EMAIL") or "").strip(), (os.environ.get("SALUS_PASSWORD") or "").strip()
@@ -42,7 +42,16 @@ try:
             st = get(f"/premium-lite/status/{dc}").json()
             if first:
                 print("enhet-form:", json.dumps(shape(det))); print("status-form:", json.dumps(shape(st))); first = False
-            gout["devices"].append({"code": dc, "details": det, "status": st})
+            t1 = datetime.datetime.utcnow() + datetime.timedelta(days=1); t0 = t1 - datetime.timedelta(days=8)
+            hist = {}
+            try:
+                hr = get(f"/premium-lite/history/{dc}?start_date={t0:%Y-%m-%d}&end_date={t1:%Y-%m-%d}&order=desc&limit=1000").json()
+                for k, v in (hr.get("properties") or {}).items():
+                    hist[k] = [[x.get("at"), x.get("value")] for x in (v.get("records") or [])]
+            except Exception as e:
+                hist = {"_feil": type(e).__name__}
+            print("enhet:", det.get("name"), "|", det.get("model"), "| tilkoblet", det.get("connected"), "| zonestates:", str(det.get("zonestates"))[:160], "| historikk:", {k: len(v) for k, v in hist.items()} if isinstance(hist, dict) else hist)
+            gout["devices"].append({"code": dc, "details": det, "status": st, "history": hist})
         OUT["gateways"].append(gout)
     print("Salus: gatewayer", len(OUT["gateways"]), "enheter", sum(len(x["devices"]) for x in OUT["gateways"]))
 except Exception as e:
