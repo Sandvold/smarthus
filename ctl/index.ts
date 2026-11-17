@@ -80,7 +80,7 @@ export async function plugStates(c?: Cfg) {
 }
 async function setPlug(did: string, on: boolean) {
   const c = await loadCfg();
-  const r = await call(c, 'write.resource.device', { resources: [{ subjectId: did, resourceId: '4.1.85', value: on ? '1' : '0' }] });
+  const r = await call(c, 'write.resource.device', [{ subjectId: did, resources: [{ resourceId: '4.1.85', value: on ? '1' : '0' }] }]);
   return { code: r.code, message: r.messageDetail || r.message || null };
 }
 
