@@ -544,8 +544,12 @@ function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J
  try{AUTHC=(await import('https://esm.sh/@neon/auth@0.8.2')).createAuthClient(AUTH_URL)}catch(e){loginScreen('Kunne ikke laste innloggingen. Prøv igjen senere.');return}
  let s=null;try{s=await AUTHC.getSession()}catch(e){}
  if(!(s&&s.data&&s.data.session)){loginScreen();return}
- let tok=null;try{tok=await AUTHC.getJWTToken()}catch(e){}
- if(!tok){loginScreen('Fikk ikke token. Logg inn på nytt.',true);return}
+ const dbg=[];const isJ=t=>typeof t==='string'&&t.split('.').length===3;
+ let tok=s.data.session.token;dbg.push('sesjon:'+(tok?(isJ(tok)?'jwt':'ugyldig-form'):'ingen'));
+ if(!isJ(tok)){tok=null;try{const t=await AUTHC.token?.();tok=t&&t.data&&t.data.token;dbg.push('token():'+(isJ(tok)?'ok':'tom'))}catch(e){dbg.push('token():feil')}}
+ if(!isJ(tok)){tok=null;try{const t=await AUTHC.getJWTToken();tok=t;dbg.push('getJWT:'+(isJ(tok)?'ok':'tom'))}catch(e){dbg.push('getJWT:feil')}}
+ if(!isJ(tok)){tok=null;try{const r0=await fetch(AUTH_URL+'/token',{credentials:'include'});dbg.push('/token:'+r0.status);if(r0.ok){const j0=await r0.json();tok=j0.token||null}const h=r0.headers.get('set-auth-jwt');if(!tok&&h)tok=h}catch(e){dbg.push('/token:feil')}}
+ if(!isJ(tok)){loginScreen('Fikk ikke token ('+dbg.join(', ')+'). Logg ut og inn på nytt.',true);return}
  let r;try{r=await fetch(FN_URL,{headers:{authorization:'Bearer '+tok}})}catch(e){m.textContent='Kunne ikke nå datatjenesten';return}
  if(r.status===403){loginScreen('Denne kontoen har ikke tilgang.',true);return}
  if(!r.ok){m.textContent='Kunne ikke laste data ('+r.status+')';return}
