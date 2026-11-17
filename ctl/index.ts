@@ -68,13 +68,16 @@ async function call(c: Cfg, intent: string, data: unknown): Promise<any> {
   }
   return r;
 }
-export async function plugStates(c?: Cfg) {
+export async function plugStates(c?: Cfg, only?: string | null) {
   c = c || await loadCfg();
-  const out: Record<string, { name: string; on: boolean | null; code: number }> = {};
+  const out: Record<string, { name: string; on: boolean | null; power: number | null; code: number }> = {};
   for (const [did, name] of Object.entries(PLUGS)) {
-    const r = await call(c, 'query.resource.value', { resources: [{ subjectId: did, resourceIds: ['4.1.85'] }] });
-    const v = (r.result || []).find((x: any) => x.resourceId === '4.1.85')?.value;
-    out[did] = { name, on: v == null || v === '' ? null : v === '1', code: r.code };
+    if (only && did !== only) continue;
+    const r = await call(c, 'query.resource.value', { resources: [{ subjectId: did, resourceIds: ['4.1.85', '0.12.85'] }] });
+    const rs = r.result || [];
+    const v = rs.find((x: any) => x.resourceId === '4.1.85')?.value;
+    const w = rs.find((x: any) => x.resourceId === '0.12.85')?.value;
+    out[did] = { name, on: v == null || v === '' ? null : v === '1', power: w == null || w === '' || isNaN(Number(w)) ? null : Number(w), code: r.code };
   }
   return out;
 }
@@ -106,7 +109,7 @@ export default {
     if (!email && payload.sub) email = (await sql('select email from neon_auth."user" where id = $1', [payload.sub]))[0]?.email?.toLowerCase() ?? null;
     if (!email || !allowed.includes(email)) return json(req, { error: 'forbidden' }, 403);
     try {
-      if (req.method === 'GET') return json(req, { plugs: await plugStates() });
+      if (req.method === 'GET') return json(req, { plugs: await plugStates(undefined, new URL(req.url).searchParams.get('did')) });
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
       if (typeof b.did !== 'string' || !(b.did in PLUGS) || typeof b.on !== 'boolean') return json(req, { error: 'ugyldig enhet eller verdi' }, 400);
       await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
