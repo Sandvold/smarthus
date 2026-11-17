@@ -573,11 +573,10 @@ async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Sl�
  if(on){const my=lv&&(lv._run=(lv._run||0)+1);for(let i=0;i<24&&lv&&lv._run===my&&document.body.contains(lv);i++){await new Promise(z=>setTimeout(z,5000));if(lv._run!==my)break;const s2=await one();if(!s2||s2.on===false){show(s2);break}show(s2)}}
  else if(lv){lv._run=(lv._run||0)+1}}
 async function lockTerrasse(b,unlock){const tc=(HM&&HM.devices||[]).find(x=>x.name==='Terrasedør'),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
- let conf=null;
- if(unlock){conf=prompt('Låse OPP terrassedøren?\n\nSkriv LÅS OPP (store bokstaver) for å bekrefte.');if(conf!=='LÅS OPP'){if(conf!==null)alert('Avbrutt: teksten stemte ikke.');return}}
+ if(unlock){if(!confirm('Låse OPP terrassedøren?'))return}
  else if(!confirm('Låse terrassedøren?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
  const msg=document.querySelector('[data-pm="terrasse"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
- const t0=Date.now()-2000,want=!unlock;const r=await ctlCall('POST',unlock?{lock:'terrasse',unlock:true,confirm:conf}:{lock:'terrasse'});
+ const t0=Date.now()-2000,want=!unlock;const r=await ctlCall('POST',unlock?{lock:'terrasse',unlock:true}:{lock:'terrasse'});
  if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);bs.forEach(x=>x.disabled=false);return}
  msg.textContent='Sendt til Homey. Venter på statusrapport …';
  for(let i=0;i<10;i++){await new Promise(z=>setTimeout(z,3000));const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs.terrasse;

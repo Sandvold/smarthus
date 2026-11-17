@@ -160,8 +160,6 @@ export default {
       }
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
       if (b.lock === 'terrasse') {
-        // Opplåsing krever eksplisitt bekreftelsestekst i tillegg til innloggingen.
-        if (b.unlock === true && b.confirm !== 'LÅS OPP') return json(req, { error: 'mangler bekreftelse' }, 400);
         const [body, st] = await lockTerrasse(email, b.unlock === true); return json(req, body, st);
       }
       if (typeof b.did !== 'string' || !(b.did in PLUGS) || typeof b.on !== 'boolean') return json(req, { error: 'ugyldig enhet eller verdi' }, 400);
