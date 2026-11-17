@@ -3,8 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 // Bare disse tre pluggene kan styres.
 export const PLUGS: Record<string, string> = {
   'lumi.54ef441000760552': 'Lys drivhus',
-  'lumi.54ef441000a0c5c6': 'Varme drivhus',
-  'lumi.54ef441000efb484': 'Ventilasjon drivhus',
+  'lumi.54ef441000a0c5c6': 'Ventilasjon drivhus',
+  'lumi.54ef441000efb484': 'Varme drivhus',
 };
 const allowed = (process.env.ALLOWED_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
 const origins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);

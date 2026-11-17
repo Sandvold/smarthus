@@ -541,7 +541,7 @@ addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(rend
 addEventListener('hashchange',()=>{TAB=(location.hash||'#oversikt').slice(1);render()});
 const AUTH_URL='https://ep-green-sea-bapdvdkk.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth',FN_URL='https://br-shy-hat-ba72i2iy-data.compute.c-8.eu-central-1.aws.neon.tech/';
 const CTL_URL='https://br-shy-hat-ba72i2iy-ctl.compute.c-8.eu-central-1.aws.neon.tech/';
-const PLUGS={'lumi.54ef441000760552':'Lys drivhus','lumi.54ef441000a0c5c6':'Varme drivhus','lumi.54ef441000efb484':'Ventilasjon drivhus'};
+const PLUGS={'lumi.54ef441000760552':'Lys drivhus','lumi.54ef441000a0c5c6':'Ventilasjon drivhus','lumi.54ef441000efb484':'Varme drivhus'};
 let FILES=null,AUTHC=null;
 async function getTok(){const isJ=t=>typeof t==='string'&&t.split('.').length===3;let t=null;
  try{const s=await AUTHC.getSession();t=s&&s.data&&s.data.session&&s.data.session.token}catch(e){}
