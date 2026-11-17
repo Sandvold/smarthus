@@ -102,8 +102,15 @@ async function lockTerrasse(email: string): Promise<[unknown, number]> {
   if (recent.length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
   let code = 0, msg: string | null = null;
   try {
-    const r = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10000) });
-    code = r.ok ? 0 : r.status; msg = r.ok ? 'Success' : 'HTTP ' + r.status;
+    let r = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10000) });
+    let via = 'webhook.homey.app';
+    const m = url.match(/^https:\/\/webhook\.homey\.app\/([^/]+)\/([^/?]+)/);
+    if (r.status === 404 && m) {
+      // Eldre Homey Pro (2016–2019) bruker connect.athom.com
+      r = await fetch(`https://${m[1]}.connect.athom.com/api/manager/logic/webhook/${m[2]}?tag=web`, { method: 'GET', signal: AbortSignal.timeout(10000) });
+      via = 'connect.athom.com';
+    }
+    code = r.ok ? 0 : r.status; msg = (r.ok ? 'Success' : 'HTTP ' + r.status) + ' via ' + via;
   } catch { code = -1; msg = 'ingen kontakt med Homey'; }
   await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, 'terrasse', 'lås', code, msg]);
   return code === 0 ? [{ ok: true, did: 'terrasse', action: 'lås' }, 200] : [{ error: 'Homey svarte ikke: ' + msg }, 502];
