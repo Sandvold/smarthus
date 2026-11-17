@@ -87,6 +87,7 @@ const SERIES=()=>{const by={};ALL.filter(r=>r.kind!=='heatpump').forEach(r=>{(by
 const sensors=pl=>SERIES().filter(s=>s.pl===pl);
 const hmList=(pl,kind)=>((HM&&HM.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl&&(!kind||c.kind===kind));
 const gdList=pl=>((GD&&GD.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl);
+const axAvg=pl=>axList(pl).filter(c=>!(pl==='oslo'&&/vaskerom/i.test(c.name)));
 const axList=pl=>((AX&&AX.rooms)||[]).filter(c=>placeOf(c.home,c.name)===pl);
 const shList=()=>((SH&&SH.channels)||[]);
 const pwList=pl=>((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length&&placeOf(h.site,h.name)===pl);
@@ -255,7 +256,7 @@ function secVarme(pl){let h='',sub=[],draw=null;
    drawLine('ch-hpt','leg-hpt','tb-hpt',HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>s&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length),'t','°C',null,2);
    drawLine('ch-hpp','leg-hpp','tb-hpp',[{name:'Effekt',color:'#d8a747',pts:rows.filter(r=>r.t>s&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5)}}
  const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join(''))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
- const ax=axList(pl);if(ax.length){const t=ax.map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
+ const ax=axList(pl);if(ax.length){const t=axAvg(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
  const mb=mtBlock(pl,pl);if(mb){sub.push(mb.sub);h+=`<h3>Gulvvarme (Microtemp)</h3>`+mb.html;const d1=draw;draw=()=>{d1&&d1();mb.draw()}}
  if(!h)return null;return sec('varme','Varme',sub.join(' · '),el(h),{draw})}
 function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl,pb=pulseBlock(pl,pl),zb=zaptecBlock(pl,pl);
@@ -324,7 +325,7 @@ function placeCard(pl,A){const L=[];
  sensors(pl).forEach(s=>{const l=s.rows[s.rows.length-1];L.push(`${s.name}: <b>${nf(l.temp)} °C</b>${l.hum!=null?` · ${nf(l.hum,0)} % fukt`:''}`)});
  const dk=hmList(pl,'daikin')[0];if(dk){const d=dk.rows[dk.rows.length-1].d||{};L.push(`Daikin: <b>${nf(d.measure_temperature)} °C</b>, innstilt ${nf(d.target_temperature)}`)}
  if(pl==='arendal'){const r=hpRows();if(r.length){const p=r[r.length-1].p;L.push(`Varmepumpe: <b>${p.switch===true?'på':'av'}</b>${p.compressor_state===true?', kompressor går':''}`)}}
- const ax=axList(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);if(ax.length)L.push(`Adax innetemp snitt: <b>${nf(ax.reduce((a,b)=>a+b,0)/ax.length)} °C</b>`);
+ const ax=axAvg(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);if(ax.length)L.push(`Adax innetemp snitt: <b>${nf(ax.reduce((a,b)=>a+b,0)/ax.length)} °C</b>`);
  ((AQ&&AQ.devices)||[]).filter(d=>placeOf(d.site,d.name)===pl&&d.rows.length&&d.rows[d.rows.length-1].on!=null).forEach(d=>{const l=d.rows[d.rows.length-1];L.push(`${d.name}: <b>${l.on?'på':'av'}</b>${l.on&&l.power!=null?', '+nf(l.power,0)+' W':''}`)});
  if(pl==='drivhus')shList().forEach(c=>{const s=shStats(c);if(/vekstlys|vifte/i.test(c.name))L.push(`${c.name}: <b>${s.last.on?'på':'av'}</b>`)});
  hmList(pl,'lock').forEach(c=>{const d=c.rows[c.rows.length-1].d||{};L.push(`${c.name}: <b>${d.locked===false?'ulåst':'låst'}</b>`)});
