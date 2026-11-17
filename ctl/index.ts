@@ -125,10 +125,10 @@ type Out = [Record<string, unknown>, number];
 const SHELLY_DEV = '98a3167b1668';
 const SHELLY_CH: Record<string, string> = { '0': 'Vekstlys', '1': 'Ventilasjonsvifte', '2': 'Uttak 3', '3': 'Uttak 4' };
 function shellyBase(s: Record<string, string>) { const v = (s.SHELLY_SERVER || '').trim().replace(/\/$/, ''); return v ? (v.startsWith('http') ? v : 'https://' + v) : ''; }
-async function shellyOutput(s: Record<string, string>, ch: string): Promise<boolean | null> {
+async function shellyOutput(s: Record<string, string>, ch: string): Promise<{ on: boolean; power: number | null } | null> {
   const r: any = await (await fetch(shellyBase(s) + '/device/all_status', { method: 'POST', body: form({ auth_key: s.SHELLY_AUTH_KEY }), signal: AbortSignal.timeout(8000) })).json();
-  const o = r?.data?.devices_status?.[SHELLY_DEV]?.['switch:' + ch]?.output;
-  return typeof o === 'boolean' ? o : null;
+  const sw = r?.data?.devices_status?.[SHELLY_DEV]?.['switch:' + ch];
+  return typeof sw?.output === 'boolean' ? { on: sw.output, power: typeof sw.apower === 'number' ? sw.apower : null } : null;
 }
 async function actShelly(b: any): Promise<Out> {
   const ch = String(b.ch);
@@ -142,7 +142,11 @@ async function actShelly(b: any): Promise<Out> {
   }
   await sleep(1500);
   const now = await shellyOutput(s, ch).catch(() => null);
-  return [{ ok: true, name: SHELLY_CH[ch], on: b.on, state: now }, 200];
+  if (now) { try {
+    await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');
+    await sql('insert into plug_state (did, name, on_state, power, ts) values ($1,$2,$3,$4,now()) on conflict (did) do update set name=$2, on_state=$3, power=$4, ts=now()', ['shelly:' + SHELLY_DEV + ':' + ch, SHELLY_CH[ch], now.on, now.power]);
+  } catch {} }
+  return [{ ok: true, name: SHELLY_CH[ch], on: b.on, state: now ? now.on : null, power: now ? now.power : null }, 200];
 }
 
 // Adax: innstilt temperatur 5–30 °C, kun rom som finnes på kontoen.
