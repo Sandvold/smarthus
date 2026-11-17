@@ -327,6 +327,7 @@ function placeCard(pl,A){const L=[];
  if(pl==='arendal'){const r=hpRows();if(r.length){const p=r[r.length-1].p;L.push(`Varmepumpe: <b>${p.switch===true?'på':'av'}</b>${p.compressor_state===true?', kompressor går':''}`)}}
  const ax=axAvg(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);if(ax.length)L.push(`Adax innetemp snitt: <b>${nf(ax.reduce((a,b)=>a+b,0)/ax.length)} °C</b>`);
  ((AQ&&AQ.devices)||[]).filter(d=>placeOf(d.site,d.name)===pl&&d.rows.length&&d.rows[d.rows.length-1].on!=null).forEach(d=>{const l=d.rows[d.rows.length-1];L.push(`${d.name}: <b>${l.on?'på':'av'}</b>${l.on&&l.power!=null?', '+nf(l.power,0)+' W':''}`)});
+ if(pl==='drivhus'){const vs=gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length&&c.rows[c.rows.length-1].link==='ONLINE');if(vs.length){const lim=Date.now()-864e5;const ran=vs.flatMap(c=>c.rows).filter(r=>r.act&&r.act!=='CLOSED'&&new Date(r.t).getTime()>lim);L.push(ran.length?`Vanning kjørt: <b>OK</b>`:`Vanning: <b>ikke kjørt siste døgn</b>`)}}
  if(pl==='drivhus')shList().forEach(c=>{const s=shStats(c);if(/vekstlys|vifte/i.test(c.name))L.push(`${c.name}: <b>${s.last.on?'på':'av'}</b>`)});
  hmList(pl,'lock').forEach(c=>{const d=c.rows[c.rows.length-1].d||{};L.push(`${c.name}: <b>${d.locked===false?'ulåst':'låst'}</b>`)});
  hmList(pl,'mower').forEach(c=>{const d=c.rows[c.rows.length-1].d||{};L.push(`${c.name}: <b>${d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–'}</b>`)});
