@@ -321,18 +321,18 @@ function alerts(all){const A=[];
   g.forEach(c=>{const b=c.rows[c.rows.length-1].batt;if(b!=null&&b<LOW_BATT)A.push({k:'gdbatt:'+c.name,pl,lvl:'warn',txt:`Lavt batteri i ${c.name} (Gardena): ${b} %`})})});
  const hid=ls.get('sh-hid',{});A.forEach(a=>a.hid=!!hid[a.k]);return all?A:A.filter(a=>!a.hid)}
 const worst=(A,pl)=>{const a=A.filter(x=>x.pl===pl&&x.lvl!=='info');return a.some(x=>x.lvl==='bad')?'bad':a.length?'warn':'ok'};
-function placeCard(pl,A){const L=[];
- sensors(pl).forEach(s=>{const l=s.rows[s.rows.length-1];L.push(`${s.name}: <b>${nf(l.temp)} °C</b>${l.hum!=null?` · ${nf(l.hum,0)} % fukt`:''}`)});
+function placeCard(pl,A){const L=[],G={ar:[],os:[]},T=(g,x)=>pl==='drivhus'?G[g].push(x):L.push(x);
+ sensors(pl).forEach(s=>{const l=s.rows[s.rows.length-1];T(/Drivhus Oslo/i.test(s.name)?'os':'ar',`${s.name}: <b>${nf(l.temp)} °C</b>${l.hum!=null?` · ${nf(l.hum,0)} % fukt`:''}`)});
  const dk=hmList(pl,'daikin')[0];if(dk){const d=dk.rows[dk.rows.length-1].d||{};L.push(`Daikin: <b>${nf(d.measure_temperature)} °C</b>, innstilt ${nf(d.target_temperature)}`)}
  if(pl==='arendal'){const r=hpRows();if(r.length){const p=r[r.length-1].p;L.push(`Varmepumpe: <b>${p.switch===true?'på':'av'}</b>${p.compressor_state===true?', kompressor går':''}`)}}
  const ax=axAvg(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);if(ax.length)L.push(`Adax innetemp snitt: <b>${nf(ax.reduce((a,b)=>a+b,0)/ax.length)} °C</b>`);
- ((AQ&&AQ.devices)||[]).filter(d=>placeOf(d.site,d.name)===pl&&d.rows.length&&d.rows[d.rows.length-1].on!=null).forEach(d=>{const l=d.rows[d.rows.length-1];L.push(`${d.name}: <b>${l.on?'på':'av'}</b>${l.on&&l.power!=null?', '+nf(l.power,0)+' W':''}`)});
- if(pl==='drivhus'){const vs=gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length&&c.rows[c.rows.length-1].link==='ONLINE');if(vs.length){const lim=Date.now()-864e5;const ran=vs.flatMap(c=>c.rows).filter(r=>r.act&&r.act!=='CLOSED'&&new Date(r.t).getTime()>lim);L.push(ran.length?`Vanning kjørt: <b>OK</b>`:`Vanning: <b>ikke kjørt siste døgn</b>`)}}
- if(pl==='drivhus')shList().forEach(c=>{const s=shStats(c);if(/vekstlys|vifte/i.test(c.name))L.push(`${c.name}: <b>${s.last.on?'på':'av'}</b>`)});
+ ((AQ&&AQ.devices)||[]).filter(d=>placeOf(d.site,d.name)===pl&&d.rows.length&&d.rows[d.rows.length-1].on!=null).forEach(d=>{const l=d.rows[d.rows.length-1];T('os',`${d.name}: <b>${l.on?'på':'av'}</b>${l.on&&l.power!=null?', '+nf(l.power,0)+' W':''}`)});
+ if(pl==='drivhus'){const vs=gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length&&c.rows[c.rows.length-1].link==='ONLINE');if(vs.length){const lim=Date.now()-864e5;const ran=vs.flatMap(c=>c.rows).filter(r=>r.act&&r.act!=='CLOSED'&&new Date(r.t).getTime()>lim);T('ar',ran.length?`Vanning kjørt: <b>OK</b>`:`Vanning: <b>ikke kjørt siste døgn</b>`)}}
+ if(pl==='drivhus')shList().forEach(c=>{const s=shStats(c);if(/vekstlys|vifte/i.test(c.name))T('ar',`${c.name}: <b>${s.last.on?'på':'av'}</b>`)});
  hmList(pl,'lock').forEach(c=>{const d=c.rows[c.rows.length-1].d||{};L.push(`${c.name}: <b>${d.locked===false?'ulåst':'låst'}</b>`)});
  hmList(pl,'mower').forEach(c=>{const d=c.rows[c.rows.length-1].d||{};L.push(`${c.name}: <b>${d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–'}</b>`)});
  pwList(pl).forEach(h=>L.push(`Strøm 24 t: <b>${nf(pwStats(h).k24,1)} kWh</b>`));
- if(pl==='drivhus')L.push('<span class="s">Innerdrivhus Arendal er ikke koblet ennå</span>');
+ if(pl==='drivhus'){const H=t=>`<div class="s" style="margin-top:8px;text-transform:uppercase;letter-spacing:.04em;font-size:11px">${t}</div>`;L.push(H('Oppvarmet drivhus Arendal'),...G.ar,H('Drivhus Oslo (Aqara)'),...G.os,H('Innerdrivhus Arendal'),'<span class="s">Ikke koblet ennå</span>')}
  const w=worst(A,pl),n=A.filter(x=>x.pl===pl&&x.lvl!=='info').length;
  return `<button class="pc" data-go="${pl}"><h2>${PLACES[pl]}<span class="${w}">${w==='ok'?'● OK':'● '+n+(n===1?' varsel':' varsler')}</span></h2>${L.map(x=>`<div>${x}</div>`).join('')||'<div class="s">Ingen data</div>'}</button>`}
 function lede(){const S=SERIES();if(!S.length)return '';
