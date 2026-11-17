@@ -30,9 +30,14 @@ try:
                      params={"sessionid": r["SessionId"], "APIKEY": K}).json()
     if g.get("ErrorCode") not in (0, None):
         OUT["error"] = f"Henting feilet (ErrorCode {g.get('ErrorCode')})"; done(); print(OUT["error"]); sys.exit(0)
+    gc = g.get("GroupContents") or []
+    OUT["debug"] = {"top": sorted(g.keys()), "groups": len(gc), "group_keys": sorted(gc[0].keys()) if gc and isinstance(gc[0], dict) else None}
+    for k, v in (gc[0].items() if gc and isinstance(gc[0], dict) else []):
+        if isinstance(v, list) and v and isinstance(v[0], dict):
+            OUT["debug"]["list_" + k] = {"n": len(v), "keys": sorted(v[0].keys())}
     found = []
     for grp in g.get("GroupContents") or []:
-        for t in grp.get("Thermostats") or []:
+        for t in (grp.get("Thermostats") or grp.get("Thermostat") or grp.get("Devices") or []):
             c = lambda x: None if x is None else round(float(x) / 100, 1)
             found.append({"serial": str(val(t, "SerialNumber", "Id")), "name": val(t, "ThermostatName", "Name") or grp.get("GroupName"),
                           "room": c(val(t, "RoomTemperature")), "floor": c(val(t, "FloorTemperature")),
