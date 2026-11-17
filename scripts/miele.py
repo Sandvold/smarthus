@@ -23,7 +23,7 @@ cmd = sys.argv[1] if len(sys.argv) > 1 else "collect"
 if cmd == "token":
     import re
     code = sys.argv[2].strip()
-    m = re.search(r"[?&#]code=([^&\s]+)", code)
+    m = re.search(r"(?:^|[?&#])code=([^&\s]+)", code)
     if m: code = m.group(1)
     if "client_id=" in code or code.startswith("http"):
         print("Feltet «code» inneholder en lenke uten code=. Lim inn adressen du havnet på ETTER innlogging."); sys.exit(1)
