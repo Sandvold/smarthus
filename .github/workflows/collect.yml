@@ -101,7 +101,9 @@ jobs:
         continue-on-error: true
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - name: Bare siden publiseres åpent, data ligger bak innlogging
+        run: mkdir public && cp site/index.html public/
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: public
       - uses: actions/deploy-pages@v4
