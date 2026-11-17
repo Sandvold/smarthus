@@ -550,7 +550,11 @@ async function getTok(){const isJ=t=>typeof t==='string'&&t.split('.').length===
 async function ctlCall(method,body,q){const t=await getTok();if(!t)return{ok:false,status:401,j:{error:'ikke innlogget'}};
  try{const r=await fetch(CTL_URL+(q||''),{method,headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}catch(e){return{ok:false,status:0,j:{error:'ingen kontakt'}}}}
 function applyTile(did,s,ts){const bn=document.querySelector('[data-bn="'+did+'"]'),bt=document.querySelector('[data-bs="'+did+'"]');if(!s||!bn||!bt)return;bn.textContent=s.power!=null?nf(s.power,0)+' W':(s.on==null?'–':s.on?'På':'Av');const kw=bt.dataset.kwh;bt.textContent=(s.on==null?'':s.on?'på':'av')+(kw?(s.on==null?'':' · ')+kw+' kWh totalt':'')+' · '+(ts?'sist sjekket '+new Date(ts).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}):'oppdatert nå')}
+function injectLock(s){const d=((HM&&HM.devices)||[]).find(x=>x.name==='Terrasedør');if(!d||!d.rows||!d.rows.length||!s||!s.ts)return false;
+ const last=d.rows[d.rows.length-1];if(new Date(s.ts)<=new Date(last.t))return false;
+ d.rows.push({d:Object.assign({},last.d,{locked:!!s.on}),t:s.ts,av:true});return true}
 async function livePlugs(){const g=await ctlCall('GET',undefined,'?cached=1');if(!(g.ok&&g.j.plugs))return;
+ if(injectLock(g.j.plugs.terrasse))render();
  for(const [did,s] of Object.entries(g.j.plugs)){const d=AQ&&(AQ.devices||[]).find(x=>x.did===did);const last=d&&d.rows&&d.rows.length?new Date(d.rows[d.rows.length-1].t).getTime():0;
   if(s.ts&&new Date(s.ts).getTime()>last)applyTile(did,s,s.ts)}}
 async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Slå '+(on?'PÅ ':'AV ')+nm+'?'))return;
@@ -575,7 +579,8 @@ async function lockTerrasse(b){const tc=(HM&&HM.devices||[]).find(x=>x.name==='T
  if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);b.disabled=false;return}
  msg.textContent='Sendt til Homey. Venter på statusrapport …';
  for(let i=0;i<10;i++){await new Promise(z=>setTimeout(z,3000));const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs.terrasse;
-  if(s&&s.ts&&new Date(s.ts).getTime()>t0){msg.textContent=s.on?'Bekreftet: låst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')':'Døren står fortsatt ulåst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')';b.disabled=false;return}}
+  if(s&&s.ts&&new Date(s.ts).getTime()>t0){const txt=s.on?'Bekreftet: låst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')':'Døren står fortsatt ulåst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')';
+   injectLock(s);render();const m2=document.querySelector('[data-pm="terrasse"]');if(m2)m2.textContent=txt;return}}
  msg.textContent='Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.';b.disabled=false}
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
