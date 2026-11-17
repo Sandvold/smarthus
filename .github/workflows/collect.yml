@@ -69,6 +69,14 @@ jobs:
           MIELE_CLIENT_ID: ${{ secrets.MIELE_CLIENT_ID }}
           MIELE_CLIENT_SECRET: ${{ secrets.MIELE_CLIENT_SECRET }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_aqara.py
+        continue-on-error: true
+        env:
+          AQARA_APP_ID: ${{ secrets.AQARA_APP_ID }}
+          AQARA_KEY_ID: ${{ secrets.AQARA_KEY_ID }}
+          AQARA_APP_KEY: ${{ secrets.AQARA_APP_KEY }}
+          AQARA_REGION: ${{ secrets.AQARA_REGION }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect_shelly.py
         env:
           SHELLY_SERVER: ${{ secrets.SHELLY_SERVER }}

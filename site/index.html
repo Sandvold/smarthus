@@ -65,7 +65,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null;
+let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -276,10 +276,15 @@ function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===p
   (LG.devices||[]).filter(mine).forEach(d=>{const l=d.rows[d.rows.length-1];if(!l)return;const s=l.s||{};const keys=Object.keys(s).filter(k=>/operation|state|temperature|remain|mode|power/i.test(k)).slice(0,6);
    h+=`<div class="tile"><div class="s">${d.name||d.type} (LG)</div>${keys.map(k=>`<div class="s">${k.split('.').pop()}: ${s[k]}</div>`).join('')||'<div class="s">ingen tilstand</div>'}<div class="s">oppdatert ${ago(l.t)}</div></div>`;sub.push(d.name||d.type)})}
  if(!h)return null;return sec('kjokken',pl==='oslo'?'Kjøkken (ovn og kjøleskap)':'Vaskemaskin',sub.join(' · ')||'ikke koblet',el(grid(h)),{open:false})}
+function secAqara(pl){if(!AQ)return null;const D=(AQ.devices||[]).filter(d=>placeOf(d.site,d.name)===pl);
+ if(!D.length)return AQ.error&&pl==='oslo'?sec('aqara','Aqara',AQ.error,el(waiting('Aqara: '+AQ.error)),{open:false}):null;
+ const cards=D.map(d=>{const l=d.rows[d.rows.length-1];const parts=[];if(l.temp!=null)parts.push(nf(l.temp,1)+' °C');if(l.hum!=null)parts.push(nf(l.hum,0)+' % fukt');if(l.power!=null)parts.push(nf(l.power,0)+' W');
+  return `<div class="tile"><div class="s">${d.name}</div><div class="n">${parts[0]||(l.on==null?'–':l.on?'På':'Av')}</div><div class="s">${parts.slice(1).join(' · ')}${l.on!=null?(parts.length>1?' · ':'')+(l.on?'på':'av'):''}${l.kwh!=null?' · '+nf(l.kwh,2)+' kWh totalt':''}</div><div class="s">oppdatert ${ago(l.t)}</div></div>`}).join('');
+ return sec('aqara'+pl,'Aqara',D.length+' enheter',el(grid(cards)),{open:false})}
 function placeView(pl){const w=document.createElement('div');
- const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
+ const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl),secKjokken(pl),secAqara(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));w.appendChild(secPlan('oslo','Drivhus Oslo','Her kommer målinger når Aqara-prosjektet er godkjent og sensorene er hentet inn.'))}
- if(pl==='oslo')w.appendChild(secPlan('aqara','Aqara-sensorer','Venter på at Aqara-utviklerprosjektet blir godkjent (pending review).'));
+ 
  if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
  return w}
 /* ---------- oversikt ---------- */
@@ -341,7 +346,6 @@ function overview(){const w=document.createElement('div'),A=alerts();
  w.appendChild(secSystemer());return w}
 /* ---------- gjøremål ---------- */
 const TODO=[
- ['Datakilder','aqara','Aqara i Oslo','Venter på godkjenning av utviklerprosjektet. Så kjøres code, token og devices, og sensorene kommer inn her. Roter også AppKey.'],
  ['Datakilder','itc','Inkbird ITC-308 i innerdrivhuset','Ikke koblet til Tuya-prosjektet. Må legges til for å få temperatur og styring.'],
  ['Datakilder','mill','Mill-ovner','Finn ut hvilken generasjon. Gen 3 har lokalt API, ellers må det søkes om API-nøkkel.'],
  ['Datakilder','salus','Salus gulvvarme (Arendal)','Trenger modell på gateway og termostater. Kan kreve lokal relé i Arendal.'],
@@ -358,6 +362,8 @@ const TODO=[
  ['Sikkerhet','login','Innlogging / privat hosting','Siden er offentlig og viser blant annet låsstatus. Flytt bak innlogging.'],
  ['Sikkerhet','tok','Minimal tilgang på GitHub-token i HomeyScript','Bruk et fine-grained token som bare får lov til å sende hendelser.']];
 const DONE=[
+ ['Aqara: hub, stikk og temperatursensor i Oslo','17. nov'],
+ ['LG: vaskemaskin (Arendal) og ovn (Oslo)','17. nov'],
  ['Zaptec: to ladere i Arendal koblet inn','17. nov'],
  ['Microtemp: gulvvarme i Oslo (rom, gulv, innstilling)','17. nov'],
  ['Layout med faner for Oslo, Arendal og Drivhus, sammenleggbare seksjoner og oversikt','17. nov'],
@@ -400,7 +406,7 @@ document.getElementById('range').addEventListener('change',e=>{hours=+e.target.v
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
 addEventListener('hashchange',()=>{TAB=(location.hash||'#oversikt').slice(1);render()});
 const J=f=>fetch(f).then(r=>r.ok?r.json():null).catch(()=>null);
-Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi])=>{LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq])=>{AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
 </script>
 </body>
 </html>
