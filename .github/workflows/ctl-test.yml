@@ -1,0 +1,26 @@
+name: Test av styring (kun lesing)
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24" }
+      - run: pip install "psycopg[binary]"
+      - run: python scripts/sync_ctl_secrets.py
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          AQARA_APP_ID: ${{ secrets.AQARA_APP_ID }}
+          AQARA_KEY_ID: ${{ secrets.AQARA_KEY_ID }}
+          AQARA_APP_KEY: ${{ secrets.AQARA_APP_KEY }}
+          AQARA_REGION: ${{ secrets.AQARA_REGION }}
+      - run: |
+          cd ctl && npm init -y >/dev/null && npm i esbuild >/dev/null
+          npx esbuild index.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/index.mjs
+          cd .. && node scripts/ctl_test.mjs
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_AUTH_BASE_URL: https://ep-green-sea-bapdvdkk.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth
