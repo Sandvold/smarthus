@@ -102,15 +102,14 @@ async function lockTerrasse(email: string): Promise<[unknown, number]> {
   if (recent.length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
   let code = 0, msg: string | null = null;
   try {
-    let r = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10000) });
-    let via = 'webhook.homey.app';
     const m = url.match(/^https:\/\/webhook\.homey\.app\/([^/]+)\/([^/?]+)/);
-    if (r.status === 404 && m) {
-      // Eldre Homey Pro (2016–2019) bruker connect.athom.com
-      r = await fetch(`https://${m[1]}.connect.athom.com/api/manager/logic/webhook/${m[2]}?tag=web`, { method: 'GET', signal: AbortSignal.timeout(10000) });
-      via = 'connect.athom.com';
-    }
-    code = r.ok ? 0 : r.status; msg = (r.ok ? 'Success' : 'HTTP ' + r.status) + ' via ' + via;
+    const get = (u: string) => fetch(u, { method: 'GET', signal: AbortSignal.timeout(10000) }).then(x => x.status).catch(() => -1);
+    // Eldre Homey Pro (2016–2019, 24-tegns ID) nås via connect.athom.com. Prøv den først.
+    const old = m && /^[0-9a-f]{24}$/.test(m[1]) ? await get(`https://${m[1]}.connect.athom.com/api/manager/logic/webhook/${m[2]}?tag=web`) : null;
+    const nw = old !== null && old >= 200 && old < 300 ? null : await get(url);
+    const ok = (old !== null && old >= 200 && old < 300) || (old === null && nw !== null && nw >= 200 && nw < 300);
+    code = ok ? 0 : (nw ?? old ?? -1);
+    msg = (ok ? 'Success' : 'Feil') + ' old:' + (old ?? '-') + ' new:' + (nw ?? '-');
   } catch { code = -1; msg = 'ingen kontakt med Homey'; }
   await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, 'terrasse', 'lås', code, msg]);
   return code === 0 ? [{ ok: true, did: 'terrasse', action: 'lås' }, 200] : [{ error: 'Homey svarte ikke: ' + msg }, 502];
