@@ -31,8 +31,9 @@ try:
     glist = gws if isinstance(gws, list) else (gws.get("gateways") or gws.get("data") or gws.get("items") or [])
     first = True
     for g in glist:
-        gc = g.get("gateway_code") or g.get("code") or g.get("id")
+        gc = g.get("device_code") or g.get("gateway_code") or g.get("code") or g.get("id")
         dv = get(f"/premium-lite/gateways/{gc}/devices").json()
+        print("devices-form:", json.dumps(shape(dv)))
         dl = dv if isinstance(dv, list) else (dv.get("devices") or dv.get("data") or dv.get("items") or [])
         gout = {"code": gc, "info": g, "devices": []}
         for d in dl:
