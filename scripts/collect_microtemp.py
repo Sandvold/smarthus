@@ -26,8 +26,21 @@ try:
     if r.get("ErrorCode") not in (0, None) or not r.get("SessionId"):
         OUT["error"] = f"Innlogging avvist (ErrorCode {r.get('ErrorCode')}). Sjekk kunde-ID, brukernavn og passord."
         done(); print(OUT["error"]); sys.exit(0)
-    g = requests.get(f"https://{HOST}/api/Group/GetGroupContents", timeout=30,
-                     params={"sessionid": r["SessionId"], "APIKEY": K}).json()
+    sid = r["SessionId"]; g = {}; tried = []
+    for method, path in (("GET", "/api/Group/GetGroupContents"), ("POST", "/api/Group/GetGroupContents"), ("GET", "/api/Group/GetGroups"), ("POST", "/api/Group/GetGroups")):
+        q = {"sessionid": sid, "APIKEY": K}
+        resp = requests.request(method, f"https://{HOST}{path}", timeout=30, params=q if method == "GET" else None,
+                                json=None if method == "GET" else {"SessionId": sid, "APIKEY": K})
+        try:
+            j = resp.json()
+        except Exception:
+            j = {}
+        tried.append(f"{method} {path.split('/')[-1]}: HTTP {resp.status_code} " + (str(j.get("Message") or j.get("MessageDetail") or sorted(j.keys()))[:120] if isinstance(j, dict) else "liste"))
+        if resp.status_code == 200 and isinstance(j, dict) and "GroupContents" in j:
+            g = j; break
+    OUT["tried"] = tried
+    if not g:
+        OUT["error"] = "Fant ikke riktig endepunkt for termostatlisten."; done(); print(OUT["error"]); sys.exit(0)
     if g.get("ErrorCode") not in (0, None):
         OUT["error"] = f"Henting feilet (ErrorCode {g.get('ErrorCode')})"; done(); print(OUT["error"]); sys.exit(0)
     gc = g.get("GroupContents") or []
