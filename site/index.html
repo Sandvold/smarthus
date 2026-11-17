@@ -213,7 +213,7 @@ function daikinHist(c,id){const S=daikinSeries(c),since=Date.now()-hours*3600000
  return{html:grid(tile('Siste 24 t (måler i Daikin)',nf(k24,1),'kWh')+tile('Snitt effekt siste time',kw==null?null:nf(kw,1),'kW'))+`<h3>Temperaturer</h3>${chartBlock('dkt'+id)}<h3>Energi per døgn (kWh)</h3><div class="chart" id="dkb${id}"></div>`,
   draw:()=>{drawLine('ch-dkt'+id,'leg-dkt'+id,'tb-dkt'+id,sets,'t','°C',null,1);bars('dkb'+id,Object.entries(day).slice(-14).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#e08363')},k24}}
 function pulseBlock(pl,id){const h=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl);if(!h)return null;
- if(!h.enabled)return{html:waiting('Tibber Pulse er ikke aktivert for dette hjemmet i Tibber-kontoen.'),draw:()=>{},sub:null};
+ if(!h.enabled)return{html:waiting('Tibber Pulse er ikke aktiv for dette hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'),draw:()=>{},sub:null};
  const R=h.rows||[];if(!R.length)return{html:waiting('Pulse er aktiv, men ingen målinger er hentet ennå'+(h.error?' ('+h.error+')':'')+'. Første måling kommer ved neste innsamling.'),draw:()=>{},sub:null};
  const l=R[R.length-1],c24=R.filter(r=>Date.now()-new Date(r.t)<86400000),mx=c24.length?Math.max(...c24.map(r=>r.max??r.w)):null,mn=c24.length?Math.min(...c24.map(r=>r.min??r.w)):null;
  return{sub:nf(l.w,0)+' W nå',html:grid(tile('Effekt nå (Pulse)',nf(l.w,0),'W')+tile('Høyeste siste 24 t',nf(mx,0),'W')+tile('Laveste siste 24 t (grunnlast)',nf(mn,0),'W'))+`<h3>Effekt over tid</h3>${chartBlock('pu'+id)}`,
@@ -319,14 +319,14 @@ const TODO=[
  ['Datakilder','itc','Inkbird ITC-308 i innerdrivhuset','Ikke koblet til Tuya-prosjektet. Må legges til for å få temperatur og styring.'],
  ['Datakilder','mill','Mill-ovner','Finn ut hvilken generasjon. Gen 3 har lokalt API, ellers må det søkes om API-nøkkel.'],
  ['Datakilder','salus','Salus gulvvarme (Arendal)','Trenger modell på gateway og termostater. Kan kreve lokal relé i Arendal.'],
- ['Datakilder','microtemp','Microtemp','Ikke undersøkt.'],
  ['Datakilder','drivhus-oslo','Sensorer i drivhuset i Oslo','Avklar hvilke sensorer som skal måle der.'],
- ['Datakilder','pulse','Tibber Pulse sanntidseffekt','Hent live effekt (W) via Homey i stedet for bare timesverdier.'],
+ ['Datakilder','pulse-ar','Tibber Pulse i Arendal','Pulse er aktiv i Oslo, men ikke i Arendal-hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'],
+ ['Datakilder','hp-effekt','Effekt på varmepumpen i Arendal','Pumpen rapporterer 0 W. Trenger Pulse i Arendal og/eller en egen måler (for eksempel Shelly EM) på pumpens kurs. Pulse-historikk samles nå for kalibrering.'],
+ ['Datakilder','microtemp','Microtemp: avklar modell','Trolig OJ Electronics MWD5. Det finnes en uoffisiell sky-integrasjon som trenger kunde-ID og API-nøkkel fra appen. Si fra hvilken modell du har.'],
+ ['Datakilder','klipper-flow','Raskere klipperstatus','Lag en Homey-flow som sender status med en gang klipperen endrer status, ikke bare hvert 15. minutt.'],
  ['Datakilder','a1','Dreame A1 viser tilgjengelig i Homey, offline i appen','Sjekk om Homey viser gammel status.'],
- ['Dashboard','hist','Historikk for klippere, låser og Daikin','Egne grafer, ikke bare siste verdi.'],
  ['Dashboard','alarm','Varsler på mobil eller e-post','Frost, lavt batteri, ulåst dør og frakoblede enheter.'],
  ['Dashboard','kost','Ekte strømkostnad fra Tibber','Bytt ut anslaget på 1,1 kr/kWh. Sjekk Norgespris-vilkår for 2027.'],
- ['Dashboard','hpw','Anslått varmepumpeeffekt','Regn fra kompressorstrøm, må kalibreres mot måler.'],
  ['Dashboard','styring','Styre fra siden','På/av for Shelly, målverdi for Adax og Daikin. Krever innlogging først.'],
  ['Sikkerhet','login','Innlogging / privat hosting','Siden er offentlig og viser blant annet låsstatus. Flytt bak innlogging.'],
  ['Sikkerhet','tok','Minimal tilgang på GitHub-token i HomeyScript','Bruk et fine-grained token som bare får lov til å sende hendelser.']];
