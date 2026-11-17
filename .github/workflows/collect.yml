@@ -45,6 +45,12 @@ jobs:
         env:
           TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_zaptec.py
+        continue-on-error: true
+        env:
+          ZAPTEC_USERNAME: ${{ secrets.ZAPTEC_USERNAME }}
+          ZAPTEC_PASSWORD: ${{ secrets.ZAPTEC_PASSWORD }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect_shelly.py
         env:
           SHELLY_SERVER: ${{ secrets.SHELLY_SERVER }}

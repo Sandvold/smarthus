@@ -65,7 +65,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null;
+let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -212,6 +212,17 @@ function daikinHist(c,id){const S=daikinSeries(c),since=Date.now()-hours*3600000
  const kw1=inc.filter(x=>x.t>Date.now()-3600000);const kw=kw1.length?kw1.reduce((a,x)=>a+x.v,0)/(kw1.length*0.25):null;
  return{html:grid(tile('Siste 24 t (måler i Daikin)',nf(k24,1),'kWh')+tile('Snitt effekt siste time',kw==null?null:nf(kw,1),'kW'))+`<h3>Temperaturer</h3>${chartBlock('dkt'+id)}<h3>Energi per døgn (kWh)</h3><div class="chart" id="dkb${id}"></div>`,
   draw:()=>{drawLine('ch-dkt'+id,'leg-dkt'+id,'tb-dkt'+id,sets,'t','°C',null,1);bars('dkb'+id,Object.entries(day).slice(-14).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#e08363')},k24}}
+
+const ZMODE={1:'Ingen bil tilkoblet',2:'Bil tilkoblet, venter',3:'Lader',5:'Ferdig ladet'};
+function zapInc(c){const R=c.rows,inc=[];for(let i=1;i<R.length;i++){const a=R[i-1].kwh,b=R[i].kwh;if(a==null||b==null)continue;
+ const t=new Date(R[i].t).getTime();if(t-new Date(R[i-1].t)>3*3600000)continue;inc.push({t,v:b>=a?b-a:b})}return inc}
+function zaptecBlock(pl,id){const c=((ZP&&ZP.chargers)||[]).find(x=>placeOf(x.site,x.name)===pl);if(!c||!c.rows.length)return null;
+ const l=c.rows[c.rows.length-1],inc=zapInc(c),k24=inc.filter(x=>x.t>Date.now()-86400000).reduce((a,x)=>a+x.v,0),day={};
+ inc.forEach(x=>{const k=new Date(x.t).toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+x.v});
+ const lab=l.on===0?'Frakoblet':ZMODE[l.m]||'Ukjent';
+ return{k24,inc,sub:'bil: '+lab.toLowerCase()+(l.m===3&&l.w!=null?' '+nf(l.w/1000,1)+' kW':''),
+  html:grid(tile('Status',lab,'')+tile('Effekt nå',l.w==null?null:nf(l.w/1000,1),'kW')+tile('Denne økten',l.kwh==null?null:nf(l.kwh,1),'kWh')+tile('Siste 24 t',nf(k24,1),'kWh'))+`<h3>Bilforbruk per døgn (kWh)</h3><div class="chart" id="zb${id}"></div>`,
+  draw:()=>bars('zb'+id,Object.entries(day).slice(-14).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#a97a9b')}}
 function pulseBlock(pl,id){const h=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl);if(!h)return null;
  if(!h.enabled)return{html:waiting('Tibber Pulse er ikke aktiv for dette hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'),draw:()=>{},sub:null};
  const R=h.rows||[];if(!R.length)return{html:waiting('Pulse er aktiv, men ingen målinger er hentet ennå'+(h.error?' ('+h.error+')':'')+'. Første måling kommer ved neste innsamling.'),draw:()=>{},sub:null};
@@ -236,9 +247,9 @@ function secVarme(pl){let h='',sub=[],draw=null;
  const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join(''))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
  const ax=axList(pl);if(ax.length){const t=ax.map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
  if(!h)return null;return sec('varme','Varme',sub.join(' · '),el(h),{draw})}
-function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl,pb=pulseBlock(pl,pl);
- const b=el((pb?`<h3>Sanntid (Tibber Pulse)</h3>`+pb.html:'')+`<h3>Forbruk (Tibber)</h3>`+grid(tile('Siste 24 timer',nf(st.k24,1),'kWh')+tile('Siste 7 dager',nf(st.k7,1),'kWh')+tile('Mot forrige 7 dager',st.ch==null?null:(st.ch>0?'+':'')+st.ch,'%')+tile('Snitt per døgn (7 d)',nf(st.k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(st.k24*RATE,0),'kr'))+`<h3>Forbruk per døgn, siste 30 dager (kWh)</h3><div class="chart" id="${id}"></div>`);
- return sec('strom','Strøm (Tibber)',(pb&&pb.sub?pb.sub+' · ':'')+`${nf(st.k24,1)} kWh siste 24 t`,b,{draw:()=>{pb&&pb.draw();const day={};st.H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
+function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl,pb=pulseBlock(pl,pl),zb=zaptecBlock(pl,pl);
+ const b=el((zb?`<h3>Elbillader (Zaptec)</h3>`+zb.html+`<div class="s">Husforbruk uten bil siste 24 t: <b>${nf(Math.max(0,st.k24-zb.k24),1)} kWh</b> av ${nf(st.k24,1)} kWh totalt.</div>`:'')+(pb?`<h3>Sanntid (Tibber Pulse)</h3>`+pb.html:'')+`<h3>Forbruk (Tibber)</h3>`+grid(tile('Siste 24 timer',nf(st.k24,1),'kWh')+tile('Siste 7 dager',nf(st.k7,1),'kWh')+tile('Mot forrige 7 dager',st.ch==null?null:(st.ch>0?'+':'')+st.ch,'%')+tile('Snitt per døgn (7 d)',nf(st.k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(st.k24*RATE,0),'kr'))+`<h3>Forbruk per døgn, siste 30 dager (kWh)</h3><div class="chart" id="${id}"></div>`);
+ return sec('strom','Strøm (Tibber)',(zb?zb.sub+' · ':'')+(pb&&pb.sub?pb.sub+' · ':'')+`${nf(st.k24,1)} kWh siste 24 t`,b,{draw:()=>{pb&&pb.draw();zb&&zb.draw();const day={};st.H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
   bars(id,Object.entries(day).slice(-30).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb')}})}
 function secShelly(){const L=shList();if(!L.length)return null;const tot=L.reduce((a,c)=>a+(shStats(c).kwh||0),0),w=L.reduce((a,c)=>a+(shStats(c).last.w||0),0);
  return sec('shelly','Strøm og stikk (Shelly)',`${nf(w,0)} W nå · ${nf(tot,1)} kWh siste 24 t`,el(grid(L.map(shellyCard).join(''))))}
@@ -320,6 +331,7 @@ const TODO=[
  ['Datakilder','mill','Mill-ovner','Finn ut hvilken generasjon. Gen 3 har lokalt API, ellers må det søkes om API-nøkkel.'],
  ['Datakilder','salus','Salus gulvvarme (Arendal)','Trenger modell på gateway og termostater. Kan kreve lokal relé i Arendal.'],
  ['Datakilder','drivhus-oslo','Sensorer i drivhuset i Oslo','Avklar hvilke sensorer som skal måle der.'],
+ ['Datakilder','zaptec','Zaptec-lader i Arendal','Koden er ferdig. Legg inn secrets ZAPTEC_USERNAME og ZAPTEC_PASSWORD i GitHub (helst en egen bruker med lesetilgang), så begynner data å komme inn.'],
  ['Datakilder','pulse-ar','Tibber Pulse i Arendal','Pulse er aktiv i Oslo, men ikke i Arendal-hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'],
  ['Datakilder','hp-effekt','Effekt på varmepumpen i Arendal','Pumpen rapporterer 0 W. Trenger Pulse i Arendal og/eller en egen måler (for eksempel Shelly EM) på pumpens kurs. Pulse-historikk samles nå for kalibrering.'],
  ['Datakilder','microtemp','Microtemp: avklar modell','Trolig OJ Electronics MWD5. Det finnes en uoffisiell sky-integrasjon som trenger kunde-ID og API-nøkkel fra appen. Si fra hvilken modell du har.'],
@@ -330,6 +342,22 @@ const TODO=[
  ['Dashboard','styring','Styre fra siden','På/av for Shelly, målverdi for Adax og Daikin. Krever innlogging først.'],
  ['Sikkerhet','login','Innlogging / privat hosting','Siden er offentlig og viser blant annet låsstatus. Flytt bak innlogging.'],
  ['Sikkerhet','tok','Minimal tilgang på GitHub-token i HomeyScript','Bruk et fine-grained token som bare får lov til å sende hendelser.']];
+const DONE=[
+ ['Layout med faner for Oslo, Arendal og Drivhus, sammenleggbare seksjoner og oversikt','17. nov'],
+ ['Varsler med mulighet til å skjule enkeltvarsler','17. nov'],
+ ['Innsamling hvert kvarter, utløst av Homey (GitHub-cron var for ustabil)','17. nov'],
+ ['Smart Life (Tuya): termostat i oppvarmet drivhus og varmepumpe i Arendal',''],
+ ['Shelly: 4-punkts stikk i oppvarmet drivhus (vekstlys, ventilasjonsvifte, to uttak)',''],
+ ['Tibber: forbruk per time og døgn med historikk i Neon, kostnadsanslag med Norgespris',''],
+ ['Tibber Pulse: sanntidseffekt for Oslo','17. nov'],
+ ['Adax: panelovner i Oslo og Arendal',''],
+ ['Gardena: to kontoer (Oslo og Arendal), med batteri og tilkobling',''],
+ ['Homey: Dreame-klippere, Yale-låser og Daikin i Oslo',''],
+ ['Daikin: historikk for temperaturer og energi fra måleren','17. nov'],
+ ['Låser: tidslinje for låst og ulåst og liste over endringer','17. nov'],
+ ['Klippere: status, klippetid, siste økt, og varsel når den står fast','17. nov'],
+ ['Zaptec: innhenting og visning er kodet, venter bare på innlogging','17. nov'],
+ ['Microtemp undersøkt: uoffisiell sky-integrasjon, trenger modell og API-nøkkel','17. nov']];
 function todoView(){const w=document.createElement('div'),done=ls.get('sh-done',{}),extra=ls.get('sh-extra',[]);
  const all=TODO.map(([c,id,t,n])=>({c,id,t,n})).concat(extra);const cats=[...new Set(['Datakilder','Dashboard','Sikkerhet',...all.map(x=>x.c)])];
  w.appendChild(el(`<p class="s">Avkrysninger og egne punkter lagres bare i denne nettleseren. Skriv til meg hvis noe skal inn i den faste listen.</p>`));
@@ -339,7 +367,8 @@ function todoView(){const w=document.createElement('div'),done=ls.get('sh-done',
   w.appendChild(sec('todo-'+c,c,`${n} av ${L.length} gjort`,b))});
  const f=el(`<div class="add"><input type="text" id="nt" placeholder="Nytt punkt"><select id="nc">${cats.map(c=>`<option>${c}</option>`).join('')}</select><button id="na">Legg til</button></div>`);
  f.querySelector('#na').onclick=()=>{const t=f.querySelector('#nt').value.trim();if(!t)return;extra.push({c:f.querySelector('#nc').value,id:'x'+Date.now(),t,n:''});ls.set('sh-extra',extra);render()};
- w.appendChild(f);return w}
+ w.appendChild(f);
+ w.appendChild(sec('done','Ferdig',DONE.length+' punkter',el('<div class="todo">'+DONE.map(x=>`<label style="cursor:default"><input type="checkbox" checked disabled><span class="d"><span class="x">${x[0]}</span>${x[1]?`<div class="s">${x[1]}</div>`:''}</span></label>`).join('')+'</div>'),{open:false}));return w}
 const todoOpen=()=>{const done=ls.get('sh-done',{});return TODO.filter(x=>!done[x[1]]).length+ls.get('sh-extra',[]).filter(x=>!done[x.id]).length};
 /* ---------- app ---------- */
 const TABS=[['oversikt','Oversikt'],['oslo','Oslo'],['arendal','Arendal'],['drivhus','Drivhus'],['todo','Gjøremål']];
@@ -354,7 +383,7 @@ document.getElementById('range').addEventListener('change',e=>{hours=+e.target.v
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
 addEventListener('hashchange',()=>{TAB=(location.hash||'#oversikt').slice(1);render()});
 const J=f=>fetch(f).then(r=>r.ok?r.json():null).catch(()=>null);
-Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json')]).then(([h,g,a,s,p,d,u])=>{PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json')]).then(([h,g,a,s,p,d,u,z])=>{ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
 </script>
 </body>
 </html>
