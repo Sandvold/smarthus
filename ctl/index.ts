@@ -103,7 +103,7 @@ async function lockTerrasse(email: string): Promise<[unknown, number]> {
   let code = 0, msg: string | null = null;
   try {
     const m = url.match(/^https:\/\/webhook\.homey\.app\/([^/]+)\/([^/?]+)/);
-    const get = (u: string) => fetch(u, { method: 'GET', signal: AbortSignal.timeout(10000) }).then(x => x.status).catch(() => -1);
+    const get = (u: string) => fetch(u, { method: 'GET', signal: AbortSignal.timeout(4000) }).then(x => x.status).catch(() => -1);
     // Eldre Homey Pro (2016–2019, 24-tegns ID) nås via connect.athom.com. Prøv den først.
     const old = m && /^[0-9a-f]{24}$/.test(m[1]) ? await get(`https://${m[1]}.connect.athom.com/api/manager/logic/webhook/${m[2]}?tag=web`) : null;
     const nw = old !== null && old >= 200 && old < 300 ? null : await get(url);
