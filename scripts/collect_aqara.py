@@ -49,7 +49,7 @@ for d in (r.get("result") or {}).get("data", []):
     v = {x["resourceId"]: x.get("value") for x in ((call("query.resource.value", {"resources": [{"subjectId": d["did"], "resourceIds": RES}]}, access).get("result")) or [])}
     num = lambda k, div=1: (float(v[k]) / div) if v.get(k) not in (None, "") else None
     name = d.get("deviceName") or model
-    site = "Drivhus Oslo" if "drivhus" in name.lower() else "Oslo"
+    site = "Drivhus Oslo"  # alle Aqara-enheter står i drivhuset i Oslo
     on = None if v.get("4.1.85") in (None, "") else v["4.1.85"] == "1"
     con.execute("insert into aqara_readings (did,name,model,site,temp,hum,power,energy,on_off) values (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 (d["did"], name, model, site, num("0.1.85", 100), num("0.2.85", 100), num("0.12.85"), num("0.13.85", 1000), on))
