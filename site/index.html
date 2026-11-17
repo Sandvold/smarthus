@@ -152,13 +152,14 @@ function homeyCard(c){if(c.kind==='mower')return mowerCard(c);const l=c.rows[c.r
  else if(c.kind==='mower'){const st=Object.entries(d).find(([k,v])=>typeof v==='string'&&/state|status|mode/i.test(k));main=st?String(st[1]).replace(/_/g,' '):(d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–')}
  const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!(c.kind==='lock'&&k==='alarm_contact')&&!HIDE.test(k)&&!(c.kind==='daikin'&&k==='measure_temperature')&&!(c.kind==='mower'&&k==='mower_status')).slice(0,6).map(([k,v])=>(HNAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/^temperature\./,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
  return `<div class="tile"><div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s">${extra}</div><div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}</div></div>`}
+function ctlBtns(key,items){return '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+items.map(([t,o])=>`<button onclick='act(this,${JSON.stringify(o).replace(/'/g,"&#39;")})' style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${t}</button>`).join('')+`</div><div class="s" data-am="${key}"></div>`}
 function gardenaCard(c){const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
  const main=c.kind==='sensor'?(l.temp==null?'–':nf(l.temp,0)+' °C jord'):(l.act==='CLOSED'?'Ventil lukket':l.act||'–');
  const sub=[c.kind==='sensor'&&l.hum!=null?'Jordfukt '+nf(l.hum,0)+' %':null,l.batt!=null?'Batteri '+l.batt+' %':null,off?'Frakoblet, tallene kan være gamle':null].filter(Boolean).join(' · ');
- return `<div class="tile"><div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s"${off?' style="color:#d8a747"':''}>${sub}</div></div>`}
+ return `<div class="tile"><div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s"${off?' style="color:#d8a747"':''}>${sub}</div>${c.kind==='valve'&&c.id&&!off?ctlBtns('g'+c.id,[['Vann 10 min',{act:'gardena',id:c.id,cmd:'start',minutes:10,q:'Starte vanning i 10 minutter: '+c.name+'?'}],['Stopp',{act:'gardena',id:c.id,cmd:'stop',q:'Stoppe vanning: '+c.name+'?'}]]):''}</div>`}
 function adaxCard(c){const last=c.rows[c.rows.length-1],cut=Date.now()-86400000,v=c.rows.filter(x=>new Date(x.t).getTime()>=cut&&x.temp!=null).map(x=>x.temp);
- return `<div class="tile"><div class="s">${c.name}</div><div class="n">${last.temp==null?'–':nf(last.temp,1)+' °C'}</div><div class="s">Innstilt ${nf(last.target,1)} °C${last.on?'':' · av'}${v.length?' · 24 t: '+nf(Math.min(...v),1)+'–'+nf(Math.max(...v),1)+' °C':''}</div></div>`}
-function shellyCard(c){const s=shStats(c);return `<div class="tile"><div class="s">${c.name}</div><div class="n">${s.last.on?'På':'Av'}${s.last.w!=null?' · '+nf(s.last.w,0)+' W':''}</div><div class="s">24 t: ${s.kwh==null?'–':nf(s.kwh,2)+' kWh'}${s.share==null?'':' · på '+s.share+' % av tiden'}</div></div>`}
+ return `<div class="tile"><div class="s">${c.name}</div><div class="n">${last.temp==null?'–':nf(last.temp,1)+' °C'}</div><div class="s">Innstilt ${nf(last.target,1)} °C${last.on?'':' · av'}${v.length?' · 24 t: '+nf(Math.min(...v),1)+'–'+nf(Math.max(...v),1)+' °C':''}</div>${c.id&&last.target!=null?ctlBtns('a'+c.id,[['− 0,5',{act:'adax',room:c.id,target:last.target-0.5,q:c.name+': sette innstilt temperatur til '+nf(last.target-0.5,1)+' °C?'}],['+ 0,5',{act:'adax',room:c.id,target:last.target+0.5,q:c.name+': sette innstilt temperatur til '+nf(last.target+0.5,1)+' °C?'}]]):''}</div>`}
+function shellyCard(c){const s=shStats(c);return `<div class="tile"><div class="s">${c.name}</div><div class="n">${s.last.on?'På':'Av'}${s.last.w!=null?' · '+nf(s.last.w,0)+' W':''}</div><div class="s">24 t: ${s.kwh==null?'–':nf(s.kwh,2)+' kWh'}${s.share==null?'':' · på '+s.share+' % av tiden'}</div>${c.id?ctlBtns('s'+c.id,[['På',{act:'shelly',ch:c.ch,on:true,q:'Slå PÅ '+c.name+'?'}],['Av',{act:'shelly',ch:c.ch,on:false,q:'Slå AV '+c.name+'?'}]]):''}</div>`}
 
 /* ---------- tidslinje, klipper, lås, daikin ---------- */
 const mins=ms=>{const m=Math.round(ms/60000);return m<90?m+' min':(m/60).toFixed(1).replace('.',',')+' t'};
@@ -232,7 +233,7 @@ function zaptecBlock(pl,id){const c=((ZP&&ZP.chargers)||[]).find(x=>placeOf(x.si
  inc.forEach(x=>{const k=new Date(x.t).toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+x.v});
  const lab=l.on===0?'Frakoblet':ZMODE[l.m]||'Ukjent';
  return{k24,inc,sub:'bil: '+lab.toLowerCase()+(l.m===3&&l.w!=null?' '+nf(l.w/1000,1)+' kW':''),
-  html:grid(tile('Status',lab,'')+tile('Effekt nå',l.w==null?null:nf(l.w/1000,1),'kW')+tile('Denne økten',l.kwh==null?null:nf(l.kwh,1),'kWh')+tile('Siste 24 t',nf(k24,1),'kWh'))+`<h3>Bilforbruk per døgn (kWh)</h3><div class="chart" id="zb${id}"></div>`,
+  html:grid(tile('Status',lab,'')+tile('Effekt nå',l.w==null?null:nf(l.w/1000,1),'kW')+tile('Denne økten',l.kwh==null?null:nf(l.kwh,1),'kWh')+tile('Siste 24 t',nf(k24,1),'kWh'))+(c.id?`<div class="tile"><div class="s">Lading (Zaptec)</div>${ctlBtns('z'+c.id,[['Pause lading',{act:'zaptec',id:c.id,cmd:'pause',q:'Pause ladingen?'}],['Fortsett lading',{act:'zaptec',id:c.id,cmd:'resume',q:'Fortsette ladingen?'}]])}</div>`:'')+`<h3>Bilforbruk per døgn (kWh)</h3><div class="chart" id="zb${id}"></div>`,
   draw:()=>bars('zb'+id,Object.entries(day).slice(-14).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#a97a9b')}}
 function pulseBlock(pl,id){const h=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl);if(!h)return null;
  if(!h.enabled)return{html:waiting('Tibber Pulse er ikke aktiv for dette hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'),draw:()=>{},sub:null};
@@ -583,6 +584,19 @@ async function lockTerrasse(b,unlock){const tc=(HM&&HM.devices||[]).find(x=>x.na
   if(s&&s.ts&&new Date(s.ts).getTime()>t0){const tm=new Date(s.ts).toLocaleTimeString('nb-NO');const txt=(!!s.on)===want?'Bekreftet: '+(s.on?'låst':'ulåst')+' ('+tm+')':(s.on?'Døren står fortsatt låst':'Døren står fortsatt ulåst')+' ('+tm+')';
    injectLock(s);render();const m2=document.querySelector('[data-pm="terrasse"]');if(m2)m2.textContent=txt;return}}
  msg.textContent='Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.';bs.forEach(x=>x.disabled=false)}
+async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.assign({},o);delete body.q;
+ const key=o.act==='shelly'?'s'+o.id:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
+ const bs=b.parentNode.querySelectorAll('button'),msg=b.parentNode.nextElementSibling;bs.forEach(x=>x.disabled=true);if(msg)msg.textContent='Sender …';
+ const r=await ctlCall('POST',body);bs.forEach(x=>x.disabled=false);
+ if(!msg)return;
+ if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);return}
+ const j=r.j,tm=new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});let t;
+ if(o.act==='shelly')t=j.state==null?'Sendt (kunne ikke bekrefte)':j.state===o.on?'Bekreftet: '+(o.on?'på':'av'):'Enheten svarte ikke ennå (står '+(j.state?'på':'av')+')';
+ else if(o.act==='adax')t=j.state==null?'Sendt (kunne ikke bekrefte)':Math.abs(j.state-o.target)<0.01?'Bekreftet: innstilt '+nf(j.state,1)+' °C':'Sendt, men skyen viser '+nf(j.state,1)+' °C ennå';
+ else if(o.act==='gardena')t=o.cmd==='start'?(j.state&&j.state!=='CLOSED'?'Bekreftet: vanner':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå'):(j.state==='CLOSED'?'Bekreftet: stoppet':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå');
+ else t=o.cmd==='pause'?(j.state===5?'Bekreftet: pauset':'Sendt. Laderen viser modus '+j.state+' ennå'):(j.state===3?'Bekreftet: lader':'Sendt. Laderen viser modus '+j.state+' ennå');
+ msg.textContent=t+' ('+tm+')'}
+window.act=act;
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
 const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);

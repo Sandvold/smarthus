@@ -21,7 +21,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
     rows = con.execute("select room_id, home, room, ts, temp, target, heating from adax_readings where ts > now() - interval '14 days' order by ts").fetchall()
 out = {}
 for rid, home, room, ts, temp, target, heating in rows:
-    d = out.setdefault(rid, {"home": NAMES.get(home, home), "name": room, "rows": []})
+    d = out.setdefault(rid, {"id": str(rid), "home": NAMES.get(home, home), "name": room, "rows": []})
     d["rows"].append({"t": ts.isoformat(), "temp": None if temp is None else float(temp), "target": None if target is None else float(target), "on": heating})
 json.dump({"rooms": list(out.values())}, open("site/adax.json", "w"), ensure_ascii=False)
 print("Adax: rom", len(out), "rader", len(rows))

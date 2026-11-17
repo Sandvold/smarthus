@@ -100,6 +100,16 @@ jobs:
           AQARA_APP_KEY: ${{ secrets.AQARA_APP_KEY }}
           AQARA_REGION: ${{ secrets.AQARA_REGION }}
           HOMEY_LOCK_URL: ${{ secrets.HOMEY_LOCK_URL }}
+          SHELLY_SERVER: ${{ secrets.SHELLY_SERVER }}
+          SHELLY_AUTH_KEY: ${{ secrets.SHELLY_AUTH_KEY }}
+          ADAX_ACCOUNT_ID: ${{ secrets.ADAX_ACCOUNT_ID }}
+          ADAX_PASSWORD: ${{ secrets.ADAX_PASSWORD }}
+          GARDENA_CLIENT_ID: ${{ secrets.GARDENA_CLIENT_ID }}
+          GARDENA_CLIENT_SECRET: ${{ secrets.GARDENA_CLIENT_SECRET }}
+          GARDENA_CLIENT_ID_2: ${{ secrets.GARDENA_CLIENT_ID_2 }}
+          GARDENA_CLIENT_SECRET_2: ${{ secrets.GARDENA_CLIENT_SECRET_2 }}
+          ZAPTEC_USERNAME: ${{ secrets.ZAPTEC_USERNAME }}
+          ZAPTEC_PASSWORD: ${{ secrets.ZAPTEC_PASSWORD }}
       - run: python scripts/upload_site.py
         continue-on-error: true
         env:

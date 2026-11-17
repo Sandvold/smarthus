@@ -29,7 +29,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
         where ts > now() - interval '14 days' order by ts""").fetchall()
 out = {}
 for did, ch, name, site, ts, ap, wh, o in rows:
-    d = out.setdefault(f"{did}:{ch}", {"name": name, "site": site, "rows": []})
+    d = out.setdefault(f"{did}:{ch}", {"id": f"{did}:{ch}", "ch": ch, "name": name, "site": site, "rows": []})
     d["rows"].append({"t": ts.isoformat(), "w": float(ap) if ap is not None else None, "wh": float(wh) if wh is not None else None, "on": o})
 json.dump({"channels": list(out.values())}, open("site/shelly.json", "w"), ensure_ascii=False)
 print("Shelly: kanaler", len(out), "rader", len(rows))

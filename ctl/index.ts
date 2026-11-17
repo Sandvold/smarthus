@@ -115,6 +115,126 @@ async function lockTerrasse(email: string, unlock = false): Promise<[unknown, nu
   return code === 0 ? [{ ok: true, did: 'terrasse', action: unlock ? 'lås opp' : 'lås' }, 200] : [{ error: 'Homey svarte ikke: ' + msg }, 502];
 }
 
+// ---------- Styring av flere leverandører (alt på hvitliste, bekreftes med avlesing) ----------
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+async function secretsMap() { const s: Record<string, string> = {}; for (const r of await sql('select name, value from ctl_secrets')) s[r.name] = r.value; return s; }
+const form = (o: Record<string, string>) => new URLSearchParams(o);
+type Out = [Record<string, unknown>, number];
+
+// Shelly (Stikk oppvarmet drivhus): kun kanalene fra config/shelly.json.
+const SHELLY_DEV = '98a3167b1668';
+const SHELLY_CH: Record<string, string> = { '0': 'Vekstlys', '1': 'Ventilasjonsvifte', '2': 'Uttak 3', '3': 'Uttak 4' };
+function shellyBase(s: Record<string, string>) { const v = (s.SHELLY_SERVER || '').trim().replace(/\/$/, ''); return v ? (v.startsWith('http') ? v : 'https://' + v) : ''; }
+async function shellyOutput(s: Record<string, string>, ch: string): Promise<boolean | null> {
+  const r: any = await (await fetch(shellyBase(s) + '/device/all_status', { method: 'POST', body: form({ auth_key: s.SHELLY_AUTH_KEY }), signal: AbortSignal.timeout(8000) })).json();
+  const o = r?.data?.devices_status?.[SHELLY_DEV]?.['switch:' + ch]?.output;
+  return typeof o === 'boolean' ? o : null;
+}
+async function actShelly(b: any): Promise<Out> {
+  const ch = String(b.ch);
+  if (!(ch in SHELLY_CH) || typeof b.on !== 'boolean') return [{ error: 'ugyldig kanal eller verdi' }, 400];
+  const s = await secretsMap();
+  if (!s.SHELLY_AUTH_KEY || !shellyBase(s)) return [{ error: 'Shelly er ikke satt opp ennå (kjør Hent målinger)' }, 503];
+  let r: any = await (await fetch(shellyBase(s) + '/device/relay/control', { method: 'POST', body: form({ id: SHELLY_DEV, channel: ch, turn: b.on ? 'on' : 'off', auth_key: s.SHELLY_AUTH_KEY }), signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+  if (!r.isok) { // nyere API som reserve
+    r = await (await fetch(shellyBase(s) + '/v2/devices/api/set/switch?auth_key=' + encodeURIComponent(s.SHELLY_AUTH_KEY), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: SHELLY_DEV, channel: Number(ch), on: b.on }), signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+    if (r.isok === false || r.error) return [{ error: 'Shelly svarte: ' + JSON.stringify(r.errors || r.error || r).slice(0, 80) }, 502];
+  }
+  await sleep(1500);
+  const now = await shellyOutput(s, ch).catch(() => null);
+  return [{ ok: true, name: SHELLY_CH[ch], on: b.on, state: now }, 200];
+}
+
+// Adax: innstilt temperatur 5–30 °C, kun rom som finnes på kontoen.
+async function adaxToken(s: Record<string, string>) {
+  const t: any = await (await fetch('https://api-1.adax.no/client-api/auth/token', { method: 'POST', body: form({ grant_type: 'password', username: s.ADAX_ACCOUNT_ID, password: s.ADAX_PASSWORD }), signal: AbortSignal.timeout(8000) })).json();
+  return t.access_token as string | undefined;
+}
+async function adaxRooms(tok: string) { return ((await (await fetch('https://api-1.adax.no/client-api/rest/v1/content/', { headers: { Authorization: 'Bearer ' + tok }, signal: AbortSignal.timeout(8000) })).json()) as any).rooms as any[] || []; }
+async function actAdax(b: any): Promise<Out> {
+  const t = Number(b.target);
+  if (!Number.isFinite(t) || t < 5 || t > 30 || Math.round(t * 2) !== t * 2) return [{ error: 'temperatur må være 5–30 °C i steg på 0,5' }, 400];
+  const s = await secretsMap();
+  if (!s.ADAX_ACCOUNT_ID || !s.ADAX_PASSWORD) return [{ error: 'Adax er ikke satt opp ennå (kjør Hent målinger)' }, 503];
+  const tok = await adaxToken(s); if (!tok) return [{ error: 'Adax-innlogging feilet' }, 502];
+  const room = (await adaxRooms(tok)).find(r => String(r.id) === String(b.room));
+  if (!room) return [{ error: 'ukjent rom' }, 400];
+  const r = await fetch('https://api-1.adax.no/client-api/rest/v1/control/', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'content-type': 'application/json' }, body: JSON.stringify({ rooms: [{ id: room.id, targetTemperature: String(Math.round(t * 100)) }] }), signal: AbortSignal.timeout(8000) });
+  if (!r.ok) return [{ error: 'Adax svarte HTTP ' + r.status }, 502];
+  await sleep(1500);
+  const now = (await adaxRooms(tok).catch(() => [])).find(x => String(x.id) === String(room.id));
+  return [{ ok: true, name: room.name, target: t, state: now?.targetTemperature != null ? now.targetTemperature / 100 : null }, 200];
+}
+
+// Gardena: kun ventiler. Start vanning 1–30 min, eller stopp.
+const GB = 'https://api.smart.gardena.dev/v1';
+async function gardenaFind(s: Record<string, string>, id: string) {
+  for (const [cid, sec] of [[s.GARDENA_CLIENT_ID, s.GARDENA_CLIENT_SECRET], [s.GARDENA_CLIENT_ID_2, s.GARDENA_CLIENT_SECRET_2]]) {
+    if (!cid || !sec) continue;
+    const t: any = await (await fetch('https://api.authentication.husqvarnagroup.dev/v1/oauth2/token', { method: 'POST', body: form({ grant_type: 'client_credentials', client_id: cid, client_secret: sec }), signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+    if (!t.access_token) continue;
+    const h = { Authorization: 'Bearer ' + t.access_token, 'X-Api-Key': cid, 'Authorization-Provider': 'husqvarna', 'Content-Type': 'application/vnd.api+json' };
+    const locs: any = await (await fetch(GB + '/locations', { headers: h, signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+    for (const l of locs.data || []) {
+      const d: any = await (await fetch(`${GB}/locations/${l.id}`, { headers: h, signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+      const inc = d.included || [];
+      const v = inc.find((x: any) => x.type === 'VALVE' && x.id === id);
+      if (v) return { h, loc: l.id, name: inc.find((x: any) => x.type === 'COMMON' && x.id === id)?.attributes?.name?.value || id };
+    }
+  }
+  return null;
+}
+async function actGardena(b: any): Promise<Out> {
+  if (typeof b.id !== 'string' || !['start', 'stop'].includes(b.cmd)) return [{ error: 'ugyldig' }, 400];
+  const min = Number(b.minutes);
+  if (b.cmd === 'start' && !(Number.isInteger(min) && min >= 1 && min <= 30)) return [{ error: 'vanningstid må være 1–30 minutter' }, 400];
+  const s = await secretsMap();
+  if (!s.GARDENA_CLIENT_ID) return [{ error: 'Gardena er ikke satt opp ennå (kjør Hent målinger)' }, 503];
+  const f = await gardenaFind(s, b.id); if (!f) return [{ error: 'fant ikke ventilen' }, 404];
+  const attributes: any = b.cmd === 'start' ? { command: 'START_SECONDS_TO_OVERRIDE', seconds: min * 60 } : { command: 'STOP_UNTIL_NEXT_TASK' };
+  const r = await fetch(`${GB}/command/${b.id}`, { method: 'PUT', headers: f.h, body: JSON.stringify({ data: { id: 'ctl-' + Date.now(), type: 'VALVE_CONTROL', attributes } }), signal: AbortSignal.timeout(8000) });
+  if (!(r.status >= 200 && r.status < 300)) return [{ error: 'Gardena svarte HTTP ' + r.status }, 502];
+  await sleep(2500);
+  const d: any = await (await fetch(`${GB}/locations/${f.loc}`, { headers: f.h, signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+  const act = (d.included || []).find((x: any) => x.type === 'VALVE' && x.id === b.id)?.attributes?.activity?.value ?? null;
+  return [{ ok: true, name: f.name, cmd: b.cmd, state: act }, 200];
+}
+
+// Zaptec: kun pause (506) og fortsett (507), med tilstandssjekk. Aldri omstart eller firmware.
+async function actZaptec(b: any): Promise<Out> {
+  if (typeof b.id !== 'string' || !['pause', 'resume'].includes(b.cmd)) return [{ error: 'ugyldig' }, 400];
+  const s = await secretsMap();
+  if (!s.ZAPTEC_USERNAME || !s.ZAPTEC_PASSWORD) return [{ error: 'Zaptec er ikke satt opp ennå (kjør Hent målinger)' }, 503];
+  const t: any = await (await fetch('https://api.zaptec.com/oauth/token', { method: 'POST', body: form({ grant_type: 'password', username: s.ZAPTEC_USERNAME, password: s.ZAPTEC_PASSWORD }), signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+  if (!t.access_token) return [{ error: 'Zaptec-innlogging feilet' }, 502];
+  const H = { Authorization: 'Bearer ' + t.access_token };
+  const chs: any = await (await fetch('https://api.zaptec.com/api/chargers', { headers: H, signal: AbortSignal.timeout(8000) })).json().catch(() => ({}));
+  const ch = (chs.Data || []).find((c: any) => c.Id === b.id); if (!ch) return [{ error: 'ukjent lader' }, 404];
+  const state = async () => { const st: any = await (await fetch(`https://api.zaptec.com/api/chargers/${b.id}/state`, { headers: H, signal: AbortSignal.timeout(8000) })).json().catch(() => []); const m: Record<number, string> = {}; for (const x of st || []) m[x.StateId] = x.ValueAsString; return { mode: Number(m[710]), final: m[718] }; };
+  const s0 = await state();
+  if (b.cmd === 'pause' && s0.mode !== 3) return [{ error: 'Laderen lader ikke akkurat nå, så den kan ikke pauses' }, 409];
+  if (b.cmd === 'resume' && !(s0.mode === 5 && s0.final === '1')) return [{ error: 'Laderen står ikke pauset av en pausekommando, så «fortsett» brukes ikke' }, 409];
+  const r = await fetch(`https://api.zaptec.com/api/chargers/${b.id}/sendCommand/${b.cmd === 'pause' ? 506 : 507}`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, signal: AbortSignal.timeout(10000) });
+  if (!(r.status >= 200 && r.status < 300)) return [{ error: 'Zaptec svarte HTTP ' + r.status }, 502];
+  await sleep(3000);
+  const s1 = await state().catch(() => null);
+  return [{ ok: true, name: ch.Name || ch.DeviceId, cmd: b.cmd, state: s1 ? s1.mode : null }, 200];
+}
+
+async function actDispatch(email: string, b: any): Promise<Out> {
+  const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : '';
+  if (!key) return [{ error: 'ukjent handling' }, 400];
+  await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
+  if ((await sql("select 1 from ctl_log where did = $1 and ts > now() - interval '3 seconds' limit 1", [key])).length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
+  let res: Out;
+  try { res = b.act === 'shelly' ? await actShelly(b) : b.act === 'adax' ? await actAdax(b) : b.act === 'gardena' ? await actGardena(b) : await actZaptec(b); }
+  catch (e: any) { res = [{ error: 'ingen kontakt: ' + String(e?.message || e).slice(0, 60) }, 502]; }
+  const [body, st] = res;
+  const what = b.act === 'shelly' ? (b.on ? 'på' : 'av') : b.act === 'adax' ? 'sett ' + b.target : b.cmd === 'start' ? 'start ' + b.minutes + ' min' : b.cmd;
+  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, key, what, st === 200 ? 0 : st, st === 200 ? null : String(body.error).slice(0, 120)]);
+  return res;
+}
+
 function cors(req: Request): Record<string, string> {
   const o = req.headers.get('origin') || '';
   const h: Record<string, string> = { 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Vary': 'Origin' };
@@ -159,6 +279,7 @@ export default {
         return json(req, { plugs: await plugStates(undefined, q.get('did')) });
       }
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
+      if (typeof b.act === 'string') { const [body, st] = await actDispatch(email, b); return json(req, body, st); }
       if (b.lock === 'terrasse') {
         const [body, st] = await lockTerrasse(email, b.unlock === true); return json(req, body, st);
       }

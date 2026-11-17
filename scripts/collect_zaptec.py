@@ -29,7 +29,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
         con.execute("insert into zaptec_readings (charger_id,name,online,mode,power_w,session_kwh,v1,i1,i2,i3) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", r)
     out = {}
     for cid, name, ts, on, mo, pw, se in con.execute("select charger_id,name,ts,online,mode,power_w,session_kwh from zaptec_readings where ts > now() - interval '30 days' order by ts").fetchall():
-        d = out.setdefault(cid, {"name": name, "site": SITE, "rows": []})
+        d = out.setdefault(cid, {"id": cid, "name": name, "site": SITE, "rows": []})
         f = lambda x: None if x is None else float(x)
         d["rows"].append({"t": ts.isoformat(), "on": f(on), "m": f(mo), "w": f(pw), "kwh": f(se)})
 os.makedirs("site", exist_ok=True)

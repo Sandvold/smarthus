@@ -35,7 +35,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
 out = {}
 for did, name, kind, ts, sh, st, act, b, link in rows:
     if not name: continue
-    d = out.setdefault(did, {"name": name, "kind": kind, "site": (devs.get(did) or {}).get("site"), "rows": []})
+    d = out.setdefault(did, {"id": did, "name": name, "kind": kind, "site": (devs.get(did) or {}).get("site"), "rows": []})
     d["rows"].append({"t": ts.isoformat(), "hum": None if sh is None else float(sh), "temp": None if st is None else float(st), "act": act, "batt": b, "link": link})
 json.dump({"devices": list(out.values())}, open("site/gardena.json", "w"), ensure_ascii=False)
 print("Gardena: enheter", len(out), "rader", len(rows))

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smarthus: sjekkliste styring</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0f1216;color:#e6e9ee;font:16px/1.45 system-ui,sans-serif;padding:16px;max-width:720px;margin:auto}
+h1{font-size:22px;margin:8px 0 4px}
+.sub{color:#8b94a3;font-size:14px;margin-bottom:12px}
+.bar{height:8px;background:#222831;border-radius:4px;overflow:hidden;margin:8px 0 18px}
+.bar i{display:block;height:100%;width:0;background:#3ecf8e;transition:width .2s}
+h2{font-size:17px;margin:22px 0 6px;color:#9ec5ff}
+label{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:#171b21;border-radius:10px;margin:6px 0;cursor:pointer}
+input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:#3ecf8e}
+label.done span.t{color:#6f7886;text-decoration:line-through}
+.h{display:block;font-size:13px;color:#8b94a3;margin-top:2px}
+.tag{font-size:11px;padding:1px 7px;border-radius:9px;margin-left:6px;vertical-align:middle}
+.ok{background:#173a2a;color:#3ecf8e}.nt{background:#3a3217;color:#f0c24b}
+button{background:#222831;color:#e6e9ee;border:0;border-radius:8px;padding:8px 14px;margin-top:18px}
+</style>
+</head>
+<body>
+<h1>Sjekkliste: styring og status</h1>
+<div class="sub">Huk av når du har testet selv på ekte utstyr. <span class="tag ok">bekreftet</span> = du har sett det virke tidligere. <span class="tag nt">ikke testet</span> = ikke prøvd ennå.</div>
+<div class="bar"><i id="p"></i></div>
+<div id="list"></div>
+<button onclick="reset()">Nullstill avhuking</button>
+<script>
+const S=[
+["Drivhus: Lys, Varme, Ventilasjon (Aqara)",[
+["Lys: På gir «Bekreftet: på» og W stiger","ok","Du så 50 W etter På."],
+["Lys: Av gir «Bekreftet: av» og W faller til 0","ok",""],
+["Varme: På og Av bekreftes","nt","Test med lav belastning først."],
+["Ventilasjon: På og Av bekreftes","nt",""],
+["Avbryt i bekreftelsesdialogen gjør ingenting","nt","Trykk På, så Avbryt: ingenting skal skje og ingen feilmelding."],
+["Sanntid (5 s) kjører bare på de som er skrudd på","ok","Skal stoppe etter ca. 2 min eller når den er av."],
+["Etter refresh vises sist kjente tilstand riktig (ikke gammel «på»)","ok","Kortet viser «sist sjekket HH:MM»."],
+["Kortet oppdateres også etter Av (ikke bare etter På)","nt","Du meldte dette som feil tidligere. Sjekk at kortet og meldingen stemmer overens."]
+]],
+["Terrasedør Oslo (Yale via Homey)",[
+["Lås: dialog vises, og «Bekreftet: låst (tid)» kommer","ok","«Funket fra siden»."],
+["Dialogen advarer hvis dørkontakten viser åpen","nt","Sensoren melder nesten alltid åpen, så advarselen er forventet."],
+["Kort, overskrift og historikk viser låst etter statusrapport","nt","Ny logikk, ikke sett i nettleser ennå."],
+["Etter refresh vises riktig låsstatus","nt","Hentes fra siste statusrapport fra Homey."],
+["Lås opp: kun vanlig dialog «Låse OPP terrassedøren?» (ingen skrevet tekst)","nt","Ny endring."],
+["Lås opp: Homey-flowen laas_opp_terrasse finnes og kjører lasstatus.js","nt","Logic-hendelse, så Lås opp Terrasedør, så Kjør script."],
+["Lås opp: «Bekreftet: ulåst» kommer, og kortet oppdateres","nt","Test selv ved døren."],
+["To trykk raskt etter hverandre: andre avvises (10 s begrensning)","nt",""],
+["Hvis Homey ikke svarer: tydelig feilmelding, ikke «OK»","ok","Du har sett «Feilet: Homey svarte ikke»."]
+]],
+["Generelt",[
+["Innlogging med Google fungerer og gir tilgang","ok",""],
+["Hent målinger (collect.yml) kjører grønt","nt","Sjekk Actions-fanen etter siste endring."],
+["Logg: hver styring står i ctl_log med riktig handling","nt","På/Av, lås og lås opp."],
+["Siden fungerer på mobil (knapper store nok, dialoger vises)","nt",""]
+]]
+];
+let st={};try{st=JSON.parse(localStorage.getItem('sjekk')||'{}')}catch(e){}
+function save(){try{localStorage.setItem('sjekk',JSON.stringify(st))}catch(e){}}
+function draw(){
+ let n=0,d=0,h='';
+ S.forEach((g,gi)=>{h+='<h2>'+g[0]+'</h2>';g[1].forEach((it,i)=>{const k=gi+'-'+i;n++;const c=!!st[k];if(c)d++;
+  h+='<label class="'+(c?'done':'')+'"><input type="checkbox" '+(c?'checked':'')+' onchange="tg(\''+k+'\')"><div><span class="t">'+it[0]+'</span><span class="tag '+it[1]+'">'+(it[1]=='ok'?'bekreftet':'ikke testet')+'</span>'+(it[2]?'<span class="h">'+it[2]+'</span>':'')+'</div></label>';});});
+ document.getElementById('list').innerHTML=h;
+ document.getElementById('p').style.width=(100*d/n)+'%';
+}
+function tg(k){st[k]=!st[k];save();draw()}
+function reset(){st={};save();draw()}
+draw();
+</script>
+</body>
+</html>
