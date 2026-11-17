@@ -94,10 +94,10 @@ async function setPlug(did: string, on: boolean) {
 }
 
 // Låser terrassedøren (Yale) via en Homey-webhook. Kun "lås" – aldri opplåsing herfra.
-async function lockTerrasse(email: string): Promise<[unknown, number]> {
+async function lockTerrasse(email: string, unlock = false): Promise<[unknown, number]> {
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
-  const url = (await sql("select value from ctl_secrets where name = 'HOMEY_LOCK_URL'"))[0]?.value;
-  if (!url) return [{ error: 'Homey-lås er ikke satt opp ennå' }, 503];
+  const url = (await sql('select value from ctl_secrets where name = $1', [unlock ? 'HOMEY_UNLOCK_URL' : 'HOMEY_LOCK_URL']))[0]?.value;
+  if (!url) return [{ error: unlock ? 'Opplåsing er ikke satt opp ennå' : 'Homey-lås er ikke satt opp ennå' }, 503];
   const recent = await sql("select 1 from ctl_log where did = 'terrasse' and ts > now() - interval '10 seconds' limit 1");
   if (recent.length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
   let code = 0, msg: string | null = null;
@@ -111,8 +111,8 @@ async function lockTerrasse(email: string): Promise<[unknown, number]> {
     code = ok ? 0 : (nw ?? old ?? -1);
     msg = (ok ? 'Success' : 'Feil') + ' old:' + (old ?? '-') + ' new:' + (nw ?? '-');
   } catch { code = -1; msg = 'ingen kontakt med Homey'; }
-  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, 'terrasse', 'lås', code, msg]);
-  return code === 0 ? [{ ok: true, did: 'terrasse', action: 'lås' }, 200] : [{ error: 'Homey svarte ikke: ' + msg }, 502];
+  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, 'terrasse', unlock ? 'lås opp' : 'lås', code, msg]);
+  return code === 0 ? [{ ok: true, did: 'terrasse', action: unlock ? 'lås opp' : 'lås' }, 200] : [{ error: 'Homey svarte ikke: ' + msg }, 502];
 }
 
 function cors(req: Request): Record<string, string> {
@@ -159,7 +159,11 @@ export default {
         return json(req, { plugs: await plugStates(undefined, q.get('did')) });
       }
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
-      if (b.lock === 'terrasse') { const [body, st] = await lockTerrasse(email); return json(req, body, st); }
+      if (b.lock === 'terrasse') {
+        // Opplåsing krever eksplisitt bekreftelsestekst i tillegg til innloggingen.
+        if (b.unlock === true && b.confirm !== 'LÅS OPP') return json(req, { error: 'mangler bekreftelse' }, 400);
+        const [body, st] = await lockTerrasse(email, b.unlock === true); return json(req, body, st);
+      }
       if (typeof b.did !== 'string' || !(b.did in PLUGS) || typeof b.on !== 'boolean') return json(req, { error: 'ugyldig enhet eller verdi' }, 400);
       await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
       const recent = await sql("select 1 from ctl_log where did = $1 and ts > now() - interval '3 seconds' limit 1", [b.did]);

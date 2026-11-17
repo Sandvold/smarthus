@@ -271,7 +271,7 @@ function secHage(pl){let h='',sub=[];const g=gdList(pl),m=hmList(pl,'mower');
  if(!h)return null;return sec('hage',pl==='drivhus'?'Vanning':'Hage',sub.join(' · '),el(h),{open:pl==='drivhus'})}
 function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
  const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
- const tc=pl==='oslo'&&L.find(c=>c.name==='Terrasedør');const btn=tc?`<div class="tile"><div class="s">Terrasedør (Yale)</div><div style="margin-top:8px"><button onclick="lockTerrasse(this)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Lås</button></div><div class="s" data-pm="terrasse"></div></div>`:'';
+ const tc=pl==='oslo'&&L.find(c=>c.name==='Terrasedør');const btn=tc?`<div class="tile"><div class="s">Terrasedør (Yale)</div><div style="margin-top:8px"><button onclick="lockTerrasse(this)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Lås</button> <button onclick="lockTerrasse(this,true)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Lås opp</button></div><div class="s" data-pm="terrasse"></div></div>`:'';
  return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+btn+L.map(lockHist).join(''))),{open:false})}
 function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
 function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===pl;
@@ -572,16 +572,18 @@ async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Sl�
  show(st);
  if(on){const my=lv&&(lv._run=(lv._run||0)+1);for(let i=0;i<24&&lv&&lv._run===my&&document.body.contains(lv);i++){await new Promise(z=>setTimeout(z,5000));if(lv._run!==my)break;const s2=await one();if(!s2||s2.on===false){show(s2);break}show(s2)}}
  else if(lv){lv._run=(lv._run||0)+1}}
-async function lockTerrasse(b){const tc=(HM&&HM.devices||[]).find(x=>x.name==='Terrasedør'),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
- if(!confirm('Låse terrassedøren?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
- const msg=document.querySelector('[data-pm="terrasse"]');b.disabled=true;msg.textContent='Sender …';
- const t0=Date.now()-2000;const r=await ctlCall('POST',{lock:'terrasse'});
- if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);b.disabled=false;return}
+async function lockTerrasse(b,unlock){const tc=(HM&&HM.devices||[]).find(x=>x.name==='Terrasedør'),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
+ let conf=null;
+ if(unlock){conf=prompt('Låse OPP terrassedøren?\n\nSkriv LÅS OPP (store bokstaver) for å bekrefte.');if(conf!=='LÅS OPP'){if(conf!==null)alert('Avbrutt: teksten stemte ikke.');return}}
+ else if(!confirm('Låse terrassedøren?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
+ const msg=document.querySelector('[data-pm="terrasse"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
+ const t0=Date.now()-2000,want=!unlock;const r=await ctlCall('POST',unlock?{lock:'terrasse',unlock:true,confirm:conf}:{lock:'terrasse'});
+ if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);bs.forEach(x=>x.disabled=false);return}
  msg.textContent='Sendt til Homey. Venter på statusrapport …';
  for(let i=0;i<10;i++){await new Promise(z=>setTimeout(z,3000));const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs.terrasse;
-  if(s&&s.ts&&new Date(s.ts).getTime()>t0){const txt=s.on?'Bekreftet: låst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')':'Døren står fortsatt ulåst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')';
+  if(s&&s.ts&&new Date(s.ts).getTime()>t0){const tm=new Date(s.ts).toLocaleTimeString('nb-NO');const txt=(!!s.on)===want?'Bekreftet: '+(s.on?'låst':'ulåst')+' ('+tm+')':(s.on?'Døren står fortsatt låst':'Døren står fortsatt ulåst')+' ('+tm+')';
    injectLock(s);render();const m2=document.querySelector('[data-pm="terrasse"]');if(m2)m2.textContent=txt;return}}
- msg.textContent='Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.';b.disabled=false}
+ msg.textContent='Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.';bs.forEach(x=>x.disabled=false)}
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
 const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
