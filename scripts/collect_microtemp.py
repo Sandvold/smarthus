@@ -38,23 +38,18 @@ try:
         tried.append(f"{method} {path.split('/')[-1]}: HTTP {resp.status_code} " + (str(j.get("Message") or j.get("MessageDetail") or sorted(j.keys()))[:120] if isinstance(j, dict) else "liste"))
         if resp.status_code == 200 and isinstance(j, dict) and "GroupContents" in j:
             g = j; break
-    OUT["tried"] = tried
     if not g:
         OUT["error"] = "Fant ikke riktig endepunkt for termostatlisten."; done(); print(OUT["error"]); sys.exit(0)
     if g.get("ErrorCode") not in (0, None):
         OUT["error"] = f"Henting feilet (ErrorCode {g.get('ErrorCode')})"; done(); print(OUT["error"]); sys.exit(0)
     gc = g.get("GroupContents") or []
-    OUT["debug"] = {"top": sorted(g.keys()), "groups": len(gc), "group_keys": sorted(gc[0].keys()) if gc and isinstance(gc[0], dict) else None}
-    for k, v in (gc[0].items() if gc and isinstance(gc[0], dict) else []):
-        if isinstance(v, list) and v and isinstance(v[0], dict):
-            OUT["debug"]["list_" + k] = {"n": len(v), "keys": sorted(v[0].keys())}
     found = []
     for grp in g.get("GroupContents") or []:
         for t in (grp.get("Thermostats") or grp.get("Thermostat") or grp.get("Devices") or []):
             c = lambda x: None if x is None else round(float(x) / 100, 1)
             found.append({"serial": str(val(t, "SerialNumber", "Id")), "name": val(t, "ThermostatName", "Name") or grp.get("GroupName"),
                           "room": c(val(t, "RoomTemperature")), "floor": c(val(t, "FloorTemperature")),
-                          "set": c(val(t, "SetPointTemp", "ManualModeSetpoint", "ComfortSetpoint")),
+                          "set": c(val(t, "ManualModeSetpoint")) if val(t, "RegulationMode") == 3 else None,
                           "heating": bool(val(t, "Heating")), "mode": val(t, "RegulationMode"), "online": val(t, "Online")})
     with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
         con.execute("""create table if not exists microtemp_readings (ts timestamptz not null default now(), serial text, name text,
