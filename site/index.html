@@ -65,7 +65,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null;
+let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -268,8 +268,16 @@ function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
  const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
  return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+L.map(lockHist).join(''))),{open:false})}
 function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
+function secKjokken(pl){if(pl!=='oslo')return null;let h='',sub=[];
+ if(MI){if(MI.error)h+=waiting('Miele: '+MI.error);
+  (MI.devices||[]).forEach(d=>{const l=d.rows[d.rows.length-1];if(!l)return;const warm=l.target!=null&&l.temp!=null&&l.temp>l.target+3;
+   h+=`<div class="tile"><div class="s">${d.name||d.type} (Miele)</div><div class="n">${l.temp==null?'–':nf(l.temp,1)+' °C'}</div><div class="s">${l.status||''}${l.target!=null?' · mål '+nf(l.target,1)+' °C':''}${l.door?' · dør åpen':''}${warm?' · for varmt':''}</div><div class="s">oppdatert ${ago(l.t)}</div></div>`;sub.push(d.name||d.type)})}
+ if(LG){if(LG.error)h+=waiting('LG: '+LG.error);
+  (LG.devices||[]).forEach(d=>{const l=d.rows[d.rows.length-1];if(!l)return;const s=l.s||{};const keys=Object.keys(s).filter(k=>/operation|state|temperature|remain|mode|power/i.test(k)).slice(0,6);
+   h+=`<div class="tile"><div class="s">${d.name||d.type} (LG)</div>${keys.map(k=>`<div class="s">${k.split('.').pop()}: ${s[k]}</div>`).join('')||'<div class="s">ingen tilstand</div>'}<div class="s">oppdatert ${ago(l.t)}</div></div>`;sub.push(d.name||d.type)})}
+ if(!h)return null;return sec('kjokken','Kjøkken (ovn og kjøleskap)',sub.join(' · ')||'ikke koblet',el(grid(h)),{open:false})}
 function placeView(pl){const w=document.createElement('div');
- const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
+ const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));w.appendChild(secPlan('oslo','Drivhus Oslo','Her kommer målinger når Aqara-prosjektet er godkjent og sensorene er hentet inn.'))}
  if(pl==='oslo')w.appendChild(secPlan('aqara','Aqara-sensorer','Venter på at Aqara-utviklerprosjektet blir godkjent (pending review).'));
  if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
@@ -338,10 +346,10 @@ const TODO=[
  ['Datakilder','mill','Mill-ovner','Finn ut hvilken generasjon. Gen 3 har lokalt API, ellers må det søkes om API-nøkkel.'],
  ['Datakilder','salus','Salus gulvvarme (Arendal)','Trenger modell på gateway og termostater. Kan kreve lokal relé i Arendal.'],
  ['Datakilder','drivhus-oslo','Sensorer i drivhuset i Oslo','Avklar hvilke sensorer som skal måle der.'],
- ['Datakilder','zaptec','Zaptec-lader i Arendal','Koden er ferdig. Legg inn secrets ZAPTEC_USERNAME og ZAPTEC_PASSWORD i GitHub (helst en egen bruker med lesetilgang), så begynner data å komme inn.'],
  ['Datakilder','pulse-ar','Tibber Pulse i Arendal','Pulse er aktiv i Oslo, men ikke i Arendal-hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'],
  ['Datakilder','hp-effekt','Effekt på varmepumpen i Arendal','Pumpen rapporterer 0 W. Trenger Pulse i Arendal og/eller en egen måler (for eksempel Shelly EM) på pumpens kurs. Pulse-historikk samles nå for kalibrering.'],
- ['Datakilder','microtemp','Microtemp (Oslo, MWD5, kunde-ID 15)','Innhenting er bygget og secrets er lagt inn. Første kjøring avgjør om skyen godtar kunde-ID 15. Hvis ikke vises feilen i Oslo-fanen under Varme.'],
+ ['Datakilder','miele','Miele-kjøleskap: godkjenn tilgang','Kjør «Miele»-workflowen i GitHub Actions med kode og redirect-URI (én gang). Deretter kommer temperatur inn.'],
+ ['Datakilder','lg','LG-ovn (ThinQ)','Innhenting er bygget. Hvis LG avviser Europa-konto vises feilen i Oslo-fanen under Kjøkken.'],
  ['Datakilder','klipper-flow','Raskere klipperstatus','Lag en Homey-flow som sender status med en gang klipperen endrer status, ikke bare hvert 15. minutt.'],
  ['Datakilder','a1','Dreame A1 viser tilgjengelig i Homey, offline i appen','Sjekk om Homey viser gammel status.'],
  ['Dashboard','alarm','Varsler på mobil eller e-post','Frost, lavt batteri, ulåst dør og frakoblede enheter.'],
@@ -350,6 +358,8 @@ const TODO=[
  ['Sikkerhet','login','Innlogging / privat hosting','Siden er offentlig og viser blant annet låsstatus. Flytt bak innlogging.'],
  ['Sikkerhet','tok','Minimal tilgang på GitHub-token i HomeyScript','Bruk et fine-grained token som bare får lov til å sende hendelser.']];
 const DONE=[
+ ['Zaptec: to ladere i Arendal koblet inn','17. nov'],
+ ['Microtemp: gulvvarme i Oslo (rom, gulv, innstilling)','17. nov'],
  ['Layout med faner for Oslo, Arendal og Drivhus, sammenleggbare seksjoner og oversikt','17. nov'],
  ['Varsler med mulighet til å skjule enkeltvarsler','17. nov'],
  ['Innsamling hvert kvarter, utløst av Homey (GitHub-cron var for ustabil)','17. nov'],
@@ -390,7 +400,7 @@ document.getElementById('range').addEventListener('change',e=>{hours=+e.target.v
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
 addEventListener('hashchange',()=>{TAB=(location.hash||'#oversikt').slice(1);render()});
 const J=f=>fetch(f).then(r=>r.ok?r.json():null).catch(()=>null);
-Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json')]).then(([h,g,a,s,p,d,u,z,m])=>{MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi])=>{LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
 </script>
 </body>
 </html>

@@ -1,0 +1,25 @@
+name: Miele
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: "Kode fra godkjenningen"
+        required: true
+      redirect:
+        description: "Redirect-URI som ble brukt"
+        required: true
+permissions:
+  contents: read
+jobs:
+  miele:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install requests "psycopg[binary]"
+      - run: python scripts/miele.py token "${{ inputs.code }}" "${{ inputs.redirect }}"
+        env:
+          MIELE_CLIENT_ID: ${{ secrets.MIELE_CLIENT_ID }}
+          MIELE_CLIENT_SECRET: ${{ secrets.MIELE_CLIENT_SECRET }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
