@@ -571,7 +571,12 @@ async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Sl�
 async function lockTerrasse(b){const tc=(HM&&HM.devices||[]).find(x=>x.name==='Terrasedør'),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
  if(!confirm('Låse terrassedøren?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
  const msg=document.querySelector('[data-pm="terrasse"]');b.disabled=true;msg.textContent='Sender …';
- const r=await ctlCall('POST',{lock:'terrasse'});msg.textContent=r.ok?'Låsekommando sendt til Homey. Sjekk i appen at den er låst.':'Feilet: '+(r.j.error||r.status);b.disabled=false}
+ const t0=Date.now()-2000;const r=await ctlCall('POST',{lock:'terrasse'});
+ if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);b.disabled=false;return}
+ msg.textContent='Sendt til Homey. Venter på statusrapport …';
+ for(let i=0;i<10;i++){await new Promise(z=>setTimeout(z,3000));const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs.terrasse;
+  if(s&&s.ts&&new Date(s.ts).getTime()>t0){msg.textContent=s.on?'Bekreftet: låst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')':'Døren står fortsatt ulåst ('+new Date(s.ts).toLocaleTimeString('nb-NO')+')';b.disabled=false;return}}
+ msg.textContent='Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.';b.disabled=false}
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
 const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);

@@ -106,7 +106,7 @@ async function lockTerrasse(email: string): Promise<[unknown, number]> {
     const get = (u: string) => fetch(u, { method: 'GET', signal: AbortSignal.timeout(4000) }).then(x => x.status).catch(() => -1);
     // Eldre Homey Pro (2016–2019, 24-tegns ID) nås via connect.athom.com. Prøv den først.
     const old = m && /^[0-9a-f]{24}$/.test(m[1]) ? await get(`https://${m[1]}.connect.athom.com/api/manager/logic/webhook/${m[2]}?tag=web`) : null;
-    const nw = old !== null && old >= 200 && old < 300 ? null : await get(url);
+    const nw = old !== null ? null : await get(url);
     const ok = (old !== null && old >= 200 && old < 300) || (old === null && nw !== null && nw >= 200 && nw < 300);
     code = ok ? 0 : (nw ?? old ?? -1);
     msg = (ok ? 'Success' : 'Feil') + ' old:' + (old ?? '-') + ' new:' + (nw ?? '-');
@@ -128,6 +128,16 @@ export default {
   async fetch(req: Request) {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
     if (req.method !== 'GET' && req.method !== 'POST') return json(req, { error: 'method' }, 405);
+    if (req.method === 'POST' && req.headers.get('x-push-token')) {
+      // Homey rapporterer låsestatus (kun terrassedøren). Eget token, ikke Google-innlogging.
+      const tok = (await sql("select value from ctl_secrets where name = 'HOMEY_PUSH_TOKEN'"))[0]?.value;
+      if (!tok || req.headers.get('x-push-token') !== tok) return json(req, { error: 'unauthorized' }, 401);
+      let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
+      if (typeof b.locked !== 'boolean') return json(req, { error: 'ugyldig' }, 400);
+      await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');
+      await sql("insert into plug_state (did, name, on_state, power, ts) values ('terrasse','Terrasedør',$1,null,now()) on conflict (did) do update set on_state=$1, ts=now()", [b.locked]);
+      return json(req, { ok: true });
+    }
     const auth = req.headers.get('authorization') || '';
     if (!auth.toLowerCase().startsWith('bearer ')) return json(req, { error: 'unauthorized' }, 401);
     let payload: any;
