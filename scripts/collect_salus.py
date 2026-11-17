@@ -2,7 +2,7 @@
 import json, os, sys
 import requests
 
-E, P = os.environ.get("SALUS_EMAIL"), os.environ.get("SALUS_PASSWORD")
+E, P = (os.environ.get("SALUS_EMAIL") or "").strip(), (os.environ.get("SALUS_PASSWORD") or "").strip()
 if not (E and P):
     print("SALUS_EMAIL/SALUS_PASSWORD mangler, hopper over Salus"); sys.exit(0)
 BASE = os.environ.get("SALUS_HOST") or "https://openapi-eu.salusconnect.io"
@@ -23,7 +23,7 @@ try:
     r = requests.post(BASE + "/login", json={"email": E, "password": P}, timeout=30)
     tok = (r.json() or {}).get("access_token") if r.ok else None
     if not tok:
-        OUT["error"] = f"Innlogging avvist (HTTP {r.status_code})"; done(); print(OUT["error"]); sys.exit(0)
+        OUT["error"] = f"Innlogging avvist (HTTP {r.status_code}): " + r.text[:160].replace(E, "<e-post>").replace(P, "<passord>"); done(); print(OUT["error"]); sys.exit(0)
     H = {"Authorization": "Bearer " + tok}
     get = lambda p: requests.get(BASE + p, headers=H, timeout=30)
     gws = get("/premium-lite/gateways").json()
