@@ -548,6 +548,8 @@ async function getTok(){const isJ=t=>typeof t==='string'&&t.split('.').length===
  return isJ(t)?t:null}
 async function ctlCall(method,body,q){const t=await getTok();if(!t)return{ok:false,status:401,j:{error:'ikke innlogget'}};
  try{const r=await fetch(CTL_URL+(q||''),{method,headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}catch(e){return{ok:false,status:0,j:{error:'ingen kontakt'}}}}
+function applyTile(did,s){const bn=document.querySelector('[data-bn="'+did+'"]'),bt=document.querySelector('[data-bs="'+did+'"]');if(!s||!bn||!bt)return;bn.textContent=s.power!=null?nf(s.power,0)+' W':(s.on==null?'–':s.on?'På':'Av');const kw=bt.dataset.kwh;bt.textContent=(s.on==null?'':s.on?'på':'av')+(kw?(s.on==null?'':' · ')+kw+' kWh totalt':'')+' · live'}
+async function livePlugs(){const g=await ctlCall('GET');if(g.ok&&g.j.plugs)for(const [did,s] of Object.entries(g.j.plugs))applyTile(did,s)}
 async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Slå '+(on?'PÅ ':'AV ')+nm+'?'))return;
  const msg=document.querySelector('[data-pm="'+did+'"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
  const r=await ctlCall('POST',{did,on});
@@ -558,7 +560,7 @@ async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Sl�
  const st=await one();
  msg.textContent=st&&st.on!=null?(st.on===on?'Bekreftet: '+(on?'på':'av'):'Enheten svarte ikke ennå (står '+(st.on?'på':'av')+')'):'Sendt (kunne ikke bekrefte)';
  bs.forEach(x=>x.disabled=false);
- const tile=s=>{const bn=document.querySelector('[data-bn="'+did+'"]'),bt=document.querySelector('[data-bs="'+did+'"]');if(!s||!bn||!bt)return;bn.textContent=s.power!=null?nf(s.power,0)+' W':(s.on==null?'–':s.on?'På':'Av');const kw=bt.dataset.kwh;bt.textContent=(s.on==null?'':s.on?'på':'av')+(kw?(s.on==null?'':' · ')+kw+' kWh totalt':'')+' · oppdatert nå'};
+ const tile=s=>applyTile(did,s);
  const show=s=>{tile(s);if(lv&&s)lv.textContent='Sanntid: '+(s.power!=null?nf(s.power,0)+' W':'–')+' · '+(s.on==null?'ukjent':s.on?'på':'av')+' ('+new Date().toLocaleTimeString('nb-NO')+')'};
  show(st);
  if(on){const my=lv&&(lv._run=(lv._run||0)+1);for(let i=0;i<24&&lv&&lv._run===my&&document.body.contains(lv);i++){await new Promise(z=>setTimeout(z,5000));if(lv._run!==my)break;const s2=await one();if(!s2||s2.on===false){show(s2);break}show(s2)}}
@@ -568,7 +570,7 @@ const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
 function loginScreen(msg,out){const m=document.getElementById('main');
  m.innerHTML=`<div style="max-width:340px;margin:70px auto;text-align:center"><h2 style="margin:0 0 6px">Smarthus</h2><p class="s" style="margin:0 0 20px">${msg||'Logg inn for å se dataene.'}</p><button id="lg" style="font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${out?'Logg ut':'Logg inn med Google'}</button></div>`;
  document.getElementById('lg').onclick=async()=>{try{if(out){await AUTHC.signOut();location.reload()}else await AUTHC.signIn.social({provider:'google',callbackURL:location.origin+location.pathname})}catch(e){loginScreen('Feil: '+(e&&e.message||e))}}}
-function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq])=>{AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq])=>{AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
  const lo=document.createElement('p');lo.className='s';lo.style.textAlign='center';lo.innerHTML='<a href="#" id="lo">Logg ut</a>';document.body.appendChild(lo);document.getElementById('lo').onclick=async e=>{e.preventDefault();try{await AUTHC.signOut()}catch(x){}location.reload()}}
 (async()=>{const m=document.getElementById('main');m.textContent='Laster …';
  try{AUTHC=(await import('https://esm.sh/@neon/auth@0.8.2')).createAuthClient(AUTH_URL)}catch(e){loginScreen('Kunne ikke laste innloggingen. Prøv igjen senere.');return}
