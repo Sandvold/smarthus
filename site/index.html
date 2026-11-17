@@ -347,7 +347,12 @@ function secSystemer(){
  ['Adax (panelovner)','ok',lastT(((AX&&AX.rooms)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
  ['Gardena (to kontoer)','ok',lastT(((GD&&GD.devices)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
  ['Homey (Daikin, Dreame, Yale)','ok',lastT(((HM&&HM.devices)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
- ['Aqara (Oslo)','wait','venter på godkjenning'],['Inkbird ITC-308','todo','ikke koblet'],['Mill','todo','ikke koblet'],['Salus','todo','ikke koblet'],['Microtemp','todo','ikke koblet']];
+ ['Aqara (drivhus Oslo)',AQ&&!AQ.error&&(AQ.devices||[]).length?'ok':'wait',AQ&&!AQ.error?lastT((AQ.devices||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime()):'venter'],
+ ['Microtemp (gulvvarme Oslo)',MT&&!MT.error&&(MT.thermostats||[]).length?'ok':'wait',MT&&!MT.error?lastT((MT.thermostats||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime()):'feil'],
+ ['Zaptec (lader)',ZP&&(ZP.chargers||[]).length?'ok':'wait',ZP&&(ZP.chargers||[]).length?lastT(ZP.chargers.flatMap(c=>c.rows),x=>new Date(x.t).getTime()):'venter'],
+ ['LG ThinQ (vaskemaskin, ovn)',LG&&(LG.devices||[]).length?'ok':'wait',LG&&(LG.devices||[]).length?lastT(LG.devices.flatMap(c=>c.rows||[]),x=>new Date(x.t).getTime()):'venter'],
+ ['Miele (kjøleskap)','wait','venter på aktivering hos Miele'],
+ ['Inkbird ITC-308','todo','ikke koblet'],['Mill','todo','ikke koblet'],['Salus','todo','ikke koblet']];
  const ic={ok:'<span class="ok">● koblet</span>',wait:'<span class="warn">● venter</span>',todo:'<span class="s">○ mangler</span>'};
  return sec('sys','Datakilder',rows.filter(r=>r[1]==='ok').length+' av '+rows.length+' koblet',el('<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td>${ic[r[1]]}</td><td class="s">${r[2]}</td></tr>`).join('')+'</table>'),{open:false})}
 function overview(){const w=document.createElement('div'),A=alerts();
