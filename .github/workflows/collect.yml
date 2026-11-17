@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "23 */3 * * *"
   workflow_dispatch:
   repository_dispatch:
     types: [homey]
@@ -36,6 +36,12 @@ jobs:
           TUYA_HOST: ${{ vars.TUYA_HOST }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect_tibber.py
+        env:
+          TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: pip install websockets
+      - run: python scripts/collect_pulse.py
+        continue-on-error: true
         env:
           TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}

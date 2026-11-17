@@ -65,7 +65,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null;
+let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -140,12 +140,12 @@ function sensorCard(s){const last=s.rows[s.rows.length-1],since=Date.now()-86400
  <div class="s" style="margin-top:8px">Fuktighet ${nf(last.hum,0)} % · siste døgn ${nf(mn)} til ${nf(mx)} °C</div><div class="s">Batteri ${nf(last.batt,0)} %${bt}</div>
  <div class="s ${stale?'warn':''}">${stale?'⚠ Ingen ny måling siden ':'Oppdatert '}${fmt(last.t)}</div></div>`}
 const HIDE=/^(cmd_|mow_map|mower_volume|child_lock|firmware_update|secure_lock|lock_unlock_open|alarm_generic|swing_mode|fan_mode\.(speed|powerful)|cutting_height|mow_efficiency|collision|meter_power)/;
-const HNAME={measure_battery:'Batteri',measure_humidity:'Fuktighet',charging_status:'Lading',consumable_blade:'Knivslitasje %',alarm_contact:'Dør åpen',alarm_battery:'Lavt batteri',measure_temperature:'Temperatur',target_temperature:'Innstilt',onoff:'På',locked:'Låst',thermostat_mode:'Modus',lawn_mower_state:'Status',measure_power:'Effekt'};
-function homeyCard(c){const l=c.rows[c.rows.length-1],d=l.d||{},stale=Date.now()-new Date(l.t)>3*3600000||l.av===false;let main='–';
+const HNAME={measure_battery:'Batteri',measure_humidity:'Fuktighet',charging_status:'Lading',consumable_blade:'Knivslitasje %',alarm_contact:'Dør åpen',alarm_battery:'Lavt batteri',measure_temperature:'Temperatur',target_temperature:'Innstilt',onoff:'På',locked:'Låst',thermostat_mode:'Modus',lawn_mower_state:'Status',measure_power:'Effekt','measure_temperature.outdoorTemperature':'Ute','fan_mode.mode':'Vifte'};
+function homeyCard(c){if(c.kind==='mower')return mowerCard(c);const l=c.rows[c.rows.length-1],d=l.d||{},stale=Date.now()-new Date(l.t)>3*3600000||l.av===false;let main='–';
  if(c.kind==='lock'&&'locked' in d)main=d.locked?'Låst':'Ulåst';
  else if(c.kind==='daikin'&&d.measure_temperature!=null)main=nf(d.measure_temperature,1)+' °C';
  else if(c.kind==='mower'){const st=Object.entries(d).find(([k,v])=>typeof v==='string'&&/state|status|mode/i.test(k));main=st?String(st[1]).replace(/_/g,' '):(d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–')}
- const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!HIDE.test(k)&&!(c.kind==='daikin'&&k==='measure_temperature')&&!(c.kind==='mower'&&k==='mower_status')).slice(0,6).map(([k,v])=>(HNAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
+ const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!(c.kind==='lock'&&k==='alarm_contact')&&!HIDE.test(k)&&!(c.kind==='daikin'&&k==='measure_temperature')&&!(c.kind==='mower'&&k==='mower_status')).slice(0,6).map(([k,v])=>(HNAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/^temperature\./,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
  return `<div class="tile"><div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s">${extra}</div><div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}</div></div>`}
 function gardenaCard(c){const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
  const main=c.kind==='sensor'?(l.temp==null?'–':nf(l.temp,0)+' °C jord'):(l.act==='CLOSED'?'Ventil lukket':l.act||'–');
@@ -154,6 +154,70 @@ function gardenaCard(c){const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
 function adaxCard(c){const last=c.rows[c.rows.length-1],cut=Date.now()-86400000,v=c.rows.filter(x=>new Date(x.t).getTime()>=cut&&x.temp!=null).map(x=>x.temp);
  return `<div class="tile"><div class="s">${c.name}</div><div class="n">${last.temp==null?'–':nf(last.temp,1)+' °C'}</div><div class="s">Innstilt ${nf(last.target,1)} °C${last.on?'':' · av'}${v.length?' · 24 t: '+nf(Math.min(...v),1)+'–'+nf(Math.max(...v),1)+' °C':''}</div></div>`}
 function shellyCard(c){const s=shStats(c);return `<div class="tile"><div class="s">${c.name}</div><div class="n">${s.last.on?'På':'Av'}${s.last.w!=null?' · '+nf(s.last.w,0)+' W':''}</div><div class="s">24 t: ${s.kwh==null?'–':nf(s.kwh,2)+' kWh'}${s.share==null?'':' · på '+s.share+' % av tiden'}</div></div>`}
+
+/* ---------- tidslinje, klipper, lås, daikin ---------- */
+const mins=ms=>{const m=Math.round(ms/60000);return m<90?m+' min':(m/60).toFixed(1).replace('.',',')+' t'};
+const hhmm=t=>new Date(t).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+function strip(items,color,label){ /* items: [{t0,t1,k}] */
+ if(!items.length)return '';const a=items[0].t0,b=items[items.length-1].t1,W=600,x=t=>(t-a)/(b-a||1)*W;
+ return `<svg viewBox="0 0 ${W} 22" preserveAspectRatio="none" style="height:22px;border-radius:5px;background:#2a2f2d">${items.map(i=>`<rect x="${x(i.t0).toFixed(1)}" width="${Math.max(1,x(i.t1)-x(i.t0)).toFixed(1)}" y="0" height="22" fill="${color[i.k]||'#555'}"><title>${label[i.k]||i.k} ${hhmm(i.t0)}–${hhmm(i.t1)}</title></rect>`).join('')}</svg><div class="s" style="display:flex;justify-content:space-between"><span>${fmt(new Date(a))}</span><span>${fmt(new Date(b))}</span></div>`}
+function segs(rows,kf){const out=[];rows.forEach((r,i)=>{const t0=new Date(r.t).getTime(),n=rows[i+1],t1=n?new Date(n.t).getTime():t0+900000,k=kf(r,i);
+ const l=out[out.length-1];if(l&&l.k===k&&t0-l.t1<2400000)l.t1=t1;else out.push({t0,t1:Math.min(t1,t0+2400000),k})});return out}
+const MCOL={mowing:'#93a877',returning:'#7eaddb',docked:'#3d4642',idle:'#59615d',paused:'#d8a747',error:'#e08363',unknown:'#555'};
+const MLAB={mowing:'Klipper',returning:'Kjører hjem',docked:'På lader',idle:'Hviler',paused:'Pause',error:'Feil / står fast',unknown:'Ukjent'};
+const mcls=d=>{const s=String(d.mower_status||d.lawn_mower_state||'').toLowerCase();
+ if(/error|stuck|trap|fault|lift|tilt|emerg/.test(s)||d.alarm_generic===true)return'error';
+ if(/return|go.?home|docking/.test(s))return'returning';
+ if(/mow|work|clean|cutting|running|spot/.test(s))return'mowing';
+ if(/pause/.test(s))return'paused';
+ if(/dock|charg/.test(s)||/^charging$/.test(String(d.charging_status||'')))return'docked';
+ if(/idle|standby|sleep/.test(s))return'idle';return s?'unknown':'unknown'};
+function mowerInfo(c){const R=c.rows;if(!R.length)return null;
+ const eff=R.map((r,i)=>{const d=r.d||{},p=i?R[i-1].d||{}:null;let k=mcls(d),hid=false;
+  if(p&&((d.meter_area_total!=null&&p.meter_area_total!=null&&d.meter_area_total>p.meter_area_total)||(d.meter_time_total!=null&&p.meter_time_total!=null&&d.meter_time_total>p.meter_time_total))&&(k==='docked'||k==='idle'||k==='unknown')){k='mowing';hid=true}
+  return{r,k,hid}});
+ const last=eff[eff.length-1],act=k=>k==='mowing'||k==='returning'||k==='paused';
+ let i=eff.length-1;if(act(last.k)){while(i>0&&act(eff[i-1].k))i--}
+ const since=act(last.k)?new Date(eff[i].r.t).getTime():null,cur=since?Date.now()-since+0:0;
+ /* siste ferdige økt */
+ let prevEnd=null,prevStart=null;{let j=act(last.k)?i-1:eff.length-1;while(j>=0&&!act(eff[j].k))j--;if(j>=0){let e=j;while(j>0&&act(eff[j-1].k))j--;prevStart=new Date(eff[j].r.t).getTime();prevEnd=new Date(eff[e].r.t).getTime()+900000}}
+ const cut=Date.now()-86400000;let m24=0;eff.forEach((e,idx)=>{const t=new Date(e.r.t).getTime();if(t>cut&&e.k==='mowing')m24+=900000});
+ const d0=last.r.d||{};let stuck=null;
+ const lt=eff.filter(e=>act(e.k)===true);
+ if(last.k==='error')stuck='Feil eller står fast ('+String(d0.mower_status||'alarm')+')';
+ else if(last.k==='mowing'||last.k==='returning'){const n=eff.slice(-4);const same=n.length===4&&n.every(e=>(e.r.d||{}).measure_battery===(n[0].r.d||{}).measure_battery)&&n.every(e=>(e.r.d||{}).meter_area_total===(n[0].r.d||{}).meter_area_total)&&n.every(e=>act(e.k));
+  if(same)stuck='Står trolig fast: ingen endring i batteri eller areal på 45 min';
+  else if(since&&cur>5*3600000)stuck='Har klippet i '+mins(cur)+' uten å lade'}
+ return{eff,last,since,cur,act:act(last.k),prevStart,prevEnd,m24,stuck,d:d0}}
+function mowerCard(c){const l=c.rows[c.rows.length-1],stale=Date.now()-new Date(l.t)>3*3600000||l.av===false,I=mowerInfo(c);if(!I)return '';
+ const d=I.d,k=I.last.k,since=Date.now()-hours*3600000,sg=segs(c.rows.filter(r=>new Date(r.t).getTime()>since),(r)=>{const e=I.eff.find(x=>x.r===r);return e?e.k:'unknown'});
+ const lab=k==='docked'?(String(d.charging_status||'').includes('complete')?'På lader (full)':String(d.charging_status||'')==='charging'?'Lader':'På lader'):MLAB[k];
+ const bat=d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–';
+ const l1=I.act?`${I.last.hid?'Klipper (teller øker) · ':''}siden ${hhmm(I.since)} (${mins(I.cur)})`:I.prevStart?`Sist klippet ${new Date(I.prevStart).toLocaleDateString('nb-NO',{weekday:'short',day:'numeric',month:'short'})} kl. ${hhmm(I.prevStart)}, ${mins(I.prevEnd-I.prevStart)}`:'Ingen klippeøkt registrert siste 14 dager';
+ const tot=d.meter_time_total!=null?` · totalt ${nf(d.meter_time_total,0)} t / ${nf(d.meter_count_total,0)} økter`:'';
+ return `<div class="tile" style="grid-column:1/-1"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div class="s">${c.name}</div><div class="n" style="font-size:26px"><i class="dot" style="background:${MCOL[k]}"></i>${lab}</div></div><div class="s" style="text-align:right">Batteri ${bat}<br>Klippet siste 24 t: ${mins(I.m24)||'0 min'}</div></div>
+ ${I.stuck?`<div class="bad" style="margin:6px 0">⚠ ${I.stuck}</div>`:''}<div class="s" style="margin:4px 0 8px">${l1}${tot}</div>${strip(sg,MCOL,MLAB)}
+ <div class="legend" style="margin-top:6px">${Object.keys(MLAB).filter(x=>sg.some(g=>g.k===x)).map(x=>`<span><i class="dot" style="background:${MCOL[x]};width:10px;height:10px"></i>${MLAB[x]}</span>`).join('')}</div>
+ <div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}${l.av===false?'':''}</div></div>`}
+function lockHist(c){const since=Date.now()-hours*3600000,R=c.rows.filter(r=>new Date(r.t).getTime()>since);if(!R.length)return '';
+ const kf=r=>(r.d||{}).locked===false?'u':'l',sg=segs(R,kf),ch=[];R.forEach((r,i)=>{if(i&&kf(r)!==kf(R[i-1]))ch.push({t:r.t,k:kf(r)})});
+ const un=sg.filter(x=>x.k==='u').reduce((a,x)=>a+(x.t1-x.t0),0);
+ return `<div class="tile" style="grid-column:1/-1"><div class="s">${c.name}: låsestatus siste ${hours>=168?Math.round(hours/24)+' dager':hours+' timer'}</div>${strip(sg,{l:'#3f6b4a',u:'#e08363'},{l:'Låst',u:'Ulåst'})}
+ <div class="s" style="margin-top:6px">${ch.length?`${ch.length} endringer, ulåst totalt ${mins(un)}. Siste: ${ch.slice(-3).reverse().map(x=>(x.k==='u'?'låst opp ':'låst ')+fmt(new Date(x.t))).join(' · ')}`:'Ingen endringer, låst hele perioden'}</div></div>`}
+function daikinSeries(c){return c.rows.map(r=>{const d=r.d||{};return{t:new Date(r.t).getTime(),out:d['measure_temperature.outdoorTemperature'],set:d.target_temperature,inn:d.measure_temperature,kwh:d.meter_power}})}
+function daikinHist(c,id){const S=daikinSeries(c),since=Date.now()-hours*3600000;
+ const sets=[['set','Innstilt','#e08363'],['inn','Inne (sensor)','#7eaddb'],['out','Ute','#93a877']].map(([k,n,col])=>({name:n,color:col,pts:S.filter(x=>x.t>since&&typeof x[k]==='number').map(x=>({t:x.t,v:x[k]}))})).filter(x=>x.pts.length);
+ const inc=[];for(let i=1;i<S.length;i++){if(typeof S[i].kwh==='number'&&typeof S[i-1].kwh==='number'&&S[i].kwh>=S[i-1].kwh&&S[i].t-S[i-1].t<3*3600000)inc.push({t:S[i].t,v:S[i].kwh-S[i-1].kwh})}
+ const k24=inc.filter(x=>x.t>Date.now()-86400000).reduce((a,x)=>a+x.v,0),day={};inc.forEach(x=>{const k=new Date(x.t).toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+x.v});
+ const kw1=inc.filter(x=>x.t>Date.now()-3600000);const kw=kw1.length?kw1.reduce((a,x)=>a+x.v,0)/(kw1.length*0.25):null;
+ return{html:grid(tile('Siste 24 t (måler i Daikin)',nf(k24,1),'kWh')+tile('Snitt effekt siste time',kw==null?null:nf(kw,1),'kW'))+`<h3>Temperaturer</h3>${chartBlock('dkt'+id)}<h3>Energi per døgn (kWh)</h3><div class="chart" id="dkb${id}"></div>`,
+  draw:()=>{drawLine('ch-dkt'+id,'leg-dkt'+id,'tb-dkt'+id,sets,'t','°C',null,1);bars('dkb'+id,Object.entries(day).slice(-14).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#e08363')},k24}}
+function pulseBlock(pl,id){const h=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl);if(!h)return null;
+ if(!h.enabled)return{html:waiting('Tibber Pulse er ikke aktivert for dette hjemmet i Tibber-kontoen.'),draw:()=>{},sub:null};
+ const R=h.rows||[];if(!R.length)return{html:waiting('Pulse er aktiv, men ingen målinger er hentet ennå'+(h.error?' ('+h.error+')':'')+'. Første måling kommer ved neste innsamling.'),draw:()=>{},sub:null};
+ const l=R[R.length-1],c24=R.filter(r=>Date.now()-new Date(r.t)<86400000),mx=c24.length?Math.max(...c24.map(r=>r.max??r.w)):null,mn=c24.length?Math.min(...c24.map(r=>r.min??r.w)):null;
+ return{sub:nf(l.w,0)+' W nå',html:grid(tile('Effekt nå (Pulse)',nf(l.w,0),'W')+tile('Høyeste siste 24 t',nf(mx,0),'W')+tile('Laveste siste 24 t (grunnlast)',nf(mn,0),'W'))+`<h3>Effekt over tid</h3>${chartBlock('pu'+id)}`,
+  draw:()=>{const s=Date.now()-hours*3600000;drawLine('ch-pu'+id,'leg-pu'+id,'tb-pu'+id,[{name:'Effekt',color:'#d8a747',pts:R.filter(r=>new Date(r.t)>s).map(r=>({t:new Date(r.t).getTime(),v:r.w}))}],'pw','W',null,50)}}}
 /* ---------- seksjoner per sted ---------- */
 function secKlima(pl){const S=sensors(pl);if(!S.length)return null;
  const b=el(grid(S.map(sensorCard).join(''))+`<h3>Temperatur</h3>${chartBlock('t'+pl)}<h3>Luftfuktighet</h3>${chartBlock('h'+pl)}`);
@@ -165,16 +229,16 @@ function secVarme(pl){let h='',sub=[],draw=null;
   sub.push('Varmepumpe '+(on?'på':'av'));
   h+=`<h3>${last.name}</h3>`+grid(`<div class="tile"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
    +tile('Innstilt',p.temp_set==null?null:nf(p.temp_set,0),'°C')+tile('Retur (inn)',p.temp_bottom==null?null:nf(p.temp_bottom,0),'°C')+tile('Ut',p.temp_top==null?null:nf(p.temp_top,0),'°C')+tile('Effekt (fra enheten)',p.cur_power==null?null:nf(p.cur_power,0),'W'))
-   +`<h3>Temperaturer</h3>${chartBlock('hpt')}<h3>Effekt</h3>${chartBlock('hpp')}<details class="mini"><summary>Alle verdier fra enheten</summary><table>${Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</table></details>`;
+   +`<div class="s" style="margin:8px 0">Varmepumpen rapporterer 0 W og 0 A (effekt, strøm og energi står på null), så den kan ikke måles direkte. Se Strøm-seksjonen for husets samlede effekt fra Pulse.</div><h3>Temperaturer</h3>${chartBlock('hpt')}<h3>Effekt</h3>${chartBlock('hpp')}<details class="mini"><summary>Alle verdier fra enheten</summary><table>${Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</table></details>`;
   draw=()=>{const s=since(),HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877']];
    drawLine('ch-hpt','leg-hpt','tb-hpt',HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>s&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length),'t','°C',null,2);
    drawLine('ch-hpp','leg-hpp','tb-hpp',[{name:'Effekt',color:'#d8a747',pts:rows.filter(r=>r.t>s&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5)}}
- const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join(''))}
+ const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join(''))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
  const ax=axList(pl);if(ax.length){const t=ax.map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
  if(!h)return null;return sec('varme','Varme',sub.join(' · '),el(h),{draw})}
-function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl;
- const b=el(grid(tile('Siste 24 timer',nf(st.k24,1),'kWh')+tile('Siste 7 dager',nf(st.k7,1),'kWh')+tile('Mot forrige 7 dager',st.ch==null?null:(st.ch>0?'+':'')+st.ch,'%')+tile('Snitt per døgn (7 d)',nf(st.k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(st.k24*RATE,0),'kr'))+`<h3>Forbruk per døgn, siste 30 dager (kWh)</h3><div class="chart" id="${id}"></div>`);
- return sec('strom','Strøm (Tibber)',`${nf(st.k24,1)} kWh siste 24 t`,b,{draw:()=>{const day={};st.H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
+function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl,pb=pulseBlock(pl,pl);
+ const b=el((pb?`<h3>Sanntid (Tibber Pulse)</h3>`+pb.html:'')+`<h3>Forbruk (Tibber)</h3>`+grid(tile('Siste 24 timer',nf(st.k24,1),'kWh')+tile('Siste 7 dager',nf(st.k7,1),'kWh')+tile('Mot forrige 7 dager',st.ch==null?null:(st.ch>0?'+':'')+st.ch,'%')+tile('Snitt per døgn (7 d)',nf(st.k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(st.k24*RATE,0),'kr'))+`<h3>Forbruk per døgn, siste 30 dager (kWh)</h3><div class="chart" id="${id}"></div>`);
+ return sec('strom','Strøm (Tibber)',(pb&&pb.sub?pb.sub+' · ':'')+`${nf(st.k24,1)} kWh siste 24 t`,b,{draw:()=>{pb&&pb.draw();const day={};st.H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
   bars(id,Object.entries(day).slice(-30).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb')}})}
 function secShelly(){const L=shList();if(!L.length)return null;const tot=L.reduce((a,c)=>a+(shStats(c).kwh||0),0),w=L.reduce((a,c)=>a+(shStats(c).last.w||0),0);
  return sec('shelly','Strøm og stikk (Shelly)',`${nf(w,0)} W nå · ${nf(tot,1)} kWh siste 24 t`,el(grid(L.map(shellyCard).join(''))))}
@@ -184,7 +248,7 @@ function secHage(pl){let h='',sub=[];const g=gdList(pl),m=hmList(pl,'mower');
  if(!h)return null;return sec('hage',pl==='drivhus'?'Vanning':'Hage',sub.join(' · '),el(h),{open:pl==='drivhus'})}
 function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
  const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
- return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join(''))),{open:false})}
+ return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+L.map(lockHist).join(''))),{open:false})}
 function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
 function placeView(pl){const w=document.createElement('div');
  const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
@@ -202,6 +266,7 @@ function alerts(all){const A=[];
  ['oslo','arendal','drivhus'].forEach(pl=>{
   hmList(pl).forEach(c=>{const l=c.rows[c.rows.length-1],d=l.d||{};
    if(c.kind==='lock'&&d.locked===false)A.push({k:'unlocked:'+c.name,pl,lvl:'warn',txt:`${c.name} er ulåst`});
+   if(c.kind==='mower'){const I=mowerInfo(c);if(I&&I.stuck)A.push({k:'mow:'+c.name,pl,lvl:'bad',txt:`${c.name}: ${I.stuck}`})}
    if(Date.now()-new Date(l.t)>3*3600000||l.av===false)A.push({k:'hmoff:'+c.name,pl,lvl:'warn',txt:`${c.name} er frakoblet i Homey`})});
   const g=gdList(pl),off=g.filter(c=>c.rows[c.rows.length-1].link==='OFFLINE').length;
   if(off)A.push({k:'gdoff:'+pl,pl,lvl:'info',txt:`${off} av ${g.length} Gardena-enheter er frakoblet (trolig vinterlagret)`});
@@ -289,7 +354,7 @@ document.getElementById('range').addEventListener('change',e=>{hours=+e.target.v
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
 addEventListener('hashchange',()=>{TAB=(location.hash||'#oversikt').slice(1);render()});
 const J=f=>fetch(f).then(r=>r.ok?r.json():null).catch(()=>null);
-Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json')]).then(([h,g,a,s,p,d])=>{HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json')]).then(([h,g,a,s,p,d,u])=>{PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
 </script>
 </body>
 </html>
