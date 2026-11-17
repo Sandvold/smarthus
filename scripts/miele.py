@@ -16,11 +16,18 @@ def save(j):
 
 def tok(data):
     r = requests.post(B + "/thirdparty/token", data={**data, "client_id": CID, "client_secret": SEC, "vg": VG}, timeout=30)
-    return r.status_code, (r.json() if r.content else {})
+    try: return r.status_code, r.json()
+    except Exception: return r.status_code, {"raw": r.text[:200]}
 
 cmd = sys.argv[1] if len(sys.argv) > 1 else "collect"
 if cmd == "token":
-    sc, j = tok({"grant_type": "authorization_code", "code": sys.argv[2], "redirect_uri": sys.argv[3]})
+    import re
+    code = sys.argv[2].strip()
+    m = re.search(r"[?&#]code=([^&\s]+)", code)
+    if m: code = m.group(1)
+    if "client_id=" in code or code.startswith("http"):
+        print("Feltet «code» inneholder en lenke uten code=. Lim inn adressen du havnet på ETTER innlogging."); sys.exit(1)
+    sc, j = tok({"grant_type": "authorization_code", "code": code, "redirect_uri": sys.argv[3]})
     if sc != 200 or "access_token" not in j:
         print("Miele token feilet: HTTP", sc, str(j)[:200]); sys.exit(1)
     save(j); print("Miele: tilgang lagret"); sys.exit(0)
