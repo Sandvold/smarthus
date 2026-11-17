@@ -52,6 +52,11 @@ jobs:
           OJ_PASSWORD: ${{ secrets.OJ_PASSWORD }}
           OJ_API_KEY: ${{ secrets.OJ_API_KEY }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_salus.py
+        continue-on-error: true
+        env:
+          SALUS_EMAIL: ${{ secrets.SALUS_EMAIL }}
+          SALUS_PASSWORD: ${{ secrets.SALUS_PASSWORD }}
       - run: python scripts/collect_lg.py
         continue-on-error: true
         env:
