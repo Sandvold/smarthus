@@ -102,7 +102,7 @@ async function lockTerrasse(email: string): Promise<[unknown, number]> {
   if (recent.length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
   let code = 0, msg: string | null = null;
   try {
-    const r = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10000) });
+    const r = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10000) });
     code = r.ok ? 0 : r.status; msg = r.ok ? 'Success' : 'HTTP ' + r.status;
   } catch { code = -1; msg = 'ingen kontakt med Homey'; }
   await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, 'terrasse', 'lås', code, msg]);
