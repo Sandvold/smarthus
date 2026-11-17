@@ -229,16 +229,39 @@ async function actZaptec(b: any): Promise<Out> {
   return [{ ok: true, name: ch.Name || ch.DeviceId, cmd: b.cmd, state: s1 ? s1.mode : null }, 200];
 }
 
+// Klipper og Daikin via Homey: én webhook-flow (smarthus_styring) som kjører et HomeyScript med hemmelig tekst + kommando.
+async function actHomey(b: any): Promise<Out> {
+  const dev = String(b.dev), cmd = String(b.cmd);
+  const okMower = (dev === 'a1' || dev === 'a3') && ['start', 'dock', 'resume'].includes(cmd);
+  let val = '';
+  if (dev === 'daikin' && (cmd === 'on' || cmd === 'off')) val = '';
+  else if (dev === 'daikin' && cmd === 'temp') { const t = Number(b.value); if (!(t >= 10 && t <= 30) || (t * 2) % 1) return [{ error: 'ugyldig temperatur (10–30 i 0,5-steg)' }, 400]; val = String(t); }
+  else if (!okMower) return [{ error: 'ugyldig kommando' }, 400];
+  const sec = await secretsMap();
+  const m = sec.HOMEY_LOCK_URL?.match(/^https:\/\/webhook\.homey\.app\/([0-9a-f]{24})\//);
+  if (!m || !sec.HOMEY_CMD_SECRET) return [{ error: 'Homey-styring er ikke satt opp ennå' }, 503];
+  const t0 = Date.now() - 1000;
+  const tag = encodeURIComponent([sec.HOMEY_CMD_SECRET, dev, cmd, val].join('|'));
+  const code = await fetch(`https://${m[1]}.connect.athom.com/api/manager/logic/webhook/smarthus_styring?tag=${tag}`, { signal: AbortSignal.timeout(5000) }).then(x => x.status).catch(() => -1);
+  if (code < 200 || code >= 300) return [{ error: 'Homey svarte ikke (' + code + ')' }, 502];
+  for (let i = 0; i < 8; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const r = (await sql("select name, on_state, power, ts from plug_state where did = $1", ['homey:' + dev]))[0];
+    if (r && new Date(r.ts).getTime() > t0) return [{ ok: true, status: r.name, on: r.on_state, temp: r.power }, 200];
+  }
+  return [{ ok: true, status: null }, 200];
+}
+
 async function actDispatch(email: string, b: any): Promise<Out> {
-  const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : '';
+  const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : '';
   if (!key) return [{ error: 'ukjent handling' }, 400];
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
   if ((await sql("select 1 from ctl_log where did = $1 and ts > now() - interval '3 seconds' limit 1", [key])).length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
   let res: Out;
-  try { res = b.act === 'shelly' ? await actShelly(b) : b.act === 'adax' ? await actAdax(b) : b.act === 'gardena' ? await actGardena(b) : await actZaptec(b); }
+  try { res = b.act === 'shelly' ? await actShelly(b) : b.act === 'adax' ? await actAdax(b) : b.act === 'gardena' ? await actGardena(b) : b.act === 'homey' ? await actHomey(b) : await actZaptec(b); }
   catch (e: any) { res = [{ error: 'ingen kontakt: ' + String(e?.message || e).slice(0, 60) }, 502]; }
   const [body, st] = res;
-  const what = b.act === 'shelly' ? (b.on ? 'på' : 'av') : b.act === 'adax' ? 'sett ' + b.target : b.cmd === 'start' ? 'start ' + b.minutes + ' min' : b.cmd;
+  const what = b.act === 'shelly' ? (b.on ? 'på' : 'av') : b.act === 'adax' ? 'sett ' + b.target : b.act === 'homey' ? b.cmd + (b.value != null ? ' ' + b.value : '') : b.cmd === 'start' ? 'start ' + b.minutes + ' min' : b.cmd;
   await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, key, what, st === 200 ? 0 : st, st === 200 ? null : String(body.error).slice(0, 120)]);
   return res;
 }
@@ -261,6 +284,12 @@ export default {
       const tok = (await sql("select value from ctl_secrets where name = 'HOMEY_PUSH_TOKEN'"))[0]?.value;
       if (!tok || req.headers.get('x-push-token') !== tok) return json(req, { error: 'unauthorized' }, 401);
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
+      if (typeof b.dev === 'string' && ['a1', 'a3', 'daikin'].includes(b.dev)) {
+        await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');
+        const tp = typeof b.temp === 'number' ? b.temp : null, on = typeof b.on === 'boolean' ? b.on : null;
+        await sql("insert into plug_state (did, name, on_state, power, ts) values ($1,$2,$3,$4,now()) on conflict (did) do update set name=$2, on_state=$3, power=$4, ts=now()", ['homey:' + b.dev, String(b.status ?? '').slice(0, 40), on, tp]);
+        return json(req, { ok: true });
+      }
       if (typeof b.locked !== 'boolean') return json(req, { error: 'ugyldig' }, 400);
       await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');
       const dr = b.door === 'inngang' ? ['inngang', 'Inngangsdør'] : ['terrasse', 'Terrasedør'];

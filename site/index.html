@@ -207,7 +207,13 @@ function mowerCard(c){const l=c.rows[c.rows.length-1],stale=Date.now()-new Date(
  return `<div class="tile" style="grid-column:1/-1"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div class="s">${c.name}</div><div class="n" style="font-size:26px"><i class="dot" style="background:${MCOL[k]}"></i>${lab}</div></div><div class="s" style="text-align:right">Batteri ${bat}<br>Klippet siste 24 t: ${mins(I.m24)||'0 min'}</div></div>
  ${I.stuck?`<div class="bad" style="margin:6px 0">⚠ ${I.stuck}</div>`:''}<div class="s" style="margin:4px 0 8px">${l1}${tot}</div>${strip(sg,MCOL,MLAB)}
  <div class="legend" style="margin-top:6px">${Object.keys(MLAB).filter(x=>sg.some(g=>g.k===x)).map(x=>`<span><i class="dot" style="background:${MCOL[x]};width:10px;height:10px"></i>${MLAB[x]}</span>`).join('')}</div>
- <div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}${l.av===false?'':''}</div></div>`}
+ ${mowCtl(c)}<div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}${l.av===false?'':''}</div></div>`}
+function mowCtl(c){const dv=/A3/.test(c.name)?'a3':/A1/.test(c.name)?'a1':null;if(!dv)return '';const n=c.name;
+ return ctlBtns('h'+dv,[['Start klipping',{act:'homey',dev:dv,cmd:'start',q:n+': starte klipping?'}],['Fortsett',{act:'homey',dev:dv,cmd:'resume',q:n+': fortsette klippingen?'}],['Hjem til lader',{act:'homey',dev:dv,cmd:'dock',q:n+': sende klipperen tilbake til ladestasjonen?'}]])}
+function daikinCtl(c){const d=(c.rows[c.rows.length-1].d)||{},cur=typeof d.target_temperature==='number'?d.target_temperature:21,o=[];for(let v=16;v<=30;v+=0.5)o.push(v);if(!o.includes(cur))o.push(cur);o.sort((a,b)=>a-b);
+ const bs='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer';
+ return `<div class="tile"><div class="s">Styring Daikin</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"on",q:"Slå på Daikin?"})' style="${bs}">På</button><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"off",q:"Slå av Daikin?"})' style="${bs}">Av</button><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===cur?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick="daikinSet(this)" style="${bs}">Sett</button></div><div class="s" data-am="hdaikin"></div></div>`}
+function daikinSet(b){const v=Number(b.previousElementSibling.value);act(b,{act:'homey',dev:'daikin',cmd:'temp',value:v,q:'Daikin: sette innstilt temperatur til '+nf(v,v%1?1:0)+' °C?'})}
 function lockHist(c){const since=Date.now()-hours*3600000,R=c.rows.filter(r=>new Date(r.t).getTime()>since);if(!R.length)return '';
  const kf=r=>(r.d||{}).locked===false?'u':'l',sg=segs(R,kf),ch=[];R.forEach((r,i)=>{if(i&&kf(r)!==kf(R[i-1]))ch.push({t:r.t,k:kf(r)})});
  const un=sg.filter(x=>x.k==='u').reduce((a,x)=>a+(x.t1-x.t0),0);
@@ -259,7 +265,7 @@ function secVarme(pl){let h='',sub=[],draw=null;
   draw=()=>{const s=since(),HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877']];
    drawLine('ch-hpt','leg-hpt','tb-hpt',HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>s&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length),'t','°C',null,2);
    drawLine('ch-hpp','leg-hpp','tb-hpp',[{name:'Effekt',color:'#d8a747',pts:rows.filter(r=>r.t>s&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5)}}
- const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join(''))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
+ const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join('')+daikinCtl(dk[0]))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
  const ax=axList(pl);if(ax.length){const t=axAvg(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
  const mb=mtBlock(pl,pl);if(mb){sub.push(mb.sub);h+=`<h3>Gulvvarme (Microtemp)</h3>`+mb.html;const d1=draw;draw=()=>{d1&&d1();mb.draw()}}
  if(!h)return null;return sec('varme','Varme',sub.join(' · '),el(h),{draw})}
@@ -592,7 +598,7 @@ async function lockTerrasse(b,unlock,door){door=door||'terrasse';const nm=door==
 function applyAdax(id,s){const e=document.querySelector('[data-at="'+id+'"]');if(e&&s&&s.power!=null)e.textContent=nf(s.power,1)}
 function applyShelly(id,s){const e=document.querySelector('[data-sn="'+id+'"]');if(e&&s)e.textContent=(s.on?'På':'Av')+(s.power!=null?' · '+nf(s.power,0)+' W':'')}
 async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.assign({},o);delete body.q;delete body.cid;
- const key=o.act==='shelly'?'s'+o.cid:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
+ const key=o.act==='homey'?'h'+o.dev:o.act==='shelly'?'s'+o.cid:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
  const bs=b.parentNode.querySelectorAll('button'),msg=b.parentNode.nextElementSibling;bs.forEach(x=>x.disabled=true);if(msg)msg.textContent='Sender …';
  const r=await ctlCall('POST',body);bs.forEach(x=>x.disabled=false);
  if(!msg)return;
@@ -603,9 +609,10 @@ async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.as
  if(o.act==='shelly')t=j.state==null?'Sendt (kunne ikke bekrefte)':j.state===o.on?'Bekreftet: '+(o.on?'på':'av'):'Enheten svarte ikke ennå (står '+(j.state?'på':'av')+')';
  else if(o.act==='adax')t=j.state!=null&&Math.abs(j.state-o.target)<0.01?'Bekreftet: innstilt '+nf(j.state,1)+' °C':'Sendt til Adax. Ovnen kan bruke litt tid på å følge etter';
  else if(o.act==='gardena')t=o.cmd==='start'?(j.state&&j.state!=='CLOSED'?'Bekreftet: vanner':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå'):(j.state==='CLOSED'?'Bekreftet: stoppet':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå');
+ else if(o.act==='homey')t=j.status?(o.dev==='daikin'?'Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+nf(j.temp,1)+' °C':''):'Klipperen melder: '+String(j.status).replace(/_/g,' ')):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt';
  else t=o.cmd==='pause'?(j.state===5?'Bekreftet: pauset':'Sendt. Laderen viser modus '+j.state+' ennå'):(j.state===3?'Bekreftet: lader':'Sendt. Laderen viser modus '+j.state+' ennå');
  msg.textContent=t+' ('+tm+')'}
-window.act=act;
+window.act=act;window.daikinSet=daikinSet;
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
 const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
