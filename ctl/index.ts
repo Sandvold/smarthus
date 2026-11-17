@@ -78,6 +78,12 @@ export async function plugStates(c?: Cfg, only?: string | null) {
     const v = rs.find((x: any) => x.resourceId === '4.1.85')?.value;
     const w = rs.find((x: any) => x.resourceId === '0.12.85')?.value;
     out[did] = { name, on: v == null || v === '' ? null : v === '1', power: w == null || w === '' || isNaN(Number(w)) ? null : Number(w), code: r.code };
+    if (r.code === 0 && out[did].on != null) {
+      try {
+        await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');
+        await sql('insert into plug_state (did, name, on_state, power, ts) values ($1,$2,$3,$4,now()) on conflict (did) do update set name=$2, on_state=$3, power=$4, ts=now()', [did, name, out[did].on, out[did].power]);
+      } catch {}
+    }
   }
   return out;
 }
@@ -109,7 +115,17 @@ export default {
     if (!email && payload.sub) email = (await sql('select email from neon_auth."user" where id = $1', [payload.sub]))[0]?.email?.toLowerCase() ?? null;
     if (!email || !allowed.includes(email)) return json(req, { error: 'forbidden' }, 403);
     try {
-      if (req.method === 'GET') return json(req, { plugs: await plugStates(undefined, new URL(req.url).searchParams.get('did')) });
+      if (req.method === 'GET') {
+        const q = new URL(req.url).searchParams;
+        if (q.get('cached')) {
+          let rows: any[] = [];
+          try { rows = await sql('select did, name, on_state, power, ts from plug_state'); } catch {}
+          const plugs: Record<string, unknown> = {};
+          for (const r of rows) plugs[r.did] = { name: r.name, on: r.on_state, power: r.power, ts: r.ts };
+          return json(req, { plugs });
+        }
+        return json(req, { plugs: await plugStates(undefined, q.get('did')) });
+      }
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
       if (typeof b.did !== 'string' || !(b.did in PLUGS) || typeof b.on !== 'boolean') return json(req, { error: 'ugyldig enhet eller verdi' }, 400);
       await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');

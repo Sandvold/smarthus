@@ -548,8 +548,10 @@ async function getTok(){const isJ=t=>typeof t==='string'&&t.split('.').length===
  return isJ(t)?t:null}
 async function ctlCall(method,body,q){const t=await getTok();if(!t)return{ok:false,status:401,j:{error:'ikke innlogget'}};
  try{const r=await fetch(CTL_URL+(q||''),{method,headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}catch(e){return{ok:false,status:0,j:{error:'ingen kontakt'}}}}
-function applyTile(did,s){const bn=document.querySelector('[data-bn="'+did+'"]'),bt=document.querySelector('[data-bs="'+did+'"]');if(!s||!bn||!bt)return;bn.textContent=s.power!=null?nf(s.power,0)+' W':(s.on==null?'–':s.on?'På':'Av');const kw=bt.dataset.kwh;bt.textContent=(s.on==null?'':s.on?'på':'av')+(kw?(s.on==null?'':' · ')+kw+' kWh totalt':'')+' · live'}
-async function livePlugs(){const g=await ctlCall('GET');if(g.ok&&g.j.plugs)for(const [did,s] of Object.entries(g.j.plugs))applyTile(did,s)}
+function applyTile(did,s,ts){const bn=document.querySelector('[data-bn="'+did+'"]'),bt=document.querySelector('[data-bs="'+did+'"]');if(!s||!bn||!bt)return;bn.textContent=s.power!=null?nf(s.power,0)+' W':(s.on==null?'–':s.on?'På':'Av');const kw=bt.dataset.kwh;bt.textContent=(s.on==null?'':s.on?'på':'av')+(kw?(s.on==null?'':' · ')+kw+' kWh totalt':'')+' · '+(ts?'sist sjekket '+new Date(ts).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}):'oppdatert nå')}
+async function livePlugs(){const g=await ctlCall('GET',undefined,'?cached=1');if(!(g.ok&&g.j.plugs))return;
+ for(const [did,s] of Object.entries(g.j.plugs)){const d=AQ&&(AQ.devices||[]).find(x=>x.did===did);const last=d&&d.rows&&d.rows.length?new Date(d.rows[d.rows.length-1].t).getTime():0;
+  if(s.ts&&new Date(s.ts).getTime()>last)applyTile(did,s,s.ts)}}
 async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Slå '+(on?'PÅ ':'AV ')+nm+'?'))return;
  const msg=document.querySelector('[data-pm="'+did+'"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
  const r=await ctlCall('POST',{did,on});
