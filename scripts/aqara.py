@@ -6,13 +6,20 @@ APP_KEY = os.environ["AQARA_APP_KEY"].strip(); ACCOUNT = os.environ["AQARA_ACCOU
 REGION = os.environ.get("AQARA_REGION", "open-ger").strip()
 URL = f"https://{REGION}.aqara.com/v3.0/open/api"
 
+SEP = None
 def call(intent, data, token=None):
-    h = {"Appid": APP_ID, "Keyid": KEY_ID, "Nonce": uuid.uuid4().hex, "Time": str(int(time.time() * 1000))}
-    if token: h["Accesstoken"] = token
-    s = "&".join(f"{k}={h[k]}" for k in sorted(h, key=str.lower)) + "&" + APP_KEY
-    h["Sign"] = hashlib.md5(s.lower().encode()).hexdigest()
-    h["Content-Type"] = "application/json"
-    return requests.post(URL, headers=h, json={"intent": intent, "data": data}, timeout=30).json()
+    global SEP
+    r = None
+    for sep in ([SEP] if SEP is not None else ["&", ""]):
+        h = {"Appid": APP_ID, "Keyid": KEY_ID, "Nonce": uuid.uuid4().hex, "Time": str(int(time.time() * 1000))}
+        if token: h["Accesstoken"] = token
+        s = "&".join(f"{k}={h[k]}" for k in sorted(h, key=str.lower)) + sep + APP_KEY
+        h["Sign"] = hashlib.md5(s.lower().encode()).hexdigest()
+        h["Content-Type"] = "application/json"
+        r = requests.post(URL, headers=h, json={"intent": intent, "data": data}, timeout=30).json()
+        if r.get("code") != 106:
+            SEP = sep; print("signatur-variant som virket:", "med &" if sep else "uten &"); return r
+    return r
 
 def db():
     con = psycopg.connect(os.environ["NEON_DATABASE_URL"])
