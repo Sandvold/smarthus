@@ -232,7 +232,7 @@ async function actZaptec(b: any): Promise<Out> {
 // Klipper og Daikin via Homey: én webhook-flow (smarthus_styring) som kjører et HomeyScript med hemmelig tekst + kommando.
 async function actHomey(b: any): Promise<Out> {
   const dev = String(b.dev), cmd = String(b.cmd);
-  const okMower = (dev === 'a1' || dev === 'a3') && ['start', 'dock', 'resume'].includes(cmd);
+  const okMower = (dev === 'a1' || dev === 'a3') && ['start', 'dock', 'resume', 'status'].includes(cmd);
   let val = '';
   if (dev === 'daikin' && (cmd === 'on' || cmd === 'off')) val = '';
   else if (dev === 'daikin' && cmd === 'temp') { const t = Number(b.value); if (!(t >= 10 && t <= 30) || (t * 2) % 1) return [{ error: 'ugyldig temperatur (10–30 i 0,5-steg)' }, 400]; val = String(t); }
