@@ -23,6 +23,7 @@ def show(r):
     print(json.dumps(r, ensure_ascii=False)[:3000])
 
 cmd = sys.argv[1]
+print("AppID-kontroll (tegn adskilt):", " ".join(APP_ID[:6]), "...", " ".join(APP_ID[-4:]), "| lengde", len(APP_ID), "| KeyID", " ".join(KEY_ID[:4]), "..", " ".join(KEY_ID[-4:]), "| region", REGION)
 if cmd == "code":
     show(call("config.auth.getAuthCode", {"account": ACCOUNT, "accountType": 0, "accessTokenValidity": "7d"}))
 elif cmd == "token":
