@@ -275,7 +275,7 @@ function secHage(pl){let h='',sub=[];const g=gdList(pl),m=hmList(pl,'mower');
  if(!h)return null;return sec('hage',pl==='drivhus'?'Vanning':'Hage',sub.join(' · '),el(h),{open:pl==='drivhus'})}
 function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
  const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
- const tc=pl==='oslo'&&L.find(c=>c.name==='Terrasedør');const btn=tc?`<div class="tile"><div class="s">Terrasedør (Yale)</div><div style="margin-top:8px"><button onclick="lockTerrasse(this)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Lås</button> <button onclick="lockTerrasse(this,true)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Lås opp</button></div><div class="s" data-pm="terrasse"></div></div>`:'';
+ const dn=pl==='oslo'?['terrasse','Terrasedør']:pl==='arendal'?['inngang','Inngangsdør']:null;const tc=dn&&L.find(c=>c.name===dn[1]);const bs0='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer';const btn=tc?`<div class="tile"><div class="s">${dn[1]} (Yale)</div><div style="margin-top:8px"><button onclick="lockTerrasse(this,false,'${dn[0]}')" style="${bs0}">Lås</button> <button onclick="lockTerrasse(this,true,'${dn[0]}')" style="${bs0}">Lås opp</button></div><div class="s" data-pm="${dn[0]}"></div></div>`:'';
  return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+btn+L.map(lockHist).join(''))),{open:false})}
 function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
 function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===pl;
@@ -554,11 +554,11 @@ async function getTok(){const isJ=t=>typeof t==='string'&&t.split('.').length===
 async function ctlCall(method,body,q){const t=await getTok();if(!t)return{ok:false,status:401,j:{error:'ikke innlogget'}};
  try{const r=await fetch(CTL_URL+(q||''),{method,headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}catch(e){return{ok:false,status:0,j:{error:'ingen kontakt'}}}}
 function applyTile(did,s,ts){const bn=document.querySelector('[data-bn="'+did+'"]'),bt=document.querySelector('[data-bs="'+did+'"]');if(!s||!bn||!bt)return;bn.textContent=s.power!=null?nf(s.power,0)+' W':(s.on==null?'–':s.on?'På':'Av');const kw=bt.dataset.kwh;bt.textContent=(s.on==null?'':s.on?'på':'av')+(kw?(s.on==null?'':' · ')+kw+' kWh totalt':'')+' · '+(ts?'sist sjekket '+new Date(ts).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}):'oppdatert nå')}
-function injectLock(s){const d=((HM&&HM.devices)||[]).find(x=>x.name==='Terrasedør');if(!d||!d.rows||!d.rows.length||!s||!s.ts)return false;
+function injectLock(s,nm){const d=((HM&&HM.devices)||[]).find(x=>x.name===(nm||'Terrasedør'));if(!d||!d.rows||!d.rows.length||!s||!s.ts)return false;
  const last=d.rows[d.rows.length-1];if(new Date(s.ts)<=new Date(last.t))return false;
  d.rows.push({d:Object.assign({},last.d,{locked:!!s.on}),t:s.ts,av:true});return true}
 async function livePlugs(){const g=await ctlCall('GET',undefined,'?cached=1');if(!(g.ok&&g.j.plugs))return;
- if(injectLock(g.j.plugs.terrasse))render();
+ {let ch=injectLock(g.j.plugs.terrasse);ch=injectLock(g.j.plugs.inngang,'Inngangsdør')||ch;if(ch)render()}
  for(const [did,s] of Object.entries(g.j.plugs)){if(did.startsWith('adax:')){const id=did.slice(5),c=AX&&(AX.rooms||[]).find(x=>String(x.id)===id),last=c&&c.rows&&c.rows.length?new Date(c.rows[c.rows.length-1].t).getTime():0;if(s.ts&&new Date(s.ts).getTime()>last)applyAdax(id,s);continue}
   if(did.startsWith('shelly:')){const id=did.slice(7),c=SH&&(SH.channels||[]).find(x=>x.id===id),last=c&&c.rows&&c.rows.length?new Date(c.rows[c.rows.length-1].t).getTime():0;if(s.ts&&new Date(s.ts).getTime()>last)applyShelly(id,s);continue}
   const d=AQ&&(AQ.devices||[]).find(x=>x.did===did);const last=d&&d.rows&&d.rows.length?new Date(d.rows[d.rows.length-1].t).getTime():0;
@@ -578,16 +578,16 @@ async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Sl�
  show(st);
  if(on){const my=lv&&(lv._run=(lv._run||0)+1);for(let i=0;i<24&&lv&&lv._run===my&&document.body.contains(lv);i++){await new Promise(z=>setTimeout(z,5000));if(lv._run!==my)break;const s2=await one();if(!s2||s2.on===false){show(s2);break}show(s2)}}
  else if(lv){lv._run=(lv._run||0)+1}}
-async function lockTerrasse(b,unlock){const tc=(HM&&HM.devices||[]).find(x=>x.name==='Terrasedør'),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
- if(unlock){if(!confirm('Låse OPP terrassedøren?'))return}
- else if(!confirm('Låse terrassedøren?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
- const msg=document.querySelector('[data-pm="terrasse"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
- const t0=Date.now()-2000,want=!unlock;const r=await ctlCall('POST',unlock?{lock:'terrasse',unlock:true}:{lock:'terrasse'});
+async function lockTerrasse(b,unlock,door){door=door||'terrasse';const nm=door==='inngang'?'Inngangsdør':'Terrasedør',tc=(HM&&HM.devices||[]).find(x=>x.name===nm),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
+ if(unlock){if(!confirm('Låse OPP '+(door==='inngang'?'inngangsdøren':'terrassedøren')+'?'))return}
+ else if(!confirm('Låse '+(door==='inngang'?'inngangsdøren':'terrassedøren')+'?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
+ const msg=document.querySelector('[data-pm="'+door+'"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
+ const t0=Date.now()-2000,want=!unlock;const r=await ctlCall('POST',unlock?{lock:door,unlock:true}:{lock:door});
  if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);bs.forEach(x=>x.disabled=false);return}
  msg.textContent='Sendt til Homey. Venter på statusrapport …';
- for(let i=0;i<10;i++){await new Promise(z=>setTimeout(z,3000));const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs.terrasse;
+ for(let i=0;i<10;i++){await new Promise(z=>setTimeout(z,3000));const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs[door];
   if(s&&s.ts&&new Date(s.ts).getTime()>t0){const tm=new Date(s.ts).toLocaleTimeString('nb-NO');const txt=(!!s.on)===want?'Bekreftet: '+(s.on?'låst':'ulåst')+' ('+tm+')':(s.on?'Døren står fortsatt låst':'Døren står fortsatt ulåst')+' ('+tm+')';
-   injectLock(s);render();const m2=document.querySelector('[data-pm="terrasse"]');if(m2)m2.textContent=txt;return}}
+   injectLock(s,nm);render();const m2=document.querySelector('[data-pm="'+door+'"]');if(m2)m2.textContent=txt;return}}
  msg.textContent='Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.';bs.forEach(x=>x.disabled=false)}
 function applyAdax(id,s){const e=document.querySelector('[data-at="'+id+'"]');if(e&&s&&s.power!=null)e.textContent=nf(s.power,1)}
 function applyShelly(id,s){const e=document.querySelector('[data-sn="'+id+'"]');if(e&&s)e.textContent=(s.on?'På':'Av')+(s.power!=null?' · '+nf(s.power,0)+' W':'')}
