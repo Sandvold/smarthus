@@ -17,6 +17,7 @@ jobs:
           AQARA_KEY_ID: ${{ secrets.AQARA_KEY_ID }}
           AQARA_APP_KEY: ${{ secrets.AQARA_APP_KEY }}
           AQARA_REGION: ${{ secrets.AQARA_REGION }}
+          HOMEY_LOCK_URL: ${{ secrets.HOMEY_LOCK_URL }}
       - run: |
           cd ctl && npm init -y >/dev/null && npm i esbuild >/dev/null
           npx esbuild index.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/index.mjs

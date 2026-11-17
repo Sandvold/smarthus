@@ -271,7 +271,8 @@ function secHage(pl){let h='',sub=[];const g=gdList(pl),m=hmList(pl,'mower');
  if(!h)return null;return sec('hage',pl==='drivhus'?'Vanning':'Hage',sub.join(' · '),el(h),{open:pl==='drivhus'})}
 function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
  const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
- return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+L.map(lockHist).join(''))),{open:false})}
+ const tc=pl==='oslo'&&L.find(c=>c.name==='Terrasedør');const btn=tc?`<div class="tile"><div class="s">Terrasedør (Yale)</div><div style="margin-top:8px"><button onclick="lockTerrasse(this)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Lås</button></div><div class="s" data-pm="terrasse"></div></div>`:'';
+ return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+btn+L.map(lockHist).join(''))),{open:false})}
 function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
 function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===pl;
  if(MI){if(MI.error&&pl==='oslo')h+=waiting('Miele: '+MI.error);
@@ -567,6 +568,11 @@ async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Sl�
  show(st);
  if(on){const my=lv&&(lv._run=(lv._run||0)+1);for(let i=0;i<24&&lv&&lv._run===my&&document.body.contains(lv);i++){await new Promise(z=>setTimeout(z,5000));if(lv._run!==my)break;const s2=await one();if(!s2||s2.on===false){show(s2);break}show(s2)}}
  else if(lv){lv._run=(lv._run||0)+1}}
+async function lockTerrasse(b){const tc=(HM&&HM.devices||[]).find(x=>x.name==='Terrasedør'),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
+ if(!confirm('Låse terrassedøren?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
+ const msg=document.querySelector('[data-pm="terrasse"]');b.disabled=true;msg.textContent='Sender …';
+ const r=await ctlCall('POST',{lock:'terrasse'});msg.textContent=r.ok?'Låsekommando sendt til Homey. Sjekk i appen at den er låst.':'Feilet: '+(r.j.error||r.status);b.disabled=false}
+window.lockTerrasse=lockTerrasse;
 window.plug=plug;
 const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
 function loginScreen(msg,out){const m=document.getElementById('main');

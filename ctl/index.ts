@@ -93,6 +93,22 @@ async function setPlug(did: string, on: boolean) {
   return { code: r.code, message: r.messageDetail || r.message || null };
 }
 
+// Låser terrassedøren (Yale) via en Homey-webhook. Kun "lås" – aldri opplåsing herfra.
+async function lockTerrasse(email: string): Promise<[unknown, number]> {
+  await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
+  const url = (await sql("select value from ctl_secrets where name = 'HOMEY_LOCK_URL'"))[0]?.value;
+  if (!url) return [{ error: 'Homey-lås er ikke satt opp ennå' }, 503];
+  const recent = await sql("select 1 from ctl_log where did = 'terrasse' and ts > now() - interval '10 seconds' limit 1");
+  if (recent.length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
+  let code = 0, msg: string | null = null;
+  try {
+    const r = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(10000) });
+    code = r.ok ? 0 : r.status; msg = r.ok ? 'Success' : 'HTTP ' + r.status;
+  } catch { code = -1; msg = 'ingen kontakt med Homey'; }
+  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, 'terrasse', 'lås', code, msg]);
+  return code === 0 ? [{ ok: true, did: 'terrasse', action: 'lås' }, 200] : [{ error: 'Homey svarte ikke: ' + msg }, 502];
+}
+
 function cors(req: Request): Record<string, string> {
   const o = req.headers.get('origin') || '';
   const h: Record<string, string> = { 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Vary': 'Origin' };
@@ -127,6 +143,7 @@ export default {
         return json(req, { plugs: await plugStates(undefined, q.get('did')) });
       }
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
+      if (b.lock === 'terrasse') { const [body, st] = await lockTerrasse(email); return json(req, body, st); }
       if (typeof b.did !== 'string' || !(b.did in PLUGS) || typeof b.on !== 'boolean') return json(req, { error: 'ugyldig enhet eller verdi' }, 400);
       await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
       const recent = await sql("select 1 from ctl_log where did = $1 and ts > now() - interval '3 seconds' limit 1", [b.did]);

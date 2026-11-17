@@ -99,6 +99,7 @@ jobs:
           AQARA_KEY_ID: ${{ secrets.AQARA_KEY_ID }}
           AQARA_APP_KEY: ${{ secrets.AQARA_APP_KEY }}
           AQARA_REGION: ${{ secrets.AQARA_REGION }}
+          HOMEY_LOCK_URL: ${{ secrets.HOMEY_LOCK_URL }}
       - run: python scripts/upload_site.py
         continue-on-error: true
         env:
