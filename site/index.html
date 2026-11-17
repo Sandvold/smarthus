@@ -50,6 +50,7 @@ details.mini{margin-top:8px;color:var(--mut);font-size:13px}table{border-collaps
 .empty{border:1px dashed var(--grid);border-radius:10px;padding:12px;color:var(--mut);font-size:14px}
 .lv{display:inline-block;font-size:11px;padding:1px 8px;border-radius:9px;margin-left:6px;border:1px solid #3a4248;color:#cfd6dc}.lv.l{border-color:#3f6b4a;color:#9ccaa6}.lv.m{border-color:#a8873a;color:#e0c277}.lv.h{border-color:#a65a47;color:#e69a87}
 .ct dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:6px 12px}.ct dt{color:#8b959d;font-size:12px}.ct dd{margin:0;font-size:13px}.ct .src{font-size:11px;color:#7f8a93;margin-top:8px}
+.sel{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 10px}.chk{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}.chk input{width:18px;height:18px}.chk i{width:10px;height:10px;border-radius:50%;display:inline-block}
 </style>
 </head>
 <body>
@@ -81,6 +82,7 @@ function sec(key,title,sub,body,o={}){
 const waiting=t=>`<div class="empty">${t}</div>`;
 /* ---------- data ---------- */
 const SERIES=()=>{const by={};ALL.filter(r=>r.kind!=='heatpump').forEach(r=>{(by[r.name]=by[r.name]||[]).push({t:new Date(r.ts),temp:r.temp,hum:r.hum,batt:r.battery,site:r.site})});
+ ((AQ&&AQ.devices)||[]).forEach(d=>{const rows=d.rows.filter(r=>r.temp!=null).map(r=>({t:new Date(r.t),temp:r.temp,hum:r.hum,batt:null,site:d.site}));if(rows.length)by[d.name]=rows});
  return Object.entries(by).map(([name,rows],i)=>({name,color:PAL[i%PAL.length],rows,pl:placeOf(rows[rows.length-1].site,name)}))};
 const sensors=pl=>SERIES().filter(s=>s.pl===pl);
 const hmList=(pl,kind)=>((HM&&HM.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl&&(!kind||c.kind===kind));
@@ -283,8 +285,20 @@ function secAqara(pl){if(!AQ)return null;const D=(AQ.devices||[]).filter(d=>plac
  const cards=D.map(d=>{const l=d.rows[d.rows.length-1];const parts=[];if(l.temp!=null)parts.push(nf(l.temp,1)+' °C');if(l.hum!=null)parts.push(nf(l.hum,0)+' % fukt');if(l.power!=null)parts.push(nf(l.power,0)+' W');
   return `<div class="tile"><div class="s">${d.name}</div><div class="n">${parts[0]||(l.on==null?'–':l.on?'På':'Av')}</div><div class="s">${parts.slice(1).join(' · ')}${l.on!=null?(parts.length>1?' · ':'')+(l.on?'på':'av'):''}${l.kwh!=null?' · '+nf(l.kwh,2)+' kWh totalt':''}</div><div class="s">oppdatert ${ago(l.t)}</div></div>`}).join('');
  return sec('aqara'+pl,'Aqara',D.length+' enheter',el(grid(cards)),{open:false})}
+function secDrivTemp(){
+ const since=()=>Date.now()-hours*3600000;let k=0;
+ const mk=()=>{const L=[];sensors('drivhus').forEach(s=>L.push({name:s.name,pts:s.rows.filter(r=>r.temp!=null).map(r=>({t:r.t.getTime(),v:r.temp}))}));
+  L.forEach((s,i)=>s.color=PAL[i%PAL.length]);return L};
+ const all=mk();if(!all.length)return null;
+ const sel=ls.get('sh-tsel',{}),last=all.map(s=>s.pts[s.pts.length-1]).filter(Boolean);
+ const b=el(`<div class="sel" id="sel-dt"></div>${chartBlock('dt')}`);
+ const draw=()=>{const S=mk(),s0=since();const box=document.getElementById('sel-dt');if(!box)return;
+  box.innerHTML=S.map(s=>{const l=s.pts[s.pts.length-1];return `<label class="chk"><input type="checkbox" data-n="${s.name.replace(/"/g,'&quot;')}" ${sel[s.name]===false?'':'checked'}><i style="background:${s.color}"></i>${s.name}${l?` <b>${nf(l.v,1)} °C</b>`:''}</label>`}).join('');
+  box.querySelectorAll('input').forEach(i=>i.onchange=()=>{sel[i.dataset.n]=i.checked;ls.set('sh-tsel',sel);draw()});
+  drawLine('ch-dt','leg-dt','tb-dt',S.filter(s=>sel[s.name]!==false).map(s=>({...s,pts:s.pts.filter(p=>p.t>s0)})).filter(s=>s.pts.length),'t','°C',FROST,1)};
+ return sec('dtemp','Temperaturer i alle drivhus',all.length+' målere',b,{open:true,draw})}
 function placeView(pl){const w=document.createElement('div');
- const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl),secKjokken(pl),secAqara(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
+ const list=[pl==='drivhus'?secDrivTemp():null,secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl),secKjokken(pl),secAqara(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
  if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
