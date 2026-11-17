@@ -41,7 +41,7 @@ details.mini{margin-top:8px;color:var(--mut);font-size:13px}table{border-collaps
 .pc{background:var(--card);border:1px solid var(--grid);border-radius:12px;padding:14px;text-align:left;cursor:pointer;width:100%}
 .pc:hover{border-color:var(--acc)}.pc h2{display:flex;justify-content:space-between;align-items:center}
 .pc div{font-size:14px;margin-top:3px}
-.al{display:flex;gap:8px;padding:6px 0;font-size:15px;border-bottom:1px solid var(--grid)}.al:last-child{border:0}
+.al{display:flex;gap:8px;padding:6px 0;font-size:15px;border-bottom:1px solid var(--grid)}.al:last-child{border:0;}.al .x{background:none;border:1px solid var(--grid);border-radius:8px;color:var(--mut);padding:2px 10px;cursor:pointer;font-size:13px;align-self:center}
 .todo label{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--grid);align-items:flex-start;cursor:pointer}
 .todo input[type=checkbox]{width:20px;height:20px;margin-top:2px;flex:none}
 .todo .d .x{text-decoration:line-through;color:var(--mut)}
@@ -193,20 +193,20 @@ function placeView(pl){const w=document.createElement('div');
  if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
  return w}
 /* ---------- oversikt ---------- */
-function alerts(){const A=[];
+function alerts(all){const A=[];
  SERIES().forEach(s=>{const l=s.rows[s.rows.length-1],pl=s.pl;
-  if(l.temp!=null&&l.temp<=FROST)A.push({pl,lvl:'bad',txt:`Frost i ${s.name}: ${nf(l.temp)} °C`});
-  else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({pl,lvl:'warn',txt:`${s.name} er nær frost: ${nf(l.temp)} °C`});
-  if((Date.now()-l.t)/60000>STALE_MIN)A.push({pl,lvl:'warn',txt:`${s.name} har ikke sendt måling siden ${fmt(l.t)}`});
-  if(l.batt!=null&&l.batt<LOW_BATT)A.push({pl,lvl:'warn',txt:`Lavt batteri i ${s.name} (${nf(l.batt,0)} %)`})});
+  if(l.temp!=null&&l.temp<=FROST)A.push({k:'frost:'+s.name,pl,lvl:'bad',txt:`Frost i ${s.name}: ${nf(l.temp)} °C`});
+  else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({k:'nearfrost:'+s.name,pl,lvl:'warn',txt:`${s.name} er nær frost: ${nf(l.temp)} °C`});
+  if((Date.now()-l.t)/60000>STALE_MIN)A.push({k:'stale:'+s.name,pl,lvl:'warn',txt:`${s.name} har ikke sendt måling siden ${fmt(l.t)}`});
+  if(l.batt!=null&&l.batt<LOW_BATT)A.push({k:'batt:'+s.name,pl,lvl:'warn',txt:`Lavt batteri i ${s.name} (${nf(l.batt,0)} %)`})});
  ['oslo','arendal','drivhus'].forEach(pl=>{
   hmList(pl).forEach(c=>{const l=c.rows[c.rows.length-1],d=l.d||{};
-   if(c.kind==='lock'&&d.locked===false)A.push({pl,lvl:'warn',txt:`${c.name} er ulåst`});
-   if(Date.now()-new Date(l.t)>3*3600000||l.av===false)A.push({pl,lvl:'warn',txt:`${c.name} er frakoblet i Homey`})});
+   if(c.kind==='lock'&&d.locked===false)A.push({k:'unlocked:'+c.name,pl,lvl:'warn',txt:`${c.name} er ulåst`});
+   if(Date.now()-new Date(l.t)>3*3600000||l.av===false)A.push({k:'hmoff:'+c.name,pl,lvl:'warn',txt:`${c.name} er frakoblet i Homey`})});
   const g=gdList(pl),off=g.filter(c=>c.rows[c.rows.length-1].link==='OFFLINE').length;
-  if(off)A.push({pl,lvl:'info',txt:`${off} av ${g.length} Gardena-enheter er frakoblet (trolig vinterlagret)`});
-  g.forEach(c=>{const b=c.rows[c.rows.length-1].batt;if(b!=null&&b<LOW_BATT)A.push({pl,lvl:'warn',txt:`Lavt batteri i ${c.name} (Gardena): ${b} %`})})});
- return A}
+  if(off)A.push({k:'gdoff:'+pl,pl,lvl:'info',txt:`${off} av ${g.length} Gardena-enheter er frakoblet (trolig vinterlagret)`});
+  g.forEach(c=>{const b=c.rows[c.rows.length-1].batt;if(b!=null&&b<LOW_BATT)A.push({k:'gdbatt:'+c.name,pl,lvl:'warn',txt:`Lavt batteri i ${c.name} (Gardena): ${b} %`})})});
+ const hid=ls.get('sh-hid',{});A.forEach(a=>a.hid=!!hid[a.k]);return all?A:A.filter(a=>!a.hid)}
 const worst=(A,pl)=>{const a=A.filter(x=>x.pl===pl&&x.lvl!=='info');return a.some(x=>x.lvl==='bad')?'bad':a.length?'warn':'ok'};
 function placeCard(pl,A){const L=[];
  sensors(pl).forEach(s=>{const l=s.rows[s.rows.length-1];L.push(`${s.name}: <b>${nf(l.temp)} °C</b>`)});
@@ -237,9 +237,12 @@ function secSystemer(){
  return sec('sys','Datakilder',rows.filter(r=>r[1]==='ok').length+' av '+rows.length+' koblet',el('<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td>${ic[r[1]]}</td><td class="s">${r[2]}</td></tr>`).join('')+'</table>'),{open:false})}
 function overview(){const w=document.createElement('div'),A=alerts();
  w.appendChild(el(lede()));
- const real=A.filter(a=>a.lvl!=='info'),info=A.filter(a=>a.lvl==='info');
+ const AA=alerts(true),real=A.filter(a=>a.lvl!=='info'),hidn=AA.filter(a=>a.hid);
  const ic={bad:'<span class="bad">⚠</span>',warn:'<span class="warn">▲</span>',info:'<span class="s">ⓘ</span>'};
- w.appendChild(sec('alerts','Varsler',real.length?real.length+(real.length===1?' varsel':' varsler'):'alt ser normalt ut',el(A.length?A.map(a=>`<div class="al">${ic[a.lvl]}<span>${a.txt}<span class="s"> · ${PLACES[a.pl]}</span></span></div>`).join(''):'<div class="s">Ingen varsler.</div>'),{open:real.length>0}));
+ const ab=el((A.length?A.map(a=>`<div class="al">${ic[a.lvl]}<span style="flex:1">${a.txt}<span class="s"> · ${PLACES[a.pl]}</span></span><button class="x" data-k="${a.k}" title="Skjul dette varselet">Skjul</button></div>`).join(''):'<div class="s">Ingen varsler.</div>')
+  +(hidn.length?`<details class="mini"><summary>${hidn.length} skjulte</summary>${hidn.map(a=>`<div class="al"><span class="s" style="flex:1">${a.txt} · ${PLACES[a.pl]}</span><button class="x" data-k="${a.k}" data-show="1">Vis igjen</button></div>`).join('')}</details>`:''));
+ ab.querySelectorAll('button.x').forEach(b=>b.onclick=()=>{const h=ls.get('sh-hid',{});if(b.dataset.show)delete h[b.dataset.k];else h[b.dataset.k]=1;ls.set('sh-hid',h);render()});
+ w.appendChild(sec('alerts','Varsler',real.length?real.length+(real.length===1?' varsel':' varsler'):'alt ser normalt ut',ab,{open:real.length>0||A.length>0}));
  const cards=el(`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">${['oslo','arendal','drivhus'].map(p=>placeCard(p,A)).join('')}</div>`);
  cards.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));w.appendChild(cards);
  const hs=((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length);
