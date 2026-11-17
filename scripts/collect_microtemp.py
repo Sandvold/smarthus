@@ -27,7 +27,7 @@ try:
         OUT["error"] = f"Innlogging avvist (ErrorCode {r.get('ErrorCode')}). Sjekk kunde-ID, brukernavn og passord."
         done(); print(OUT["error"]); sys.exit(0)
     sid = r["SessionId"]; g = {}; tried = []
-    for method, path in (("GET", "/api/Group/GetGroupContents"), ("POST", "/api/Group/GetGroupContents"), ("GET", "/api/Group/GetGroups"), ("POST", "/api/Group/GetGroups")):
+    for method, path in (("GET", "/api/Group/GroupContents"),):
         q = {"sessionid": sid, "APIKEY": K}
         resp = requests.request(method, f"https://{HOST}{path}", timeout=30, params=q if method == "GET" else None,
                                 json=None if method == "GET" else {"SessionId": sid, "APIKEY": K})
