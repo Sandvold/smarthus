@@ -282,10 +282,10 @@ function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===p
    h+=`<div class="tile"><div class="s">${d.name||d.type} (LG)</div>${keys.map(k=>`<div class="s">${k.split('.').pop()}: ${s[k]}</div>`).join('')||'<div class="s">ingen tilstand</div>'}<div class="s">oppdatert ${ago(l.t)}</div></div>`;sub.push(d.name||d.type)})}
  if(!h)return null;return sec('kjokken',pl==='oslo'?'Kjøkken (ovn og kjøleskap)':'Vaskemaskin',sub.join(' · ')||'ikke koblet',el(grid(h)),{open:false})}
 function secAqara(pl){if(!AQ)return null;const D=(AQ.devices||[]).filter(d=>placeOf(d.site,d.name)===pl);
- if(!D.length)return AQ.error&&pl==='drivhus'?sec('aqara','Aqara',AQ.error,el(waiting('Aqara: '+AQ.error)),{open:false}):null;
+ if(!D.length)return AQ.error&&pl==='drivhus'?sec('aqara','Drivhus Oslo (Aqara)',AQ.error,el(waiting('Aqara: '+AQ.error)),{open:false}):null;
  const cards=D.map(d=>{const l=d.rows[d.rows.length-1];const parts=[];if(l.temp!=null)parts.push(nf(l.temp,1)+' °C');if(l.hum!=null)parts.push(nf(l.hum,0)+' % fukt');if(l.power!=null)parts.push(nf(l.power,0)+' W');
   return `<div class="tile"><div class="s">${d.name}</div><div class="n">${parts[0]||(l.on==null?'–':l.on?'På':'Av')}</div><div class="s">${parts.slice(1).join(' · ')}${l.on!=null?(parts.length>1?' · ':'')+(l.on?'på':'av'):''}${l.kwh!=null?' · '+nf(l.kwh,2)+' kWh totalt':''}</div><div class="s">oppdatert ${ago(l.t)}</div></div>`}).join('');
- return sec('aqara'+pl,'Aqara',D.length+' enheter',el(grid(cards)),{open:false})}
+ return sec('aqara'+pl,'Drivhus Oslo (Aqara)',D.length+' enheter',el(grid(cards)),{open:false})}
 function secDrivTemp(){
  const since=()=>Date.now()-hours*3600000;let k=0;
  const mk=()=>{const L=[];sensors('drivhus').forEach(s=>L.push({name:s.name,pts:s.rows.filter(r=>r.temp!=null).map(r=>({t:r.t.getTime(),v:r.temp}))}));

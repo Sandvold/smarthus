@@ -60,7 +60,7 @@ for did, n, m, s, ts, t, h, p, e, o in con.execute("select did,name,model,site,t
     x["name"], x["site"] = n, s
     x["rows"].append({"t": ts.isoformat(), "temp": f(t), "hum": f(h), "power": f(p), "kwh": f(e), "on": o})
 NAMES = {"lumi.54ef441000760552": "Lys drivhus", "lumi.54ef441000a0c5c6": "Varme drivhus",
-         "lumi.54ef441000efb484": "Ventilasjon drivhus", "lumi.158d000253f9f4": "Temperatur og fukt drivhus Oslo"}
+         "lumi.54ef441000efb484": "Ventilasjon drivhus", "lumi.158d000253f9f4": "Drivhus Oslo"}
 for did, x in out.items():
     x["name"] = NAMES.get(did, x["name"]); x["did"] = did
 OUT["devices"] = list(out.values()); done()
