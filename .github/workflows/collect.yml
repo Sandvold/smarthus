@@ -24,12 +24,14 @@ jobs:
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect.py
+        continue-on-error: true
         env:
           TUYA_ACCESS_ID: ${{ secrets.TUYA_ACCESS_ID }}
           TUYA_ACCESS_SECRET: ${{ secrets.TUYA_ACCESS_SECRET }}
           TUYA_HOST: ${{ vars.TUYA_HOST }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect_tibber.py
+        continue-on-error: true
         env:
           TIBBER_TOKEN: ${{ secrets.TIBBER_TOKEN }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -77,16 +79,19 @@ jobs:
           AQARA_REGION: ${{ secrets.AQARA_REGION }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect_shelly.py
+        continue-on-error: true
         env:
           SHELLY_SERVER: ${{ secrets.SHELLY_SERVER }}
           SHELLY_AUTH_KEY: ${{ secrets.SHELLY_AUTH_KEY }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect_adax.py
+        continue-on-error: true
         env:
           ADAX_ACCOUNT_ID: ${{ secrets.ADAX_ACCOUNT_ID }}
           ADAX_PASSWORD: ${{ secrets.ADAX_PASSWORD }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect_gardena.py
+        continue-on-error: true
         env:
           GARDENA_CLIENT_ID: ${{ secrets.GARDENA_CLIENT_ID }}
           GARDENA_CLIENT_SECRET: ${{ secrets.GARDENA_CLIENT_SECRET }}
@@ -94,6 +99,7 @@ jobs:
           GARDENA_CLIENT_SECRET_2: ${{ secrets.GARDENA_CLIENT_SECRET_2 }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/export_homey.py
+        continue-on-error: true
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/sync_ctl_secrets.py
@@ -117,7 +123,7 @@ jobs:
           ZAPTEC_PASSWORD: ${{ secrets.ZAPTEC_PASSWORD }}
           TUYA_ACCESS_ID: ${{ secrets.TUYA_ACCESS_ID }}
           TUYA_ACCESS_SECRET: ${{ secrets.TUYA_ACCESS_SECRET }}
-          TUYA_HOST: ${{ secrets.TUYA_HOST }}
+          TUYA_HOST: ${{ vars.TUYA_HOST || secrets.TUYA_HOST }}
           OJ_USERNAME: ${{ secrets.OJ_USERNAME }}
           OJ_PASSWORD: ${{ secrets.OJ_PASSWORD }}
           OJ_API_KEY: ${{ secrets.OJ_API_KEY }}
