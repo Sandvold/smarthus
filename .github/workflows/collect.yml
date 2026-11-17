@@ -1,7 +1,5 @@
-name: Hent målinger og publiser
+name: Hent målinger
 on:
-  push:
-    branches: [main]
   schedule:
     - cron: "23 */3 * * *"
   workflow_dispatch:
@@ -9,16 +7,12 @@ on:
     types: [homey]
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
-  group: pages
+  group: collect
   cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -109,9 +103,3 @@ jobs:
         continue-on-error: true
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-      - name: Bare siden publiseres åpent, data ligger bak innlogging
-        run: mkdir public && cp site/index.html public/
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
-      - uses: actions/deploy-pages@v4
