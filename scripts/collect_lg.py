@@ -6,7 +6,8 @@ PAT = os.environ.get("LG_THINQ_PAT")
 if not PAT:
     print("LG_THINQ_PAT mangler, hopper over LG"); sys.exit(0)
 COUNTRY = os.environ.get("LG_COUNTRY") or "NO"
-SITE = "Oslo"
+SITE_BY_TYPE = {"DEVICE_WASHER": "Arendal", "DEVICE_WASHTOWER": "Arendal", "DEVICE_DRYER": "Arendal"}
+site_of = lambda t: SITE_BY_TYPE.get(t, "Oslo")
 API_KEY = "v6GFvkweNo7DK7yD3ylIZ9w52aKBU0eJ7wLXkSR3"
 OUT = {"error": None, "devices": [], "tried": []}
 CLIENT = "smarthus-" + uuid.uuid5(uuid.NAMESPACE_DNS, "sandvold-smarthus").hex[:16]
@@ -55,7 +56,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
         con.execute("insert into lg_readings (device_id,name,type,state) values (%s,%s,%s,%s::jsonb)", (did, n, t, json.dumps(s)))
     out = {}
     for did, n, t, ts, s in con.execute("select device_id,name,type,ts,state from lg_readings where ts > now() - interval '30 days' order by ts").fetchall():
-        o = out.setdefault(did, {"name": n, "type": t, "site": SITE, "rows": []})
+        o = out.setdefault(did, {"name": n, "type": t, "site": site_of(t), "rows": []})
         o["rows"].append({"t": ts.isoformat(), "s": s})
 OUT["devices"] = list(out.values()); OUT["tried"] = OUT["tried"][-1:]
 done(); print("LG: enheter", len(rows))

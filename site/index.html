@@ -268,14 +268,14 @@ function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
  const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
  return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+L.map(lockHist).join(''))),{open:false})}
 function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
-function secKjokken(pl){if(pl!=='oslo')return null;let h='',sub=[];
- if(MI){if(MI.error)h+=waiting('Miele: '+MI.error);
-  (MI.devices||[]).forEach(d=>{const l=d.rows[d.rows.length-1];if(!l)return;const warm=l.target!=null&&l.temp!=null&&l.temp>l.target+3;
+function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===pl;
+ if(MI){if(MI.error&&pl==='oslo')h+=waiting('Miele: '+MI.error);
+  (MI.devices||[]).filter(mine).forEach(d=>{const l=d.rows[d.rows.length-1];if(!l)return;const warm=l.target!=null&&l.temp!=null&&l.temp>l.target+3;
    h+=`<div class="tile"><div class="s">${d.name||d.type} (Miele)</div><div class="n">${l.temp==null?'–':nf(l.temp,1)+' °C'}</div><div class="s">${l.status||''}${l.target!=null?' · mål '+nf(l.target,1)+' °C':''}${l.door?' · dør åpen':''}${warm?' · for varmt':''}</div><div class="s">oppdatert ${ago(l.t)}</div></div>`;sub.push(d.name||d.type)})}
- if(LG){if(LG.error)h+=waiting('LG: '+LG.error);
-  (LG.devices||[]).forEach(d=>{const l=d.rows[d.rows.length-1];if(!l)return;const s=l.s||{};const keys=Object.keys(s).filter(k=>/operation|state|temperature|remain|mode|power/i.test(k)).slice(0,6);
+ if(LG){if(LG.error&&pl==='oslo')h+=waiting('LG: '+LG.error);
+  (LG.devices||[]).filter(mine).forEach(d=>{const l=d.rows[d.rows.length-1];if(!l)return;const s=l.s||{};const keys=Object.keys(s).filter(k=>/operation|state|temperature|remain|mode|power/i.test(k)).slice(0,6);
    h+=`<div class="tile"><div class="s">${d.name||d.type} (LG)</div>${keys.map(k=>`<div class="s">${k.split('.').pop()}: ${s[k]}</div>`).join('')||'<div class="s">ingen tilstand</div>'}<div class="s">oppdatert ${ago(l.t)}</div></div>`;sub.push(d.name||d.type)})}
- if(!h)return null;return sec('kjokken','Kjøkken (ovn og kjøleskap)',sub.join(' · ')||'ikke koblet',el(grid(h)),{open:false})}
+ if(!h)return null;return sec('kjokken',pl==='oslo'?'Kjøkken (ovn og kjøleskap)':'Vaskemaskin',sub.join(' · ')||'ikke koblet',el(grid(h)),{open:false})}
 function placeView(pl){const w=document.createElement('div');
  const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));w.appendChild(secPlan('oslo','Drivhus Oslo','Her kommer målinger når Aqara-prosjektet er godkjent og sensorene er hentet inn.'))}
