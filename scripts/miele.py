@@ -6,6 +6,8 @@ CID, SEC = os.environ.get("MIELE_CLIENT_ID"), os.environ.get("MIELE_CLIENT_SECRE
 VG = os.environ.get("MIELE_VG") or "nb-NO"
 SITE = "Oslo"
 B = "https://api.mcs3.miele.com"
+TOKEN_URL = os.environ.get("MIELE_TOKEN_URL") or "https://auth.domestic.miele-iot.com/partner/realms/mcs/protocol/openid-connect/token"
+LEGACY = "mcs3" in TOKEN_URL
 if not (CID and SEC):
     print("MIELE_CLIENT_ID/SECRET mangler, hopper over Miele"); sys.exit(0)
 con = psycopg.connect(os.environ["NEON_DATABASE_URL"], autocommit=True)
@@ -15,7 +17,8 @@ def save(j):
     con.execute("insert into miele_auth (id,access,refresh) values (1,%s,%s) on conflict (id) do update set access=excluded.access, refresh=excluded.refresh, updated=now()", (j["access_token"], j["refresh_token"]))
 
 def tok(data):
-    r = requests.post(B + "/thirdparty/token", data={**data, "client_id": CID, "client_secret": SEC, "vg": VG}, timeout=30)
+    extra = {"vg": VG} if LEGACY else {}
+    r = requests.post(TOKEN_URL, data={**data, "client_id": CID, "client_secret": SEC, **extra}, timeout=30)
     try: return r.status_code, r.json()
     except Exception: return r.status_code, {"raw": r.text[:200]}
 
