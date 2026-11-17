@@ -165,6 +165,10 @@ async function actAdax(b: any): Promise<Out> {
   if (!room) return [{ error: 'ukjent rom' }, 400];
   const r = await fetch('https://api-1.adax.no/client-api/rest/v1/control/', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'content-type': 'application/json' }, body: JSON.stringify({ rooms: [{ id: room.id, targetTemperature: String(Math.round(t * 100)) }] }), signal: AbortSignal.timeout(8000) });
   if (!r.ok) return [{ error: 'Adax svarte HTTP ' + r.status }, 502];
+  try {
+    await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');
+    await sql('insert into plug_state (did, name, on_state, power, ts) values ($1,$2,null,$3,now()) on conflict (did) do update set name=$2, on_state=null, power=$3, ts=now()', ['adax:' + room.id, room.name, t]);
+  } catch {}
   await sleep(1500);
   const now = (await adaxRooms(tok).catch(() => [])).find(x => String(x.id) === String(room.id));
   return [{ ok: true, name: room.name, target: t, state: now?.targetTemperature != null ? now.targetTemperature / 100 : null }, 200];

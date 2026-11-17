@@ -4,7 +4,9 @@ ID, PW = os.environ.get("ADAX_ACCOUNT_ID", "").strip(), os.environ.get("ADAX_PAS
 if not ID or not PW:
     print("Adax-secrets mangler, hopper over"); sys.exit(0)
 API = "https://api-1.adax.no/client-api"
-NAMES = json.load(open("config/adax.json")).get("homes", {})
+_CFG = json.load(open("config/adax.json"))
+NAMES = _CFG.get("homes", {})
+IGNORE = set(_CFG.get("ignore_rooms", []))
 t = requests.post(API + "/auth/token", data={"grant_type": "password", "username": ID, "password": PW}, timeout=30)
 t.raise_for_status()
 j = requests.get(API + "/rest/v1/content/", headers={"Authorization": "Bearer " + t.json()["access_token"]}, timeout=30).json()
@@ -21,6 +23,7 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
     rows = con.execute("select room_id, home, room, ts, temp, target, heating from adax_readings where ts > now() - interval '14 days' order by ts").fetchall()
 out = {}
 for rid, home, room, ts, temp, target, heating in rows:
+    if rid in IGNORE: continue
     d = out.setdefault(rid, {"id": str(rid), "home": NAMES.get(home, home), "name": room, "rows": []})
     d["rows"].append({"t": ts.isoformat(), "temp": None if temp is None else float(temp), "target": None if target is None else float(target), "on": heating})
 json.dump({"rooms": list(out.values())}, open("site/adax.json", "w"), ensure_ascii=False)
