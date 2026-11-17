@@ -113,6 +113,10 @@ jobs:
           TUYA_ACCESS_ID: ${{ secrets.TUYA_ACCESS_ID }}
           TUYA_ACCESS_SECRET: ${{ secrets.TUYA_ACCESS_SECRET }}
           TUYA_HOST: ${{ secrets.TUYA_HOST }}
+          OJ_USERNAME: ${{ secrets.OJ_USERNAME }}
+          OJ_PASSWORD: ${{ secrets.OJ_PASSWORD }}
+          OJ_API_KEY: ${{ secrets.OJ_API_KEY }}
+          OJ_CUSTOMER_ID: ${{ secrets.OJ_CUSTOMER_ID }}
       - run: python scripts/upload_site.py
         continue-on-error: true
         env:

@@ -290,16 +290,56 @@ async function actTuya(b: any): Promise<Out> {
   return [{ ok: true, on: typeof get('switch') === 'boolean' ? get('switch') : null, temp: typeof get('temp_set') === 'number' ? get('temp_set') : null }, 200];
 }
 
+
+// Microtemp (OJ Electronics, uoffisielt API): manuell temperatur eller tilbake til timeplan. Timeplanen sendes uendret tilbake.
+async function actMicrotemp(b: any): Promise<Out> {
+  const s = await secretsMap();
+  if (!s.OJ_USERNAME || !s.OJ_PASSWORD || !s.OJ_API_KEY) return [{ error: 'Microtemp er ikke satt opp ennå (kjør Hent målinger)' }, 503];
+  const serial = String(b.serial || ''), cmd = String(b.cmd);
+  if (!/^[A-Za-z0-9\-]{3,40}$/.test(serial)) return [{ error: 'ugyldig termostat' }, 400];
+  let temp = 0;
+  if (cmd === 'temp') { temp = Number(b.value); if (!Number.isFinite(temp) || temp < 5 || temp > 35 || Math.round(temp * 2) !== temp * 2) return [{ error: 'temperatur må være 5–35 °C i steg på 0,5' }, 400]; }
+  else if (cmd !== 'schedule') return [{ error: 'ukjent kommando' }, 400];
+  const host = 'https://' + (s.OJ_HOST || 'owd5-mh015-app.ojelectronics.com'), key = s.OJ_API_KEY;
+  const login: any = await (await fetch(host + '/api/UserProfile/SignIn', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ APIKEY: key, ClientSWVersion: 1, CustomerId: Number(s.OJ_CUSTOMER_ID || 15), UserName: s.OJ_USERNAME, Password: s.OJ_PASSWORD }), signal: AbortSignal.timeout(10000) })).json().catch(() => ({}));
+  if (!login.SessionId) return [{ error: 'Microtemp-innlogging avvist' }, 502];
+  const sid = login.SessionId as string;
+  const list = async () => {
+    const g: any = await (await fetch(`${host}/api/Group/GroupContents?sessionid=${encodeURIComponent(sid)}&APIKEY=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(10000) })).json();
+    return g;
+  };
+  const g0 = await list();
+  let th: any = null;
+  for (const grp of g0.GroupContents || []) for (const t of grp.Thermostats || []) if (String(t.SerialNumber) === serial) th = t;
+  if (!th) return [{ error: 'fant ikke termostaten' }, 404];
+  const mode = cmd === 'temp' ? 3 : 1;
+  const sp = cmd === 'temp' ? Math.round(temp * 100) : th.ManualModeSetpoint;
+  if (cmd === 'temp' && (sp < (th.MinSetpoint ?? 0) || sp > (th.MaxSetpoint ?? 99999))) return [{ error: 'utenfor termostatens grenser' }, 400];
+  const body = { APIKEY: key, SetGroup: {
+    ExcludeVacationData: false, GroupId: th.GroupId, GroupName: th.GroupName,
+    BoostEndTime: th.BoostEndTime, ComfortEndTime: th.ComfortEndTime, ComfortSetpoint: th.ComfortSetpoint,
+    LastPrimaryModeIsAuto: mode === 1 ? true : th.RegulationMode === 1,
+    ManualModeSetpoint: sp, RegulationMode: mode, Schedule: th.Schedule,
+    VacationEnabled: th.VacationEnabled, VacationBeginDay: th.VacationBeginDay, VacationEndDay: th.VacationEndDay, VacationTemperature: th.VacationTemperature,
+  } };
+  const r: any = await (await fetch(`${host}/api/Group/UpdateGroup?sessionid=${encodeURIComponent(sid)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000) })).json().catch(() => ({}));
+  if (r.ErrorCode === 1 || r.ErrorCode === undefined && !r.Success) return [{ error: 'Microtemp svarte med feil' + (r.ErrorCode != null ? ' (kode ' + r.ErrorCode + ')' : '') }, 502];
+  await sleep(2000);
+  let now: any = null;
+  try { const g1 = await list(); for (const grp of g1.GroupContents || []) for (const t of grp.Thermostats || []) if (String(t.SerialNumber) === serial) now = t; } catch {}
+  return [{ ok: true, mode: now ? now.RegulationMode : null, set: now && now.RegulationMode === 3 ? now.ManualModeSetpoint / 100 : null }, 200];
+}
+
 async function actDispatch(email: string, b: any): Promise<Out> {
-  const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : b.act === 'tuya' ? 'tuya:hp' : '';
+  const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : b.act === 'tuya' ? 'tuya:hp' : b.act === 'microtemp' ? 'microtemp:' + String(b.serial).slice(0, 20) : '';
   if (!key) return [{ error: 'ukjent handling' }, 400];
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
   if ((await sql("select 1 from ctl_log where did = $1 and ts > now() - interval '3 seconds' limit 1", [key])).length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
   let res: Out;
-  try { res = b.act === 'shelly' ? await actShelly(b) : b.act === 'adax' ? await actAdax(b) : b.act === 'gardena' ? await actGardena(b) : b.act === 'homey' ? await actHomey(b) : b.act === 'tuya' ? await actTuya(b) : await actZaptec(b); }
+  try { res = b.act === 'shelly' ? await actShelly(b) : b.act === 'adax' ? await actAdax(b) : b.act === 'gardena' ? await actGardena(b) : b.act === 'homey' ? await actHomey(b) : b.act === 'tuya' ? await actTuya(b) : b.act === 'microtemp' ? await actMicrotemp(b) : await actZaptec(b); }
   catch (e: any) { res = [{ error: 'ingen kontakt: ' + String(e?.message || e).slice(0, 60) }, 502]; }
   const [body, st] = res;
-  const what = b.act === 'shelly' ? (b.on ? 'på' : 'av') : b.act === 'adax' ? 'sett ' + b.target : (b.act === 'homey' || b.act === 'tuya') ? b.cmd + (b.value != null ? ' ' + b.value : '') : b.cmd === 'start' ? 'start ' + b.minutes + ' min' : b.cmd;
+  const what = b.act === 'shelly' ? (b.on ? 'på' : 'av') : b.act === 'adax' ? 'sett ' + b.target : (b.act === 'homey' || b.act === 'tuya' || b.act === 'microtemp') ? b.cmd + (b.value != null ? ' ' + b.value : '') : b.cmd === 'start' ? 'start ' + b.minutes + ' min' : b.cmd;
   await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, key, what, st === 200 ? 0 : st, st === 200 ? null : String(body.error).slice(0, 120)]);
   return res;
 }

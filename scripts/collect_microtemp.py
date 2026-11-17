@@ -61,7 +61,7 @@ try:
         out = {}
         f = lambda x: None if x is None else float(x)
         for s, n, ts, ro, fl, st, he, mo in con.execute("select serial,name,ts,room,floor,setpoint,heating,mode from microtemp_readings where ts > now() - interval '30 days' order by ts").fetchall():
-            d = out.setdefault(s, {"name": n, "site": SITE, "rows": []})
+            d = out.setdefault(s, {"serial": s, "name": n, "site": SITE, "rows": []})
             d["rows"].append({"t": ts.isoformat(), "room": f(ro), "floor": f(fl), "set": f(st), "heat": he, "mode": mo})
     OUT["thermostats"] = list(out.values())
     if not found:

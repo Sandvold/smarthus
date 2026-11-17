@@ -222,9 +222,13 @@ function lockHist(c){const since=Date.now()-hours*3600000,R=c.rows.filter(r=>new
  const un=sg.filter(x=>x.k==='u').reduce((a,x)=>a+(x.t1-x.t0),0);
  return `<div class="tile" style="grid-column:1/-1"><div class="s">${c.name}: låsestatus siste ${hours>=168?Math.round(hours/24)+' dager':hours+' timer'}</div>${strip(sg,{l:'#3f6b4a',u:'#e08363'},{l:'Låst',u:'Ulåst'})}
  <div class="s" style="margin-top:6px">${ch.length?`${ch.length} endringer, ulåst totalt ${mins(un)}. Siste: ${ch.slice(-3).reverse().map(x=>(x.k==='u'?'låst opp ':'låst ')+fmt(new Date(x.t))).join(' · ')}`:'Ingen endringer, låst hele perioden'}</div></div>`}
+function mtCtl(t,l){const bs='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer',o=[];for(let v=10;v<=35;v+=0.5)o.push(v);const c=l.set!=null?l.set:(l.room!=null?Math.round(l.room*2)/2:21);if(!o.includes(c))o.push(c);o.sort((a,b)=>a-b);const sr=JSON.stringify(t.serial);
+ if(!t.serial)return '';
+ return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===c?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick='mtSet(this,${sr},${JSON.stringify(t.name)})' style="${bs}">Sett manuelt</button><button onclick='act(this,{act:"microtemp",serial:${sr},cmd:"schedule",q:"${String(t.name).replace(/["\\]/g,'')}: gå tilbake til timeplan?"})' style="${bs}">Timeplan</button></div><div class="s" data-am="mt${t.serial}"></div>`}
+function mtSet(b,serial,name){const v=Number(b.previousElementSibling.value);act(b,{act:'microtemp',serial,cmd:'temp',value:v,q:name+': sette temperaturen manuelt til '+nf(v,v%1?1:0)+' °C?'})}
 function mtBlock(pl,id){if(!MT)return null;const T=(MT.thermostats||[]).filter(t=>placeOf(t.site,t.name)===pl);
  if(!T.length)return MT.error&&pl==='oslo'?{html:waiting('Microtemp: '+MT.error),draw:()=>{},sub:'feil'}:null;
- const cards=T.map(t=>{const l=t.rows[t.rows.length-1];return `<div class="tile"><div class="s">${t.name}</div><div class="n">${l.room==null?'–':nf(l.room,1)+' °C'}</div><div class="s">Gulv ${nf(l.floor,1)} °C · ${l.mode===3?'manuell, innstilt '+nf(l.set,1)+' °C':l.mode===1?'følger timeplan':'modus '+l.mode} · ${l.heat?'varmer':'varmer ikke'}</div><div class="s">oppdatert ${ago(l.t)}</div></div>`}).join('');
+ const cards=T.map(t=>{const l=t.rows[t.rows.length-1];return `<div class="tile"><div class="s">${t.name}</div><div class="n">${l.room==null?'–':nf(l.room,1)+' °C'}</div><div class="s">Gulv ${nf(l.floor,1)} °C · ${l.mode===3?'manuell, innstilt '+nf(l.set,1)+' °C':l.mode===1?'følger timeplan':'modus '+l.mode} · ${l.heat?'varmer':'varmer ikke'}</div><div class="s">oppdatert ${ago(l.t)}</div>${mtCtl(t,l)}</div>`}).join('');
  const sets=()=>{const s=Date.now()-hours*3600000,o=[];T.forEach(t=>[['room','Rom','#7eaddb'],['floor','Gulv','#d8a747'],['set','Innstilt','#e08363']].forEach(([k,n,c])=>o.push({name:T.length>1?t.name+' '+n.toLowerCase():n,color:c,pts:t.rows.filter(r=>new Date(r.t)>s&&r[k]!=null).map(r=>({t:new Date(r.t).getTime(),v:r[k]}))})));return o.filter(x=>x.pts.length)};
  const l0=T[0].rows[T[0].rows.length-1];
  return{sub:'Gulvvarme '+nf(l0.room,1)+' °C',html:grid(cards)+chartBlock('mt'+id),draw:()=>drawLine('ch-mt'+id,'leg-mt'+id,'tb-mt'+id,sets(),'t','°C',null,1)}}
@@ -604,7 +608,7 @@ async function lockTerrasse(b,unlock,door){door=door||'terrasse';const nm=door==
 function applyAdax(id,s){const e=document.querySelector('[data-at="'+id+'"]');if(e&&s&&s.power!=null)e.textContent=nf(s.power,1)}
 function applyShelly(id,s){const e=document.querySelector('[data-sn="'+id+'"]');if(e&&s)e.textContent=(s.on?'På':'Av')+(s.power!=null?' · '+nf(s.power,0)+' W':'')}
 async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.assign({},o);delete body.q;delete body.cid;
- const key=o.act==='tuya'?'tuya':o.act==='homey'?'h'+o.dev:o.act==='shelly'?'s'+o.cid:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
+ const key=o.act==='microtemp'?'mt'+o.serial:o.act==='tuya'?'tuya':o.act==='homey'?'h'+o.dev:o.act==='shelly'?'s'+o.cid:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
  const bs=b.parentNode.querySelectorAll('button'),msg=b.parentNode.nextElementSibling;bs.forEach(x=>x.disabled=true);if(msg)msg.textContent='Sender …';
  const r=await ctlCall('POST',body);bs.forEach(x=>x.disabled=false);
  if(!msg)return;
@@ -615,11 +619,12 @@ async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.as
  if(o.act==='shelly')t=j.state==null?'Sendt (kunne ikke bekrefte)':j.state===o.on?'Bekreftet: '+(o.on?'på':'av'):'Enheten svarte ikke ennå (står '+(j.state?'på':'av')+')';
  else if(o.act==='adax')t=j.state!=null&&Math.abs(j.state-o.target)<0.01?'Bekreftet: innstilt '+nf(j.state,1)+' °C':'Sendt til Adax. Ovnen kan bruke litt tid på å følge etter';
  else if(o.act==='gardena')t=o.cmd==='start'?(j.state&&j.state!=='CLOSED'?'Bekreftet: vanner':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå'):(j.state==='CLOSED'?'Bekreftet: stoppet':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå');
+ else if(o.act==='microtemp')t=j.mode===3?'Bekreftet: manuell, '+nf(j.set,1)+' °C':j.mode===1?'Bekreftet: følger timeplan':'Sendt. Modus nå '+j.mode;
  else if(o.act==='tuya')t='Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+j.temp+' °C':'');
  else if(o.act==='homey')t=j.status?(o.dev==='daikin'?'Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+nf(j.temp,1)+' °C':''):'Klipperen melder: '+String(j.status).replace(/_/g,' ')):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt';
  else t=o.cmd==='pause'?(j.state===5?'Bekreftet: pauset':'Sendt. Laderen viser modus '+j.state+' ennå'):(j.state===3?'Bekreftet: lader':'Sendt. Laderen viser modus '+j.state+' ennå');
  msg.textContent=t+' ('+tm+')'}
-window.act=act;window.daikinSet=daikinSet;window.hpSet=hpSet;
+window.act=act;window.daikinSet=daikinSet;window.hpSet=hpSet;window.mtSet=mtSet;
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
 const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
