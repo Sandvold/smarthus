@@ -1,75 +1,106 @@
 <!doctype html>
 <html lang="nb">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Smarthus – drivhus</title>
+<title>Smarthus</title>
 <style>
-:root{--bg:#0f1110;--card:#181b1a;--fg:#f0efec;--mut:#9aa39d;--grid:#2a2f2d;--warn:#d8a747;--bad:#e08363;--ok:#93a877}
+:root{--bg:#0f1110;--card:#181b1a;--tile:#1f2321;--fg:#f0efec;--mut:#9aa39d;--grid:#2a2f2d;--warn:#d8a747;--bad:#e08363;--ok:#93a877;--acc:#7eaddb}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif;margin:0;padding:16px;max-width:1100px;margin-inline:auto}
-header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
-h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 8px}
-select{background:var(--card);color:var(--fg);border:1px solid var(--grid);border-radius:8px;padding:8px 10px;font:inherit}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px}
-.c{background:var(--card);border-radius:12px;padding:14px}
-.big{font-size:34px;line-height:1.1}
+h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 8px}h3{font-size:14px;color:var(--mut);font-weight:600;margin:16px 0 6px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:8px}
+select,input,button{font:inherit;color:var(--fg)}
+select,input[type=text]{background:var(--card);border:1px solid var(--grid);border-radius:8px;padding:8px 10px}
+.nav{position:sticky;top:0;z-index:5;background:#0f1110ee;backdrop-filter:blur(6px);display:flex;gap:6px;overflow-x:auto;padding:8px 16px;margin:0 -16px 14px;border-bottom:1px solid var(--grid)}
+.nav button{background:var(--card);border:1px solid var(--grid);border-radius:999px;padding:8px 16px;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.nav button.on{background:#7eaddb22;border-color:var(--acc);color:var(--acc)}
+.pill{font-size:12px;border-radius:999px;padding:1px 8px;background:var(--bad);color:#111}.pill.w{background:var(--warn)}.pill.g{background:var(--grid);color:var(--mut)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:6px}
+.c,.tile{background:var(--tile);border-radius:10px;padding:12px}
+.tile .n{font-size:26px;line-height:1.15}
+.big{font-size:32px;line-height:1.1}
 .s{color:var(--mut);font-size:13px}
 .badge{display:inline-block;font-size:13px;border-radius:999px;padding:2px 10px;margin-top:6px;border:1px solid currentColor}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-.lede{font-size:18px;line-height:1.5;max-width:62ch;margin:0 0 20px}.lede b{font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.lede{font-size:18px;line-height:1.5;max-width:62ch;margin:0 0 16px}
+details.sec{background:var(--card);border-radius:12px;margin:0 0 10px;color:var(--fg);font-size:inherit}
+details.sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px;min-height:48px}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec .t{font-weight:600;font-size:16px}
+details.sec .sub{color:var(--mut);font-size:13px;margin-left:auto;text-align:right}
+details.sec .chev{width:10px;height:10px;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-left:4px}
+details.sec[open]>summary .chev{transform:rotate(45deg)}
+details.sec>.body{padding:0 14px 14px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--mut);margin-bottom:6px}
 .legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
 .chart{position:relative}svg{width:100%;height:240px;display:block;touch-action:pan-y}
 .tip{position:absolute;pointer-events:none;background:#000d;border:1px solid var(--grid);border-radius:8px;padding:6px 10px;font-size:13px;display:none;white-space:nowrap}
-details{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:3px 8px 3px 0}
+details.mini{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:3px 8px 3px 0}
+.pc{background:var(--card);border:1px solid var(--grid);border-radius:12px;padding:14px;text-align:left;cursor:pointer;width:100%}
+.pc:hover{border-color:var(--acc)}.pc h2{display:flex;justify-content:space-between;align-items:center}
+.pc div{font-size:14px;margin-top:3px}
+.al{display:flex;gap:8px;padding:6px 0;font-size:15px;border-bottom:1px solid var(--grid)}.al:last-child{border:0}
+.todo label{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--grid);align-items:flex-start;cursor:pointer}
+.todo input[type=checkbox]{width:20px;height:20px;margin-top:2px;flex:none}
+.todo .d .x{text-decoration:line-through;color:var(--mut)}
+.add{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.add input{flex:1;min-width:200px}
+.add button{background:var(--acc);color:#111;border:0;border-radius:8px;padding:8px 16px;cursor:pointer}
+.empty{border:1px dashed var(--grid);border-radius:10px;padding:12px;color:var(--mut);font-size:14px}
 </style>
+</head>
+<body>
 <header><h1>Smarthus</h1>
-<label class="s">Periode <select id="range"><option value="24">Siste 24 timer</option><option value="72">Siste 3 dager</option><option value="168" selected>Siste 7 dager</option><option value="336">Siste 14 dager</option></select></label></header>
-<p class="lede" id="lede"></p>
-<h2 style="margin-bottom:2px">Akkurat nå</h2><p class="s" style="margin:0 0 10px">Siste måling per enhet, og laveste og høyeste temperatur siste døgn.</p>
-<div id="cards" class="cards">Laster…</div>
-<section class="c" style="margin-bottom:16px"><h2>Temperatur</h2><div class="legend" id="leg-t"></div><div class="chart" id="ch-t"></div><details><summary>Tabell</summary><div id="tb-t"></div></details></section>
-<section class="c"><h2>Luftfuktighet</h2><div class="legend" id="leg-h"></div><div class="chart" id="ch-h"></div><details><summary>Tabell</summary><div id="tb-h"></div></details></section>
-<section class="c" id="hp" hidden style="margin-top:16px"><h2 id="hp-title">Varmepumpe</h2><div id="hp-cards" class="cards" style="margin-bottom:8px"></div>
-<h2 style="font-size:14px;color:var(--mut)">Temperaturer</h2><div class="legend" id="leg-hp"></div><div class="chart" id="ch-hp"></div><details><summary>Tabell</summary><div id="tb-hp"></div></details>
-<h2 style="font-size:14px;color:var(--mut);margin-top:14px">Strøm</h2><div class="legend" id="leg-pw"></div><div class="chart" id="ch-pw"></div><details><summary>Tabell</summary><div id="tb-pw"></div></details>
-<details><summary>Alle verdier fra enheten</summary><div id="hp-all"></div></details></section>
-<section class="c" id="hm" hidden style="margin-top:16px"><h2>Klippere, låser og Daikin (Homey)</h2><div id="hm-body"></div></section>
-<section class="c" id="gd" hidden style="margin-top:16px"><h2>Hage og vanning (Gardena)</h2><div id="gd-body"></div></section>
-<section class="c" id="ax" hidden style="margin-top:16px"><h2>Panelovner (Adax)</h2><div id="ax-body"></div></section>
-<section class="c" id="sh" hidden style="margin-top:16px"><h2>Stikk i drivhus (Shelly)</h2><div id="sh-body"></div></section>
-<section class="c" id="pw" hidden style="margin-top:16px"><h2>Strøm (Tibber)</h2><div id="pw-body"></div></section>
-<details class="s" style="margin-top:16px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Temperaturen fra sensoren leses i tiendedels grader. Døgn regnes de siste 24 timene fra siste måling. Siden oppdateres omtrent hvert 15. minutt.</p></details>
+<label class="s">Periode for grafer <select id="range"><option value="24">Siste 24 timer</option><option value="72">Siste 3 dager</option><option value="168" selected>Siste 7 dager</option><option value="336">Siste 14 dager</option></select></label></header>
+<nav class="nav" id="nav"></nav>
+<main id="main">Laster…</main>
+<details class="mini" style="margin-top:20px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Døgn regnes som de siste 24 timene. Kostnad per kWh er et anslag på 1,1 kr med Norgespris, nett og avgifter. Siden oppdateres omtrent hvert 15. minutt.</p></details>
 <script>
-const FROST=0, WARN_NEAR=3, LOW_BATT=30, STALE_MIN=60;
+const FROST=0,WARN_NEAR=3,LOW_BATT=30,STALE_MIN=60,RATE=1.1;
 const PAL=['#7eaddb','#e08363','#93a877','#d8a747','#a97a9b','#b98e5a','#c9c2b3','#8d9aa3'];
-const nf=(v,d=1)=>v==null?'–':v.toLocaleString('nb-NO',{minimumFractionDigits:d,maximumFractionDigits:d});
+const nf=(v,d=1)=>v==null||isNaN(v)?'–':v.toLocaleString('nb-NO',{minimumFractionDigits:d,maximumFractionDigits:d});
 const fmt=d=>d.toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-let ALL=[],hours=168;
+const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå':m<90?m+' min siden':m<2880?Math.round(m/60)+' t siden':Math.round(m/1440)+' d siden'};
+const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus'};
+const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
+let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null;
+let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
+const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
+const grid=h=>`<div class="cards">${h}</div>`;
+const el=(h)=>{const d=document.createElement('div');d.innerHTML=h;return d};
+function sec(key,title,sub,body,o={}){
+ const d=document.createElement('details');d.className='sec';const k=TAB+'/'+key;
+ d.open=k in OPEN?OPEN[k]:o.open!==false;
+ d.innerHTML=`<summary><span class="t">${title}</span><span class="sub">${sub||''}</span><span class="chev"></span></summary><div class="body"></div>`;
+ const b=d.querySelector('.body');typeof body==='string'?b.innerHTML=body:b.appendChild(body);
+ d._draw=o.draw;d.addEventListener('toggle',()=>{OPEN[k]=d.open;if(d.open&&d._draw)d._draw()});return d}
+const waiting=t=>`<div class="empty">${t}</div>`;
+/* ---------- data ---------- */
 const SERIES=()=>{const by={};ALL.filter(r=>r.kind!=='heatpump').forEach(r=>{(by[r.name]=by[r.name]||[]).push({t:new Date(r.ts),temp:r.temp,hum:r.hum,batt:r.battery,site:r.site})});
- return Object.entries(by).map(([name,rows],i)=>({name,color:PAL[i%PAL.length],rows}))};
-function cards(){
- const el=document.getElementById('cards');const S=SERIES();if(!S.length){el.textContent='Ingen data ennå';return}
- el.innerHTML=S.map(s=>{const last=s.rows[s.rows.length-1];
-  const since=Date.now()-86400000,day=s.rows.filter(r=>r.t>since&&r.temp!=null).map(r=>r.temp);
-  const mn=day.length?Math.min(...day):null,mx=day.length?Math.max(...day):null;
-  let cls='ok',txt='✓ Over frost';
-  if(last.temp!=null&&last.temp<=FROST){cls='bad';txt='⚠ Frost'}else if(last.temp!=null&&last.temp<=WARN_NEAR){cls='warn';txt='▲ Nær frost'}
-  const age=(Date.now()-last.t)/60000,stale=age>STALE_MIN;
-  const bt=last.batt!=null&&last.batt<LOW_BATT?` · <span class="warn">⚠ lavt batteri</span>`:'';
-  return `<div class="c"><h2><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};margin-right:6px"></i>${s.name}</h2>
-  <div class="big">${nf(last.temp)} °C</div><span class="badge ${cls}">${txt}</span>
-  <div class="s" style="margin-top:8px">Fuktighet ${nf(last.hum,0)} % · siste døgn ${nf(mn)} til ${nf(mx)} °C</div>
-  <div class="s">Batteri ${nf(last.batt,0)} %${bt}</div>
-  <div class="s ${stale?'warn':''}">${stale?'⚠ Ingen ny måling siden ':'Oppdatert '}${fmt(last.t)}</div></div>`}).join('');
-}
-function chart(id,legId,tbId,key,unit,refLine,pad){
+ return Object.entries(by).map(([name,rows],i)=>({name,color:PAL[i%PAL.length],rows,pl:placeOf(rows[rows.length-1].site,name)}))};
+const sensors=pl=>SERIES().filter(s=>s.pl===pl);
+const hmList=(pl,kind)=>((HM&&HM.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl&&(!kind||c.kind===kind));
+const gdList=pl=>((GD&&GD.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl);
+const axList=pl=>((AX&&AX.rooms)||[]).filter(c=>placeOf(c.home,c.name)===pl);
+const shList=()=>((SH&&SH.channels)||[]);
+const pwList=pl=>((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length&&placeOf(h.site,h.name)===pl);
+const hpRows=()=>ALL.filter(r=>r.kind==='heatpump').map(r=>({t:new Date(r.ts).getTime(),p:r.props||{},name:r.name}));
+function pwStats(hm){const H=hm.hourly.map(r=>({t:new Date(r.from),kwh:r.kwh,cost:r.cost}));
+ const tmax=Math.max(...H.map(r=>r.t.getTime()))+3600000,sum=(a,b)=>H.filter(r=>r.t.getTime()>tmax-b*3600000&&r.t.getTime()<=tmax-a*3600000).reduce((x,r)=>x+(r.kwh||0),0);
+ const k24=sum(0,24),k7=sum(0,168),p7=sum(168,336);return{H,k24,k7,p7,ch:p7?Math.round((k7-p7)/p7*100):null}}
+function shStats(c){const r=c.rows,last=r[r.length-1],cut=Date.now()-86400000,r24=r.filter(x=>new Date(x.t).getTime()>=cut),first=r24[0]||last;
+ const kwh=(last.wh!=null&&first.wh!=null)?Math.max(0,(last.wh-first.wh)/1000):null,on=r24.filter(x=>x.on).length;
+ return{last,kwh,share:r24.length?Math.round(on/r24.length*100):null}}
+/* ---------- charts ---------- */
+const chartBlock=id=>`<div class="legend" id="leg-${id}"></div><div class="chart" id="ch-${id}"></div><details class="mini"><summary>Tabell</summary><div id="tb-${id}"></div></details>`;
+function chart(id,key,unit,refLine,pad,S){
  const since=Date.now()-hours*3600000;
- const sets=SERIES().map(s=>({name:s.name,color:s.color,pts:s.rows.filter(r=>r.t>since&&r[key]!=null).map(r=>({t:r.t.getTime(),v:r[key]}))}));
- drawLine(id,legId,tbId,sets,key,unit,refLine,pad);
-}
+ const sets=S.map(s=>({name:s.name,color:s.color,pts:s.rows.filter(r=>r.t>since&&r[key]!=null).map(r=>({t:r.t.getTime(),v:r[key]}))}));
+ drawLine('ch-'+id,'leg-'+id,'tb-'+id,sets,key,unit,refLine,pad)}
 function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
- const host=document.getElementById(id);
+ const host=document.getElementById(id);if(!host)return;
  document.getElementById(legId).innerHTML=sets.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');
  const all=sets.flatMap(s=>s.pts);
  if(!all.length){host.innerHTML='<div class="s">Ingen målinger i perioden</div>';return}
@@ -77,139 +108,185 @@ function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
  let t0=Math.min(...all.map(p=>p.t)),t1=Math.max(...all.map(p=>p.t));if(t1===t0)t1=t0+1;
  let lo=Math.min(...all.map(p=>p.v),...(refLine!=null?[refLine]:[])),hi=Math.max(...all.map(p=>p.v),...(refLine!=null?[refLine]:[]));
  lo-=pad;hi+=pad;if(hi===lo)hi=lo+1;
- const X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b);
- let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,(key==='hum'||key==='pw')?0:1)}</text>`}
+ const X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b),d0=(key==='hum'||key==='pw')?0:1;
+ let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,d0)}</text>`}
  for(let i=0;i<=3;i++){const t=t0+(t1-t0)*i/3;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==3?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</text>`}
  if(refLine!=null)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(refLine)}" y2="${Y(refLine)}" stroke="#e08363" stroke-dasharray="4 4"/><text x="${W-m.r}" y="${Y(refLine)-4}" text-anchor="end" fill="#e08363" font-size="11">Frost ${refLine} °C</text>`;
  const lines=sets.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" points="${s.pts.map(p=>X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}"/>`+(s.pts.length===1?`<circle cx="${X(s.pts[0].t)}" cy="${Y(s.pts[0].v)}" r="4" fill="${s.color}"/>`:'')).join('');
- host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${key==='hum'?'Luftfuktighet':key==='pw'?'Effekt':'Temperatur'} over tid">${g}${lines}<line id="${id}-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="${id}-tip"></div>`;
+ host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf over tid">${g}${lines}<line id="${id}-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="${id}-tip"></div>`;
  const svg=host.querySelector('svg'),xl=document.getElementById(id+'-x'),tip=document.getElementById(id+'-tip');
  const move=e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*W,t=t0+(px-m.l)/(W-m.l-m.r)*(t1-t0);
   const rows=sets.map(s=>{if(!s.pts.length)return null;let b=s.pts[0];s.pts.forEach(p=>{if(Math.abs(p.t-t)<Math.abs(b.t-t))b=p});return{s,b}}).filter(Boolean);
   if(!rows.length)return;const ref=rows[0].b.t;xl.setAttribute('x1',X(ref));xl.setAttribute('x2',X(ref));xl.style.display='';
-  tip.innerHTML=`<div class="s">${fmt(new Date(ref))}</div>`+rows.map(o=>`<div><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${o.s.color};margin-right:6px"></i>${o.s.name}: ${nf(o.b.v,(key==='hum'||key==='pw')?0:1)} ${unit}</div>`).join('');
-  tip.style.display='block';const left=Math.min(Math.max(X(ref)/W*r.width+10,0),r.width-tip.offsetWidth);tip.style.left=left+'px';tip.style.top='8px'};
+  tip.innerHTML=`<div class="s">${fmt(new Date(ref))}</div>`+rows.map(o=>`<div><i class="dot" style="background:${o.s.color}"></i>${o.s.name}: ${nf(o.b.v,d0)} ${unit}</div>`).join('');
+  tip.style.display='block';tip.style.left=Math.min(Math.max(X(ref)/W*r.width+10,0),r.width-tip.offsetWidth)+'px';tip.style.top='8px'};
  svg.addEventListener('pointermove',move);svg.addEventListener('pointerleave',()=>{xl.style.display='none';tip.style.display='none'});
  const rows=sets.flatMap(s=>s.pts.slice(-30).reverse().map(p=>({n:s.name,t:p.t,v:p.v}))).sort((a,b)=>b.t-a.t).slice(0,40);
- document.getElementById(tbId).innerHTML='<table><tr><th>Tidspunkt</th><th>Enhet</th><th>Verdi</th></tr>'+rows.map(r=>`<tr><td>${fmt(new Date(r.t))}</td><td>${r.n}</td><td>${nf(r.v,(key==='hum'||key==='pw')?0:1)} ${unit}</td></tr>`).join('')+'</table>';
-}
-function lede(){
- const el=document.getElementById('lede'),S=SERIES();if(!S.length){el.textContent='';return}
- const info=S.map(s=>{const last=s.rows[s.rows.length-1],since=last.t.getTime()-86400000;
-  const w=s.rows.filter(r=>r.t.getTime()>since&&r.temp!=null).map(r=>r.temp);return{name:s.name,temp:last.temp,min:w.length?Math.min(...w):null}}).filter(i=>i.temp!=null);
- if(!info.length){el.textContent='';return}
- const c=info.reduce((a,b)=>b.temp<a.temp?b:a),frost=info.some(i=>i.min!=null&&i.min<=FROST);
- const who=info.length>1?'Det kaldeste stedet, <b>'+c.name+'</b>,':'<b>'+c.name+'</b>';
- el.innerHTML=`${who} er nå <b>${nf(c.temp)}</b> °C og var nede i <b>${nf(c.min)}</b> °C det siste døgnet. ${frost?'Minst ett sted hadde frost.':'Ingen steder hadde frost.'}`;
-}
-const HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877']];
-function hp(){
- const sec=document.getElementById('hp'),rows=ALL.filter(r=>r.kind==='heatpump').map(r=>({t:new Date(r.ts).getTime(),p:r.props||{},name:r.name}));
- if(!rows.length){sec.hidden=true;return}
- sec.hidden=false;const last=rows[rows.length-1],p=last.p,since=Date.now()-hours*3600000;
- document.getElementById('hp-title').textContent=last.name;
- const run=p.compressor_state===true,on=p.switch===true,fault=p.fault&&p.fault!==0;
- const tile=(l,v,u)=>`<div class="c" style="margin:0;background:#1f2321"><div class="s">${l}</div><div class="n" style="font-size:26px">${v==null?'–':nf(v,0)}${v==null?'':' '+u}</div></div>`;
- document.getElementById('hp-cards').innerHTML=
-  `<div class="c" style="margin:0;background:#1f2321"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
-  +tile('Innstilt temp',p.temp_set,'°C')+tile('Retur (inn)',p.temp_bottom,'°C')+tile('Ut',p.temp_top,'°C')+tile('Kompressorstrøm (fase 1/2/3)',p.cur_current,'')+tile('Fase 2',p.b_cur,'')+tile('Fase 3',p.c_cur,'')+tile('Spenning (fase 1)',p.voltage_current,'')+tile('Effekt (fra enheten)',p.cur_power,'W')+tile('Total energi',p.electric_total,'');
- const sets=HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>since&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length);
- drawLine('ch-hp','leg-hp','tb-hp',sets,'t','°C',null,2);
- drawLine('ch-pw','leg-pw','tb-pw',[{name:'Effekt (cur_power)',color:'#d8a747',pts:rows.filter(r=>r.t>since&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5);
- document.getElementById('hp-all').innerHTML='<table>'+Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')+'</table>';
-}
-let PW=null,SH=null,AX=null,GD=null,HM=null;
-function homey(){
- const sec=document.getElementById('hm'),body=document.getElementById('hm-body');
- if(!HM||!HM.devices||!HM.devices.length){sec.hidden=true;return}
- sec.hidden=false;body.innerHTML='';
- const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå':m<90?m+' min siden':m<2880?Math.round(m/60)+' t siden':Math.round(m/1440)+' d siden'};
- const NAME={measure_battery:'Batteri',measure_humidity:'Fuktighet',charging_status:'Lading',consumable_blade:'Knivslitasje %',alarm_contact:'Dør åpen',alarm_battery:'Lavt batteri',measure_temperature:'Temperatur',target_temperature:'Innstilt',onoff:'På',locked:'Låst',thermostat_mode:'Modus',lawn_mower_state:'Status',measure_power:'Effekt'};
- const hs={};HM.devices.forEach(c=>(hs[c.site||'Homey']=hs[c.site||'Homey']||[]).push(c));
- Object.entries(hs).forEach(([site,list])=>{
-  const t=document.createElement('h2');t.style.cssText='font-size:14px;color:var(--mut);margin:12px 0 6px';t.textContent=site;body.appendChild(t);
-  const box=document.createElement('div');box.className='cards';
-  list.forEach(c=>{const l=c.rows[c.rows.length-1],d=l.d||{},stale=Date.now()-new Date(l.t)>3*3600000||l.av===false;
-   let main='–';
-   if(c.kind==='lock'&&'locked' in d)main=d.locked?'Låst':'Ulåst';
-   else if(c.kind==='daikin'&&d.measure_temperature!=null)main=nf(d.measure_temperature,1)+' °C';
-   else if(c.kind==='mower'){const st=Object.entries(d).find(([k,v])=>typeof v==='string'&&/state|status|mode/i.test(k));main=st?String(st[1]).replace(/_/g,' '):(d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–')}
-   const HIDE=/^(cmd_|mow_map|mower_volume|child_lock|firmware_update|secure_lock|lock_unlock_open|alarm_generic|swing_mode|fan_mode\.(speed|powerful)|cutting_height|mow_efficiency|collision|meter_power)/;
-   const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!HIDE.test(k)&&!(c.kind==='daikin'&&k==='measure_temperature')&&!(c.kind==='mower'&&k==='mower_status')).slice(0,6).map(([k,v])=>(NAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
-   const el=document.createElement('div');el.className='c';el.style.cssText='margin:0;background:#1f2321';
-   el.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s">${extra}</div><div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}</div>`;box.appendChild(el)});
-  body.appendChild(box)})}
-function gardena(){
- const sec=document.getElementById('gd'),body=document.getElementById('gd-body');
- if(!GD||!GD.devices||!GD.devices.length){sec.hidden=true;return}
- sec.hidden=false;body.innerHTML='';const SN={Oslo:'Oslo',Arendal:'Arendal'};
- const gs={};GD.devices.forEach(c=>(gs[c.site||'Gardena']=gs[c.site||'Gardena']||[]).push(c));
- Object.entries(gs).forEach(([site,list])=>{const t=document.createElement('h2');t.style.cssText='font-size:14px;color:var(--mut);margin:12px 0 6px';t.textContent=SN[site]||site;body.appendChild(t);const box=document.createElement('div');box.className='cards';
- list.forEach(c=>{const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
-  const main=c.kind==='sensor'?(l.temp==null?'–':nf(l.temp,0)+' °C jord'):(l.act==='CLOSED'?'Ventil lukket':l.act||'–');
-  const sub=[c.kind==='sensor'&&l.hum!=null?'Jordfukt '+nf(l.hum,0)+' %':null,l.batt!=null?'Batteri '+l.batt+' %':null,off?'Frakoblet – tallene kan være gamle':null].filter(Boolean).join(' · ');
-  const d=document.createElement('div');d.className='c';d.style.cssText='margin:0;background:#1f2321';
-  d.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s"${off?' style="color:#d8a747"':''}>${sub}</div>`;box.appendChild(d)});
- body.appendChild(box)})}
-function adax(){
- const sec=document.getElementById('ax'),body=document.getElementById('ax-body');
- if(!AX||!AX.rooms||!AX.rooms.length){sec.hidden=true;return}
- sec.hidden=false;body.innerHTML='';
- const cut=Date.now()-86400000,homes={};AX.rooms.forEach(r=>(homes[r.home||'Adax']=homes[r.home||'Adax']||[]).push(r));
- Object.entries(homes).forEach(([h,rooms])=>{
-  const t=document.createElement('h2');t.style.cssText='font-size:14px;color:var(--mut);margin:12px 0 6px';t.textContent=h;body.appendChild(t);
-  const box=document.createElement('div');box.className='cards';
-  rooms.forEach(c=>{const last=c.rows[c.rows.length-1],v=c.rows.filter(x=>new Date(x.t).getTime()>=cut&&x.temp!=null).map(x=>x.temp);
-   const d=document.createElement('div');d.className='c';d.style.cssText='margin:0;background:#1f2321';
-   d.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:26px">${last.temp==null?'–':nf(last.temp,1)+' °C'}</div><div class="s">Innstilt ${nf(last.target,1)} °C${last.on?'':' · av'}${v.length?' · 24 t: '+nf(Math.min(...v),1)+'–'+nf(Math.max(...v),1)+' °C':''}</div>`;
-   box.appendChild(d)});
-  body.appendChild(box)})}
-function shelly(){
- const sec=document.getElementById('sh'),body=document.getElementById('sh-body');
- if(!SH||!SH.channels||!SH.channels.length){sec.hidden=true;return}
- sec.hidden=false;body.innerHTML='';
- const cut=Date.now()-86400000,box=document.createElement('div');box.className='cards';
- SH.channels.forEach(c=>{
-  const r=c.rows,last=r[r.length-1],r24=r.filter(x=>new Date(x.t).getTime()>=cut),first=r24[0]||last;
-  const kwh=(last.wh!=null&&first.wh!=null)?Math.max(0,(last.wh-first.wh)/1000):null;
-  const on=r24.filter(x=>x.on).length,share=r24.length?Math.round(on/r24.length*100):null;
-  const d=document.createElement('div');d.className='c';d.style.cssText='margin:0;background:#1f2321';
-  d.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:26px">${last.on?'På':'Av'}${last.w!=null?' · '+nf(last.w,0)+' W':''}</div><div class="s">24 t: ${kwh==null?'–':nf(kwh,2)+' kWh'}${share==null?'':' · på '+share+' % av tiden'}</div>`;
-  box.appendChild(d)});
- body.appendChild(box)}
-function bars(id,items,unit,dec,color,hi){
- const host=document.getElementById(id);if(!items.length){host.innerHTML='<div class="s">Ingen data</div>';return}
+ document.getElementById(tbId).innerHTML='<table><tr><th>Tidspunkt</th><th>Enhet</th><th>Verdi</th></tr>'+rows.map(r=>`<tr><td>${fmt(new Date(r.t))}</td><td>${r.n}</td><td>${nf(r.v,d0)} ${unit}</td></tr>`).join('')+'</table>'}
+function bars(id,items,unit,dec,color){
+ const host=document.getElementById(id);if(!host)return;if(!items.length){host.innerHTML='<div class="s">Ingen data</div>';return}
  const W=host.clientWidth||600,H=220,m={l:40,r:6,t:8,b:24},mx=Math.max(...items.map(i=>i.v),0.001)*1.1,bw=(W-m.l-m.r)/items.length;
  let g='';for(let i=0;i<=4;i++){const v=mx*i/4,y=H-m.b-(v/mx)*(H-m.t-m.b);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,dec)}</text>`}
  const step=Math.ceil(items.length/Math.max(2,Math.floor(W/70)));
- items.forEach((it,i)=>{const h=(it.v/mx)*(H-m.t-m.b),x=m.l+i*bw+1;g+=`<rect x="${x}" y="${H-m.b-h}" width="${Math.max(1,bw-2)}" height="${h}" rx="2" fill="${it.hi?hi:color}"><title>${it.tip}: ${nf(it.v,dec)} ${unit}</title></rect>`;
+ items.forEach((it,i)=>{const h=(it.v/mx)*(H-m.t-m.b),x=m.l+i*bw+1;g+=`<rect x="${x}" y="${H-m.b-h}" width="${Math.max(1,bw-2)}" height="${h}" rx="2" fill="${color}"><title>${it.tip}: ${nf(it.v,dec)} ${unit}</title></rect>`;
   if(i%step===0)g+=`<text x="${x+bw/2}" y="${H-6}" text-anchor="middle" fill="#9aa39d" font-size="11">${it.lab}</text>`});
- host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Søylediagram">${g}</svg>`;
-}
-function power(){
- const sec=document.getElementById('pw'),body=document.getElementById('pw-body');
- if(!PW||!PW.homes||!PW.homes.some(x=>x.hourly&&x.hourly.length)){sec.hidden=true;return}
- sec.hidden=false;body.innerHTML='';
- PW.homes.forEach((hm,i)=>{
-  if(!hm.hourly||!hm.hourly.length)return;
-  const RATE=1.1; /* kr/kWh, anslag: Norgespris + nett + avgifter */
-  const H=hm.hourly.map(r=>({t:new Date(r.from),kwh:r.kwh,cost:r.cost}));
-  const tmax=Math.max(...H.map(r=>r.t.getTime()))+3600000,sum=(a,b,k='kwh')=>H.filter(r=>r.t.getTime()>tmax-b*3600000&&r.t.getTime()<=tmax-a*3600000).reduce((x,r)=>x+(r[k]||0),0);
-  const k24=sum(0,24),k7=sum(0,168),p7=sum(168,336),c24=sum(0,24,'cost'),ch=p7?Math.round((k7-p7)/p7*100):null;
-  const now=Date.now(),cur=(hm.prices||[]).find(p=>{const t=new Date(p.from).getTime();return t<=now&&now<t+3600000});
-  const tile=(l,v,u)=>`<div class="c" style="margin:0;background:#1f2321"><div class="s">${l}</div><div class="n" style="font-size:26px">${v==null?'–':v}${v==null?'':' '+u}</div></div>`;
-  const d=document.createElement('div');d.style.marginTop='14px';
-  d.innerHTML=`<h2>${hm.name}</h2><div class="cards" style="margin-bottom:8px">`+tile('Siste 24 timer',nf(k24,1),'kWh')+tile('Siste 7 dager',nf(k7,1),'kWh')+tile('Mot forrige 7 dager',ch==null?null:(ch>0?'+':'')+ch,'%')+tile('Snitt per døgn (7 d)',nf(k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(k24*RATE,0),'kr')+`</div>
-  <h2 style="font-size:14px;color:var(--mut)">Forbruk per døgn, siste 30 dager (kWh)</h2><div class="chart" id="cd-${i}"></div>
-`;
-  body.appendChild(d);
-  const day={};H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
-  bars('cd-'+i,Object.entries(day).slice(-30).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb','#7eaddb');
- });
-}
-function render(){lede();shelly();adax();gardena();homey();cards();hp();power();chart('ch-t','leg-t','tb-t','temp','°C',FROST,1);chart('ch-h','leg-h','tb-h','hum','%',null,3)}
+ host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Søylediagram">${g}</svg>`}
+/* ---------- kort ---------- */
+function sensorCard(s){const last=s.rows[s.rows.length-1],since=Date.now()-86400000,day=s.rows.filter(r=>r.t>since&&r.temp!=null).map(r=>r.temp);
+ const mn=day.length?Math.min(...day):null,mx=day.length?Math.max(...day):null;let cls='ok',txt='✓ Over frost';
+ if(last.temp!=null&&last.temp<=FROST){cls='bad';txt='⚠ Frost'}else if(last.temp!=null&&last.temp<=WARN_NEAR){cls='warn';txt='▲ Nær frost'}
+ const stale=(Date.now()-last.t)/60000>STALE_MIN,bt=last.batt!=null&&last.batt<LOW_BATT?` · <span class="warn">⚠ lavt batteri</span>`:'';
+ return `<div class="c"><h2><i class="dot" style="background:${s.color}"></i>${s.name}</h2><div class="big">${nf(last.temp)} °C</div><span class="badge ${cls}">${txt}</span>
+ <div class="s" style="margin-top:8px">Fuktighet ${nf(last.hum,0)} % · siste døgn ${nf(mn)} til ${nf(mx)} °C</div><div class="s">Batteri ${nf(last.batt,0)} %${bt}</div>
+ <div class="s ${stale?'warn':''}">${stale?'⚠ Ingen ny måling siden ':'Oppdatert '}${fmt(last.t)}</div></div>`}
+const HIDE=/^(cmd_|mow_map|mower_volume|child_lock|firmware_update|secure_lock|lock_unlock_open|alarm_generic|swing_mode|fan_mode\.(speed|powerful)|cutting_height|mow_efficiency|collision|meter_power)/;
+const HNAME={measure_battery:'Batteri',measure_humidity:'Fuktighet',charging_status:'Lading',consumable_blade:'Knivslitasje %',alarm_contact:'Dør åpen',alarm_battery:'Lavt batteri',measure_temperature:'Temperatur',target_temperature:'Innstilt',onoff:'På',locked:'Låst',thermostat_mode:'Modus',lawn_mower_state:'Status',measure_power:'Effekt'};
+function homeyCard(c){const l=c.rows[c.rows.length-1],d=l.d||{},stale=Date.now()-new Date(l.t)>3*3600000||l.av===false;let main='–';
+ if(c.kind==='lock'&&'locked' in d)main=d.locked?'Låst':'Ulåst';
+ else if(c.kind==='daikin'&&d.measure_temperature!=null)main=nf(d.measure_temperature,1)+' °C';
+ else if(c.kind==='mower'){const st=Object.entries(d).find(([k,v])=>typeof v==='string'&&/state|status|mode/i.test(k));main=st?String(st[1]).replace(/_/g,' '):(d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–')}
+ const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!HIDE.test(k)&&!(c.kind==='daikin'&&k==='measure_temperature')&&!(c.kind==='mower'&&k==='mower_status')).slice(0,6).map(([k,v])=>(HNAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
+ return `<div class="tile"><div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s">${extra}</div><div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}</div></div>`}
+function gardenaCard(c){const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
+ const main=c.kind==='sensor'?(l.temp==null?'–':nf(l.temp,0)+' °C jord'):(l.act==='CLOSED'?'Ventil lukket':l.act||'–');
+ const sub=[c.kind==='sensor'&&l.hum!=null?'Jordfukt '+nf(l.hum,0)+' %':null,l.batt!=null?'Batteri '+l.batt+' %':null,off?'Frakoblet, tallene kan være gamle':null].filter(Boolean).join(' · ');
+ return `<div class="tile"><div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s"${off?' style="color:#d8a747"':''}>${sub}</div></div>`}
+function adaxCard(c){const last=c.rows[c.rows.length-1],cut=Date.now()-86400000,v=c.rows.filter(x=>new Date(x.t).getTime()>=cut&&x.temp!=null).map(x=>x.temp);
+ return `<div class="tile"><div class="s">${c.name}</div><div class="n">${last.temp==null?'–':nf(last.temp,1)+' °C'}</div><div class="s">Innstilt ${nf(last.target,1)} °C${last.on?'':' · av'}${v.length?' · 24 t: '+nf(Math.min(...v),1)+'–'+nf(Math.max(...v),1)+' °C':''}</div></div>`}
+function shellyCard(c){const s=shStats(c);return `<div class="tile"><div class="s">${c.name}</div><div class="n">${s.last.on?'På':'Av'}${s.last.w!=null?' · '+nf(s.last.w,0)+' W':''}</div><div class="s">24 t: ${s.kwh==null?'–':nf(s.kwh,2)+' kWh'}${s.share==null?'':' · på '+s.share+' % av tiden'}</div></div>`}
+/* ---------- seksjoner per sted ---------- */
+function secKlima(pl){const S=sensors(pl);if(!S.length)return null;
+ const b=el(grid(S.map(sensorCard).join(''))+`<h3>Temperatur</h3>${chartBlock('t'+pl)}<h3>Luftfuktighet</h3>${chartBlock('h'+pl)}`);
+ const last=S[0].rows[S[0].rows.length-1];
+ return sec('klima','Klima',`${nf(last.temp)} °C · ${nf(last.hum,0)} % fukt`,b,{draw:()=>{chart('t'+pl,'temp','°C',FROST,1,S);chart('h'+pl,'hum','%',null,3,S)}})}
+function secVarme(pl){let h='',sub=[],draw=null;
+ const rows=pl==='arendal'?hpRows():[];
+ if(rows.length){const last=rows[rows.length-1],p=last.p,run=p.compressor_state===true,on=p.switch===true,fault=p.fault&&p.fault!==0,since=()=>Date.now()-hours*3600000;
+  sub.push('Varmepumpe '+(on?'på':'av'));
+  h+=`<h3>${last.name}</h3>`+grid(`<div class="tile"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
+   +tile('Innstilt',p.temp_set==null?null:nf(p.temp_set,0),'°C')+tile('Retur (inn)',p.temp_bottom==null?null:nf(p.temp_bottom,0),'°C')+tile('Ut',p.temp_top==null?null:nf(p.temp_top,0),'°C')+tile('Effekt (fra enheten)',p.cur_power==null?null:nf(p.cur_power,0),'W'))
+   +`<h3>Temperaturer</h3>${chartBlock('hpt')}<h3>Effekt</h3>${chartBlock('hpp')}<details class="mini"><summary>Alle verdier fra enheten</summary><table>${Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</table></details>`;
+  draw=()=>{const s=since(),HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877']];
+   drawLine('ch-hpt','leg-hpt','tb-hpt',HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>s&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length),'t','°C',null,2);
+   drawLine('ch-hpp','leg-hpp','tb-hpp',[{name:'Effekt',color:'#d8a747',pts:rows.filter(r=>r.t>s&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5)}}
+ const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join(''))}
+ const ax=axList(pl);if(ax.length){const t=ax.map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
+ if(!h)return null;return sec('varme','Varme',sub.join(' · '),el(h),{draw})}
+function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl;
+ const b=el(grid(tile('Siste 24 timer',nf(st.k24,1),'kWh')+tile('Siste 7 dager',nf(st.k7,1),'kWh')+tile('Mot forrige 7 dager',st.ch==null?null:(st.ch>0?'+':'')+st.ch,'%')+tile('Snitt per døgn (7 d)',nf(st.k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(st.k24*RATE,0),'kr'))+`<h3>Forbruk per døgn, siste 30 dager (kWh)</h3><div class="chart" id="${id}"></div>`);
+ return sec('strom','Strøm (Tibber)',`${nf(st.k24,1)} kWh siste 24 t`,b,{draw:()=>{const day={};st.H.forEach(r=>{const k=r.t.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+r.kwh});
+  bars(id,Object.entries(day).slice(-30).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#7eaddb')}})}
+function secShelly(){const L=shList();if(!L.length)return null;const tot=L.reduce((a,c)=>a+(shStats(c).kwh||0),0),w=L.reduce((a,c)=>a+(shStats(c).last.w||0),0);
+ return sec('shelly','Strøm og stikk (Shelly)',`${nf(w,0)} W nå · ${nf(tot,1)} kWh siste 24 t`,el(grid(L.map(shellyCard).join(''))))}
+function secHage(pl){let h='',sub=[];const g=gdList(pl),m=hmList(pl,'mower');
+ if(g.length){const off=g.filter(c=>c.rows[c.rows.length-1].link==='OFFLINE').length;sub.push(g.length+' Gardena'+(off?' · '+off+' frakoblet':''));h+=`<h3>Vanning og sensorer (Gardena)</h3>`+grid(g.map(gardenaCard).join(''))}
+ if(m.length){sub.push('Robotklipper');h+=`<h3>Robotklipper (Dreame)</h3>`+grid(m.map(homeyCard).join(''))}
+ if(!h)return null;return sec('hage',pl==='drivhus'?'Vanning':'Hage',sub.join(' · '),el(h),{open:pl==='drivhus'})}
+function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
+ const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
+ return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join(''))),{open:false})}
+function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
+function placeView(pl){const w=document.createElement('div');
+ const list=[secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
+ if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));w.appendChild(secPlan('oslo','Drivhus Oslo','Her kommer målinger når Aqara-prosjektet er godkjent og sensorene er hentet inn.'))}
+ if(pl==='oslo')w.appendChild(secPlan('aqara','Aqara-sensorer','Venter på at Aqara-utviklerprosjektet blir godkjent (pending review).'));
+ if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
+ return w}
+/* ---------- oversikt ---------- */
+function alerts(){const A=[];
+ SERIES().forEach(s=>{const l=s.rows[s.rows.length-1],pl=s.pl;
+  if(l.temp!=null&&l.temp<=FROST)A.push({pl,lvl:'bad',txt:`Frost i ${s.name}: ${nf(l.temp)} °C`});
+  else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({pl,lvl:'warn',txt:`${s.name} er nær frost: ${nf(l.temp)} °C`});
+  if((Date.now()-l.t)/60000>STALE_MIN)A.push({pl,lvl:'warn',txt:`${s.name} har ikke sendt måling siden ${fmt(l.t)}`});
+  if(l.batt!=null&&l.batt<LOW_BATT)A.push({pl,lvl:'warn',txt:`Lavt batteri i ${s.name} (${nf(l.batt,0)} %)`})});
+ ['oslo','arendal','drivhus'].forEach(pl=>{
+  hmList(pl).forEach(c=>{const l=c.rows[c.rows.length-1],d=l.d||{};
+   if(c.kind==='lock'&&d.locked===false)A.push({pl,lvl:'warn',txt:`${c.name} er ulåst`});
+   if(Date.now()-new Date(l.t)>3*3600000||l.av===false)A.push({pl,lvl:'warn',txt:`${c.name} er frakoblet i Homey`})});
+  const g=gdList(pl),off=g.filter(c=>c.rows[c.rows.length-1].link==='OFFLINE').length;
+  if(off)A.push({pl,lvl:'info',txt:`${off} av ${g.length} Gardena-enheter er frakoblet (trolig vinterlagret)`});
+  g.forEach(c=>{const b=c.rows[c.rows.length-1].batt;if(b!=null&&b<LOW_BATT)A.push({pl,lvl:'warn',txt:`Lavt batteri i ${c.name} (Gardena): ${b} %`})})});
+ return A}
+const worst=(A,pl)=>{const a=A.filter(x=>x.pl===pl&&x.lvl!=='info');return a.some(x=>x.lvl==='bad')?'bad':a.length?'warn':'ok'};
+function placeCard(pl,A){const L=[];
+ sensors(pl).forEach(s=>{const l=s.rows[s.rows.length-1];L.push(`${s.name}: <b>${nf(l.temp)} °C</b>`)});
+ const dk=hmList(pl,'daikin')[0];if(dk){const d=dk.rows[dk.rows.length-1].d||{};L.push(`Daikin: <b>${nf(d.measure_temperature)} °C</b>, innstilt ${nf(d.target_temperature)}`)}
+ if(pl==='arendal'){const r=hpRows();if(r.length){const p=r[r.length-1].p;L.push(`Varmepumpe: <b>${p.switch===true?'på':'av'}</b>${p.compressor_state===true?', kompressor går':''}`)}}
+ const ax=axList(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);if(ax.length)L.push(`Adax innetemp snitt: <b>${nf(ax.reduce((a,b)=>a+b,0)/ax.length)} °C</b>`);
+ if(pl==='drivhus')shList().forEach(c=>{const s=shStats(c);if(/vekstlys|vifte/i.test(c.name))L.push(`${c.name}: <b>${s.last.on?'på':'av'}</b>`)});
+ hmList(pl,'lock').forEach(c=>{const d=c.rows[c.rows.length-1].d||{};L.push(`${c.name}: <b>${d.locked===false?'ulåst':'låst'}</b>`)});
+ hmList(pl,'mower').forEach(c=>{const d=c.rows[c.rows.length-1].d||{};L.push(`${c.name}: <b>${d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–'}</b>`)});
+ pwList(pl).forEach(h=>L.push(`Strøm 24 t: <b>${nf(pwStats(h).k24,1)} kWh</b>`));
+ if(pl==='drivhus')L.push('<span class="s">Innerdrivhus og Oslo-drivhus er ikke koblet ennå</span>');
+ const w=worst(A,pl),n=A.filter(x=>x.pl===pl&&x.lvl!=='info').length;
+ return `<button class="pc" data-go="${pl}"><h2>${PLACES[pl]}<span class="${w}">${w==='ok'?'● OK':'● '+n+(n===1?' varsel':' varsler')}</span></h2>${L.map(x=>`<div>${x}</div>`).join('')||'<div class="s">Ingen data</div>'}</button>`}
+function lede(){const S=SERIES();if(!S.length)return '';
+ const info=S.map(s=>{const last=s.rows[s.rows.length-1],since=last.t.getTime()-86400000,w=s.rows.filter(r=>r.t.getTime()>since&&r.temp!=null).map(r=>r.temp);return{name:s.name,temp:last.temp,min:w.length?Math.min(...w):null}}).filter(i=>i.temp!=null);
+ if(!info.length)return '';const c=info.reduce((a,b)=>b.temp<a.temp?b:a),frost=info.some(i=>i.min!=null&&i.min<=FROST);
+ return `<p class="lede">Det kaldeste stedet, <b>${c.name}</b>, er nå <b>${nf(c.temp)}</b> °C og var nede i <b>${nf(c.min)}</b> °C siste døgn. ${frost?'Minst ett sted hadde frost.':'Ingen steder hadde frost.'}</p>`}
+function lastT(arr,f){let m=0;arr.forEach(x=>{const t=f(x);if(t>m)m=t});return m?'sist '+ago(m):''}
+function secSystemer(){
+ const rows=[['Tuya / Smart Life (termostat, varmepumpe)','ok',lastT(ALL,r=>new Date(r.ts).getTime())],
+ ['Shelly (stikk i oppvarmet drivhus)','ok',lastT(shList().flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
+ ['Tibber (strøm Oslo og Arendal)','ok',lastT(((PW&&PW.homes)||[]).flatMap(h=>h.hourly||[]),x=>new Date(x.from).getTime())],
+ ['Adax (panelovner)','ok',lastT(((AX&&AX.rooms)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
+ ['Gardena (to kontoer)','ok',lastT(((GD&&GD.devices)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
+ ['Homey (Daikin, Dreame, Yale)','ok',lastT(((HM&&HM.devices)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
+ ['Aqara (Oslo)','wait','venter på godkjenning'],['Inkbird ITC-308','todo','ikke koblet'],['Mill','todo','ikke koblet'],['Salus','todo','ikke koblet'],['Microtemp','todo','ikke koblet']];
+ const ic={ok:'<span class="ok">● koblet</span>',wait:'<span class="warn">● venter</span>',todo:'<span class="s">○ mangler</span>'};
+ return sec('sys','Datakilder',rows.filter(r=>r[1]==='ok').length+' av '+rows.length+' koblet',el('<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td>${ic[r[1]]}</td><td class="s">${r[2]}</td></tr>`).join('')+'</table>'),{open:false})}
+function overview(){const w=document.createElement('div'),A=alerts();
+ w.appendChild(el(lede()));
+ const real=A.filter(a=>a.lvl!=='info'),info=A.filter(a=>a.lvl==='info');
+ const ic={bad:'<span class="bad">⚠</span>',warn:'<span class="warn">▲</span>',info:'<span class="s">ⓘ</span>'};
+ w.appendChild(sec('alerts','Varsler',real.length?real.length+(real.length===1?' varsel':' varsler'):'alt ser normalt ut',el(A.length?A.map(a=>`<div class="al">${ic[a.lvl]}<span>${a.txt}<span class="s"> · ${PLACES[a.pl]}</span></span></div>`).join(''):'<div class="s">Ingen varsler.</div>'),{open:real.length>0}));
+ const cards=el(`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">${['oslo','arendal','drivhus'].map(p=>placeCard(p,A)).join('')}</div>`);
+ cards.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));w.appendChild(cards);
+ const hs=((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length);
+ if(hs.length)w.appendChild(sec('kwh','Strømforbruk',hs.map(h=>nf(pwStats(h).k24,0)+' kWh '+PLACES[placeOf(h.site,h.name)]).join(' · '),el(grid(hs.map(h=>{const s=pwStats(h);return tile(h.name+' siste 24 t',nf(s.k24,1),'kWh')+tile(h.name+' 7 dager',nf(s.k7,1),'kWh')}).join('')))));
+ w.appendChild(secSystemer());return w}
+/* ---------- gjøremål ---------- */
+const TODO=[
+ ['Datakilder','aqara','Aqara i Oslo','Venter på godkjenning av utviklerprosjektet. Så kjøres code, token og devices, og sensorene kommer inn her. Roter også AppKey.'],
+ ['Datakilder','itc','Inkbird ITC-308 i innerdrivhuset','Ikke koblet til Tuya-prosjektet. Må legges til for å få temperatur og styring.'],
+ ['Datakilder','mill','Mill-ovner','Finn ut hvilken generasjon. Gen 3 har lokalt API, ellers må det søkes om API-nøkkel.'],
+ ['Datakilder','salus','Salus gulvvarme (Arendal)','Trenger modell på gateway og termostater. Kan kreve lokal relé i Arendal.'],
+ ['Datakilder','microtemp','Microtemp','Ikke undersøkt.'],
+ ['Datakilder','drivhus-oslo','Sensorer i drivhuset i Oslo','Avklar hvilke sensorer som skal måle der.'],
+ ['Datakilder','pulse','Tibber Pulse sanntidseffekt','Hent live effekt (W) via Homey i stedet for bare timesverdier.'],
+ ['Datakilder','a1','Dreame A1 viser tilgjengelig i Homey, offline i appen','Sjekk om Homey viser gammel status.'],
+ ['Dashboard','hist','Historikk for klippere, låser og Daikin','Egne grafer, ikke bare siste verdi.'],
+ ['Dashboard','alarm','Varsler på mobil eller e-post','Frost, lavt batteri, ulåst dør og frakoblede enheter.'],
+ ['Dashboard','kost','Ekte strømkostnad fra Tibber','Bytt ut anslaget på 1,1 kr/kWh. Sjekk Norgespris-vilkår for 2027.'],
+ ['Dashboard','hpw','Anslått varmepumpeeffekt','Regn fra kompressorstrøm, må kalibreres mot måler.'],
+ ['Dashboard','styring','Styre fra siden','På/av for Shelly, målverdi for Adax og Daikin. Krever innlogging først.'],
+ ['Sikkerhet','login','Innlogging / privat hosting','Siden er offentlig og viser blant annet låsstatus. Flytt bak innlogging.'],
+ ['Sikkerhet','tok','Minimal tilgang på GitHub-token i HomeyScript','Bruk et fine-grained token som bare får lov til å sende hendelser.']];
+function todoView(){const w=document.createElement('div'),done=ls.get('sh-done',{}),extra=ls.get('sh-extra',[]);
+ const all=TODO.map(([c,id,t,n])=>({c,id,t,n})).concat(extra);const cats=[...new Set(['Datakilder','Dashboard','Sikkerhet',...all.map(x=>x.c)])];
+ w.appendChild(el(`<p class="s">Avkrysninger og egne punkter lagres bare i denne nettleseren. Skriv til meg hvis noe skal inn i den faste listen.</p>`));
+ cats.forEach(c=>{const L=all.filter(x=>x.c===c);if(!L.length)return;const n=L.filter(x=>done[x.id]).length;
+  const b=el(`<div class="todo">${L.map(x=>`<label><input type="checkbox" data-id="${x.id}" ${done[x.id]?'checked':''}><span class="d"><span class="${done[x.id]?'x':''}">${x.t}</span>${x.n?`<div class="s">${x.n}</div>`:''}</span></label>`).join('')}</div>`);
+  b.querySelectorAll('input').forEach(i=>i.onchange=()=>{done[i.dataset.id]=i.checked;ls.set('sh-done',done);render()});
+  w.appendChild(sec('todo-'+c,c,`${n} av ${L.length} gjort`,b))});
+ const f=el(`<div class="add"><input type="text" id="nt" placeholder="Nytt punkt"><select id="nc">${cats.map(c=>`<option>${c}</option>`).join('')}</select><button id="na">Legg til</button></div>`);
+ f.querySelector('#na').onclick=()=>{const t=f.querySelector('#nt').value.trim();if(!t)return;extra.push({c:f.querySelector('#nc').value,id:'x'+Date.now(),t,n:''});ls.set('sh-extra',extra);render()};
+ w.appendChild(f);return w}
+const todoOpen=()=>{const done=ls.get('sh-done',{});return TODO.filter(x=>!done[x[1]]).length+ls.get('sh-extra',[]).filter(x=>!done[x.id]).length};
+/* ---------- app ---------- */
+const TABS=[['oversikt','Oversikt'],['oslo','Oslo'],['arendal','Arendal'],['drivhus','Drivhus'],['todo','Gjøremål']];
+function go(t){TAB=t;history.replaceState(null,'','#'+t);render();scrollTo(0,0)}
+function nav(){const n=alerts().filter(a=>a.lvl!=='info').length;
+ document.getElementById('nav').innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${k===TAB?'on':''}">${l}${k==='oversikt'&&n?`<span class="pill w">${n}</span>`:''}${k==='todo'?`<span class="pill g">${todoOpen()}</span>`:''}</button>`).join('');
+ document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.t))}
+function render(){if(!TABS.some(t=>t[0]===TAB))TAB='oversikt';nav();const m=document.getElementById('main');m.innerHTML='';
+ m.appendChild(TAB==='oversikt'?overview():TAB==='todo'?todoView():placeView(TAB));
+ m.querySelectorAll('details.sec').forEach(d=>{if(d.open&&d._draw)d._draw()})}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
-fetch('homey.json').then(r=>r.ok?r.json():null).catch(()=>null).then(h=>{HM=h;return fetch('gardena.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(g=>{GD=g;return fetch('adax.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(a=>{AX=a;return fetch('shelly.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(x=>{SH=x;return fetch('power.json')}).then(r=>r.ok?r.json():null).catch(()=>null).then(p=>{PW=p;return fetch('data.json')}).then(r=>r.json()).then(d=>{ALL=d;render()}).catch(()=>{document.getElementById('cards').textContent='Kunne ikke laste data'});
+addEventListener('hashchange',()=>{TAB=(location.hash||'#oversikt').slice(1);render()});
+const J=f=>fetch(f).then(r=>r.ok?r.json():null).catch(()=>null);
+Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json')]).then(([h,g,a,s,p,d])=>{HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
 </script>
+</body>
 </html>
