@@ -124,7 +124,7 @@ function homey(){
  if(!HM||!HM.devices||!HM.devices.length){sec.hidden=true;return}
  sec.hidden=false;body.innerHTML='';
  const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå':m<90?m+' min siden':m<2880?Math.round(m/60)+' t siden':Math.round(m/1440)+' d siden'};
- const NAME={measure_battery:'Batteri',measure_temperature:'Temperatur',target_temperature:'Innstilt',onoff:'På',locked:'Låst',thermostat_mode:'Modus',lawn_mower_state:'Status',measure_power:'Effekt'};
+ const NAME={measure_battery:'Batteri',measure_humidity:'Fuktighet',charging_status:'Lading',consumable_blade:'Knivslitasje %',alarm_contact:'Dør åpen',alarm_battery:'Lavt batteri',measure_temperature:'Temperatur',target_temperature:'Innstilt',onoff:'På',locked:'Låst',thermostat_mode:'Modus',lawn_mower_state:'Status',measure_power:'Effekt'};
  const hs={};HM.devices.forEach(c=>(hs[c.site||'Homey']=hs[c.site||'Homey']||[]).push(c));
  Object.entries(hs).forEach(([site,list])=>{
   const t=document.createElement('h2');t.style.cssText='font-size:14px;color:var(--mut);margin:12px 0 6px';t.textContent=site;body.appendChild(t);
@@ -134,7 +134,8 @@ function homey(){
    if(c.kind==='lock'&&'locked' in d)main=d.locked?'Låst':'Ulåst';
    else if(c.kind==='daikin'&&d.measure_temperature!=null)main=nf(d.measure_temperature,1)+' °C';
    else if(c.kind==='mower'){const st=Object.entries(d).find(([k,v])=>typeof v==='string'&&/state|status|mode/i.test(k));main=st?String(st[1]).replace(/_/g,' '):(d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–')}
-   const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!(c.kind==='daikin'&&k==='measure_temperature')).slice(0,6).map(([k,v])=>(NAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
+   const HIDE=/^(cmd_|mow_map|mower_volume|child_lock|firmware_update|secure_lock|lock_unlock_open|alarm_generic|swing_mode|fan_mode\.(speed|powerful)|cutting_height|mow_efficiency|collision|meter_power)/;
+   const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!HIDE.test(k)&&!(c.kind==='daikin'&&k==='measure_temperature')&&!(c.kind==='mower'&&k==='mower_status')).slice(0,6).map(([k,v])=>(NAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
    const el=document.createElement('div');el.className='c';el.style.cssText='margin:0;background:#1f2321';
    el.innerHTML=`<div class="s">${c.name}</div><div class="n" style="font-size:24px">${main}</div><div class="s">${extra}</div><div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}</div>`;box.appendChild(el)});
   body.appendChild(box)})}
