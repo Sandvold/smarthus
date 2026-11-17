@@ -252,16 +252,54 @@ async function actHomey(b: any): Promise<Out> {
   return [{ ok: true, status: null }, 200];
 }
 
+
+// Tuya: varmepumpe Arendal. Kun av/på (switch) og temperatur (temp_set 5–80).
+const TUYA_HP = 'bfd14e6aab2c5f419al41c';
+async function tuyaCall(s: Record<string, string>, method: string, path: string, body: unknown, token = ''): Promise<any> {
+  const host = (s.TUYA_HOST || 'https://openapi.tuyaeu.com').replace(/\/$/, '');
+  const bs = body === undefined ? '' : JSON.stringify(body);
+  const hex = (u: ArrayBuffer) => [...new Uint8Array(u)].map(x => x.toString(16).padStart(2, '0')).join('');
+  const sha = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bs)));
+  const t = String(Date.now()), nonce = crypto.randomUUID().replace(/-/g, '');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(s.TUYA_ACCESS_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sign = hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(s.TUYA_ACCESS_ID + token + t + nonce + `${method}\n${sha}\n\n${path}`))).toUpperCase();
+  const h: Record<string, string> = { client_id: s.TUYA_ACCESS_ID, t, nonce, sign_method: 'HMAC-SHA256', sign };
+  if (token) h.access_token = token;
+  if (bs) h['content-type'] = 'application/json';
+  return (await fetch(host + path, { method, headers: h, body: bs || undefined, signal: AbortSignal.timeout(8000) })).json();
+}
+async function actTuya(b: any): Promise<Out> {
+  const cmd = String(b.cmd);
+  let commands: { code: string; value: unknown }[];
+  if (cmd === 'on' || cmd === 'off') commands = [{ code: 'switch', value: cmd === 'on' }];
+  else if (cmd === 'temp') {
+    const t = Number(b.value);
+    if (!Number.isInteger(t) || t < 5 || t > 80) return [{ error: 'temperatur må være et helt tall 5–80 °C' }, 400];
+    commands = [{ code: 'temp_set', value: t }];
+  } else return [{ error: 'ukjent kommando' }, 400];
+  const s = await secretsMap();
+  if (!s.TUYA_ACCESS_ID || !s.TUYA_ACCESS_SECRET) return [{ error: 'Tuya er ikke satt opp ennå (kjør Hent målinger)' }, 503];
+  const tk = await tuyaCall(s, 'GET', '/v1.0/token?grant_type=1', undefined);
+  if (!tk.success) return [{ error: 'Tuya-innlogging feilet: ' + String(tk.msg).slice(0, 60) }, 502];
+  const token = tk.result.access_token;
+  const r = await tuyaCall(s, 'POST', `/v1.0/devices/${TUYA_HP}/commands`, { commands }, token);
+  if (!r.success) return [{ error: 'Tuya svarte: ' + String(r.msg || r.code).slice(0, 80) }, 502];
+  await sleep(2000);
+  const st = await tuyaCall(s, 'GET', `/v1.0/devices/${TUYA_HP}/status`, undefined, token);
+  const get = (c: string) => (st.result || []).find((x: any) => x.code === c)?.value;
+  return [{ ok: true, on: typeof get('switch') === 'boolean' ? get('switch') : null, temp: typeof get('temp_set') === 'number' ? get('temp_set') : null }, 200];
+}
+
 async function actDispatch(email: string, b: any): Promise<Out> {
-  const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : '';
+  const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : b.act === 'tuya' ? 'tuya:hp' : '';
   if (!key) return [{ error: 'ukjent handling' }, 400];
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
   if ((await sql("select 1 from ctl_log where did = $1 and ts > now() - interval '3 seconds' limit 1", [key])).length) return [{ error: 'for raskt, vent noen sekunder' }, 429];
   let res: Out;
-  try { res = b.act === 'shelly' ? await actShelly(b) : b.act === 'adax' ? await actAdax(b) : b.act === 'gardena' ? await actGardena(b) : b.act === 'homey' ? await actHomey(b) : await actZaptec(b); }
+  try { res = b.act === 'shelly' ? await actShelly(b) : b.act === 'adax' ? await actAdax(b) : b.act === 'gardena' ? await actGardena(b) : b.act === 'homey' ? await actHomey(b) : b.act === 'tuya' ? await actTuya(b) : await actZaptec(b); }
   catch (e: any) { res = [{ error: 'ingen kontakt: ' + String(e?.message || e).slice(0, 60) }, 502]; }
   const [body, st] = res;
-  const what = b.act === 'shelly' ? (b.on ? 'på' : 'av') : b.act === 'adax' ? 'sett ' + b.target : b.act === 'homey' ? b.cmd + (b.value != null ? ' ' + b.value : '') : b.cmd === 'start' ? 'start ' + b.minutes + ' min' : b.cmd;
+  const what = b.act === 'shelly' ? (b.on ? 'på' : 'av') : b.act === 'adax' ? 'sett ' + b.target : (b.act === 'homey' || b.act === 'tuya') ? b.cmd + (b.value != null ? ' ' + b.value : '') : b.cmd === 'start' ? 'start ' + b.minutes + ' min' : b.cmd;
   await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [email, key, what, st === 200 ? 0 : st, st === 200 ? null : String(body.error).slice(0, 120)]);
   return res;
 }

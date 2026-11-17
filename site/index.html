@@ -213,6 +213,9 @@ function mowCtl(c){const dv=/A3/.test(c.name)?'a3':/A1/.test(c.name)?'a1':null;i
 function daikinCtl(c){const d=(c.rows[c.rows.length-1].d)||{},cur=typeof d.target_temperature==='number'?d.target_temperature:21,o=[];for(let v=16;v<=30;v+=0.5)o.push(v);if(!o.includes(cur))o.push(cur);o.sort((a,b)=>a-b);
  const bs='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer';
  return `<div class="tile"><div class="s">Styring Daikin</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"on",q:"Slå på Daikin?"})' style="${bs}">På</button><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"off",q:"Slå av Daikin?"})' style="${bs}">Av</button><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===cur?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick="daikinSet(this)" style="${bs}">Sett</button></div><div class="s" data-am="hdaikin"></div></div>`}
+function hpCtl(cur){const bs='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer',o=[];for(let v=5;v<=80;v++)o.push(v);const c=typeof cur==='number'?cur:45;
+ return `<div class="tile"><div class="s">Styring varmepumpe</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick='act(this,{act:"tuya",cmd:"on",q:"Slå på varmepumpa i Arendal?"})' style="${bs}">På</button><button onclick='act(this,{act:"tuya",cmd:"off",q:"Slå av varmepumpa i Arendal?"})' style="${bs}">Av</button><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===c?' selected':''}>${v} °C</option>`).join('')}</select><button onclick="hpSet(this)" style="${bs}">Sett</button></div><div class="s" data-am="htuya"></div></div>`}
+function hpSet(b){const v=Number(b.previousElementSibling.value);act(b,{act:'tuya',cmd:'temp',value:v,q:'Varmepumpe Arendal: sette innstilt temperatur til '+v+' °C?'})}
 function daikinSet(b){const v=Number(b.previousElementSibling.value);act(b,{act:'homey',dev:'daikin',cmd:'temp',value:v,q:'Daikin: sette innstilt temperatur til '+nf(v,v%1?1:0)+' °C?'})}
 function lockHist(c){const since=Date.now()-hours*3600000,R=c.rows.filter(r=>new Date(r.t).getTime()>since);if(!R.length)return '';
  const kf=r=>(r.d||{}).locked===false?'u':'l',sg=segs(R,kf),ch=[];R.forEach((r,i)=>{if(i&&kf(r)!==kf(R[i-1]))ch.push({t:r.t,k:kf(r)})});
@@ -260,7 +263,7 @@ function secVarme(pl){let h='',sub=[],draw=null;
  if(rows.length){const last=rows[rows.length-1],p=last.p,run=p.compressor_state===true,on=p.switch===true,fault=p.fault&&p.fault!==0,since=()=>Date.now()-hours*3600000;
   sub.push('Varmepumpe '+(on?'på':'av'));
   h+=`<h3>${last.name}</h3>`+grid(`<div class="tile"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
-   +tile('Innstilt',p.temp_set==null?null:nf(p.temp_set,0),'°C')+tile('Retur (inn)',p.temp_bottom==null?null:nf(p.temp_bottom,0),'°C')+tile('Ut',p.temp_top==null?null:nf(p.temp_top,0),'°C')+tile('Effekt (fra enheten)',p.cur_power==null?null:nf(p.cur_power,0),'W'))
+   +tile('Innstilt',p.temp_set==null?null:nf(p.temp_set,0),'°C')+tile('Retur (inn)',p.temp_bottom==null?null:nf(p.temp_bottom,0),'°C')+tile('Ut',p.temp_top==null?null:nf(p.temp_top,0),'°C')+tile('Effekt (fra enheten)',p.cur_power==null?null:nf(p.cur_power,0),'W')+hpCtl(p.temp_set))
    +`<div class="s" style="margin:8px 0">Varmepumpen rapporterer 0 W og 0 A (effekt, strøm og energi står på null), så den kan ikke måles direkte. Se Strøm-seksjonen for husets samlede effekt fra Pulse.</div><h3>Temperaturer</h3>${chartBlock('hpt')}<h3>Effekt</h3>${chartBlock('hpp')}<details class="mini"><summary>Alle verdier fra enheten</summary><table>${Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</table></details>`;
   draw=()=>{const s=since(),HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877']];
    drawLine('ch-hpt','leg-hpt','tb-hpt',HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>s&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length),'t','°C',null,2);
@@ -601,7 +604,7 @@ async function lockTerrasse(b,unlock,door){door=door||'terrasse';const nm=door==
 function applyAdax(id,s){const e=document.querySelector('[data-at="'+id+'"]');if(e&&s&&s.power!=null)e.textContent=nf(s.power,1)}
 function applyShelly(id,s){const e=document.querySelector('[data-sn="'+id+'"]');if(e&&s)e.textContent=(s.on?'På':'Av')+(s.power!=null?' · '+nf(s.power,0)+' W':'')}
 async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.assign({},o);delete body.q;delete body.cid;
- const key=o.act==='homey'?'h'+o.dev:o.act==='shelly'?'s'+o.cid:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
+ const key=o.act==='tuya'?'tuya':o.act==='homey'?'h'+o.dev:o.act==='shelly'?'s'+o.cid:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
  const bs=b.parentNode.querySelectorAll('button'),msg=b.parentNode.nextElementSibling;bs.forEach(x=>x.disabled=true);if(msg)msg.textContent='Sender …';
  const r=await ctlCall('POST',body);bs.forEach(x=>x.disabled=false);
  if(!msg)return;
@@ -612,10 +615,11 @@ async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.as
  if(o.act==='shelly')t=j.state==null?'Sendt (kunne ikke bekrefte)':j.state===o.on?'Bekreftet: '+(o.on?'på':'av'):'Enheten svarte ikke ennå (står '+(j.state?'på':'av')+')';
  else if(o.act==='adax')t=j.state!=null&&Math.abs(j.state-o.target)<0.01?'Bekreftet: innstilt '+nf(j.state,1)+' °C':'Sendt til Adax. Ovnen kan bruke litt tid på å følge etter';
  else if(o.act==='gardena')t=o.cmd==='start'?(j.state&&j.state!=='CLOSED'?'Bekreftet: vanner':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå'):(j.state==='CLOSED'?'Bekreftet: stoppet':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå');
+ else if(o.act==='tuya')t='Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+j.temp+' °C':'');
  else if(o.act==='homey')t=j.status?(o.dev==='daikin'?'Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+nf(j.temp,1)+' °C':''):'Klipperen melder: '+String(j.status).replace(/_/g,' ')):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt';
  else t=o.cmd==='pause'?(j.state===5?'Bekreftet: pauset':'Sendt. Laderen viser modus '+j.state+' ennå'):(j.state===3?'Bekreftet: lader':'Sendt. Laderen viser modus '+j.state+' ennå');
  msg.textContent=t+' ('+tm+')'}
-window.act=act;window.daikinSet=daikinSet;
+window.act=act;window.daikinSet=daikinSet;window.hpSet=hpSet;
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
 const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);

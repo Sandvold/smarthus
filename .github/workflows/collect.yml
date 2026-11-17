@@ -110,6 +110,9 @@ jobs:
           GARDENA_CLIENT_SECRET_2: ${{ secrets.GARDENA_CLIENT_SECRET_2 }}
           ZAPTEC_USERNAME: ${{ secrets.ZAPTEC_USERNAME }}
           ZAPTEC_PASSWORD: ${{ secrets.ZAPTEC_PASSWORD }}
+          TUYA_ACCESS_ID: ${{ secrets.TUYA_ACCESS_ID }}
+          TUYA_ACCESS_SECRET: ${{ secrets.TUYA_ACCESS_SECRET }}
+          TUYA_HOST: ${{ secrets.TUYA_HOST }}
       - run: python scripts/upload_site.py
         continue-on-error: true
         env:
