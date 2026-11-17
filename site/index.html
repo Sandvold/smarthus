@@ -65,7 +65,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null;
+let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -204,6 +204,12 @@ function lockHist(c){const since=Date.now()-hours*3600000,R=c.rows.filter(r=>new
  const un=sg.filter(x=>x.k==='u').reduce((a,x)=>a+(x.t1-x.t0),0);
  return `<div class="tile" style="grid-column:1/-1"><div class="s">${c.name}: låsestatus siste ${hours>=168?Math.round(hours/24)+' dager':hours+' timer'}</div>${strip(sg,{l:'#3f6b4a',u:'#e08363'},{l:'Låst',u:'Ulåst'})}
  <div class="s" style="margin-top:6px">${ch.length?`${ch.length} endringer, ulåst totalt ${mins(un)}. Siste: ${ch.slice(-3).reverse().map(x=>(x.k==='u'?'låst opp ':'låst ')+fmt(new Date(x.t))).join(' · ')}`:'Ingen endringer, låst hele perioden'}</div></div>`}
+function mtBlock(pl,id){if(!MT)return null;const T=(MT.thermostats||[]).filter(t=>placeOf(t.site,t.name)===pl);
+ if(!T.length)return MT.error&&pl==='oslo'?{html:waiting('Microtemp: '+MT.error),draw:()=>{},sub:'feil'}:null;
+ const cards=T.map(t=>{const l=t.rows[t.rows.length-1];return `<div class="tile"><div class="s">${t.name}</div><div class="n">${l.room==null?'–':nf(l.room,1)+' °C'}</div><div class="s">Gulv ${nf(l.floor,1)} °C · innstilt ${nf(l.set,1)} °C · ${l.heat?'varmer':'varmer ikke'}</div><div class="s">oppdatert ${ago(l.t)}</div></div>`}).join('');
+ const sets=()=>{const s=Date.now()-hours*3600000,o=[];T.forEach(t=>[['room','Rom','#7eaddb'],['floor','Gulv','#d8a747'],['set','Innstilt','#e08363']].forEach(([k,n,c])=>o.push({name:T.length>1?t.name+' '+n.toLowerCase():n,color:c,pts:t.rows.filter(r=>new Date(r.t)>s&&r[k]!=null).map(r=>({t:new Date(r.t).getTime(),v:r[k]}))})));return o.filter(x=>x.pts.length)};
+ const l0=T[0].rows[T[0].rows.length-1];
+ return{sub:'Gulvvarme '+nf(l0.room,1)+' °C',html:grid(cards)+chartBlock('mt'+id),draw:()=>drawLine('ch-mt'+id,'leg-mt'+id,'tb-mt'+id,sets(),'t','°C',null,1)}}
 function daikinSeries(c){return c.rows.map(r=>{const d=r.d||{};return{t:new Date(r.t).getTime(),out:d['measure_temperature.outdoorTemperature'],set:d.target_temperature,inn:d.measure_temperature,kwh:d.meter_power}})}
 function daikinHist(c,id){const S=daikinSeries(c),since=Date.now()-hours*3600000;
  const sets=[['set','Innstilt','#e08363'],['inn','Inne (sensor)','#7eaddb'],['out','Ute','#93a877']].map(([k,n,col])=>({name:n,color:col,pts:S.filter(x=>x.t>since&&typeof x[k]==='number').map(x=>({t:x.t,v:x[k]}))})).filter(x=>x.pts.length);
@@ -246,6 +252,7 @@ function secVarme(pl){let h='',sub=[],draw=null;
    drawLine('ch-hpp','leg-hpp','tb-hpp',[{name:'Effekt',color:'#d8a747',pts:rows.filter(r=>r.t>s&&typeof r.p.cur_power==='number').map(r=>({t:r.t,v:r.p.cur_power}))}],'pw','W',null,5)}}
  const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join(''))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
  const ax=axList(pl);if(ax.length){const t=ax.map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
+ const mb=mtBlock(pl,pl);if(mb){sub.push(mb.sub);h+=`<h3>Gulvvarme (Microtemp)</h3>`+mb.html;const d1=draw;draw=()=>{d1&&d1();mb.draw()}}
  if(!h)return null;return sec('varme','Varme',sub.join(' · '),el(h),{draw})}
 function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl,pb=pulseBlock(pl,pl),zb=zaptecBlock(pl,pl);
  const b=el((zb?`<h3>Elbillader (Zaptec)</h3>`+zb.html+`<div class="s">Husforbruk uten bil siste 24 t: <b>${nf(Math.max(0,st.k24-zb.k24),1)} kWh</b> av ${nf(st.k24,1)} kWh totalt.</div>`:'')+(pb?`<h3>Sanntid (Tibber Pulse)</h3>`+pb.html:'')+`<h3>Forbruk (Tibber)</h3>`+grid(tile('Siste 24 timer',nf(st.k24,1),'kWh')+tile('Siste 7 dager',nf(st.k7,1),'kWh')+tile('Mot forrige 7 dager',st.ch==null?null:(st.ch>0?'+':'')+st.ch,'%')+tile('Snitt per døgn (7 d)',nf(st.k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(st.k24*RATE,0),'kr'))+`<h3>Forbruk per døgn, siste 30 dager (kWh)</h3><div class="chart" id="${id}"></div>`);
@@ -334,7 +341,7 @@ const TODO=[
  ['Datakilder','zaptec','Zaptec-lader i Arendal','Koden er ferdig. Legg inn secrets ZAPTEC_USERNAME og ZAPTEC_PASSWORD i GitHub (helst en egen bruker med lesetilgang), så begynner data å komme inn.'],
  ['Datakilder','pulse-ar','Tibber Pulse i Arendal','Pulse er aktiv i Oslo, men ikke i Arendal-hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'],
  ['Datakilder','hp-effekt','Effekt på varmepumpen i Arendal','Pumpen rapporterer 0 W. Trenger Pulse i Arendal og/eller en egen måler (for eksempel Shelly EM) på pumpens kurs. Pulse-historikk samles nå for kalibrering.'],
- ['Datakilder','microtemp','Microtemp: avklar modell','Trolig OJ Electronics MWD5. Det finnes en uoffisiell sky-integrasjon som trenger kunde-ID og API-nøkkel fra appen. Si fra hvilken modell du har.'],
+ ['Datakilder','microtemp','Microtemp (Oslo, MWD5, kunde-ID 15)','Innhenting er bygget og secrets er lagt inn. Første kjøring avgjør om skyen godtar kunde-ID 15. Hvis ikke vises feilen i Oslo-fanen under Varme.'],
  ['Datakilder','klipper-flow','Raskere klipperstatus','Lag en Homey-flow som sender status med en gang klipperen endrer status, ikke bare hvert 15. minutt.'],
  ['Datakilder','a1','Dreame A1 viser tilgjengelig i Homey, offline i appen','Sjekk om Homey viser gammel status.'],
  ['Dashboard','alarm','Varsler på mobil eller e-post','Frost, lavt batteri, ulåst dør og frakoblede enheter.'],
@@ -383,7 +390,7 @@ document.getElementById('range').addEventListener('change',e=>{hours=+e.target.v
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
 addEventListener('hashchange',()=>{TAB=(location.hash||'#oversikt').slice(1);render()});
 const J=f=>fetch(f).then(r=>r.ok?r.json():null).catch(()=>null);
-Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json')]).then(([h,g,a,s,p,d,u,z])=>{ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json')]).then(([h,g,a,s,p,d,u,z,m])=>{MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render()}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
 </script>
 </body>
 </html>
