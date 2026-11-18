@@ -424,9 +424,19 @@ function secDrivTemp(){
   box.querySelectorAll('input').forEach(i=>i.onchange=()=>{sel[i.dataset.n]=i.checked;ls.set('sh-tsel',sel);draw()});
   drawLine('ch-dt','leg-dt','tb-dt',S.filter(s=>sel[s.name]!==false).map(s=>({...s,pts:s.pts.filter(p=>p.t>s0)})).filter(s=>s.pts.length),'t','°C',FROST,1)};
  return sec('dtemp','Temperaturer i alle drivhus',all.length+' målere',b,{open:true,draw})}
+const ghHome=(site,name)=>/oslo/i.test((site||'')+' '+(name||''))?'oslo':'arendal';
+function secDrivhusIn(pl){const T=[];
+ sensors('drivhus').filter(x=>ghHome(x.rows[x.rows.length-1].site,x.name)===pl).forEach(x=>T.push(sensorCard(x)));
+ ((AQ&&AQ.devices)||[]).filter(d=>placeOf(d.site,d.name)==='drivhus'&&ghHome(d.site,d.name)===pl&&d.rows.length).forEach(d=>{const l=lastOf(d.rows),pp=[];if(l.temp!=null)pp.push(nf(l.temp,1)+' °C');if(l.hum!=null)pp.push(nf(l.hum,0)+' % fukt');if(l.on!=null)pp.push(l.on?'på':'av');if(l.power!=null&&l.on)pp.push(nf(l.power,0)+' W');
+  T.push(`<div class="tile"><div class="s">${esc(d.name)}</div><div class="n">${pp[0]||'–'}</div><div class="s">${pp.slice(1).join(' · ')}</div><div class="s">oppdatert ${ago(l.t)}</div>${PLUGS[d.did]?`<div style="margin-top:8px;display:flex;gap:6px"><button onclick="plug('${d.did}',true)" class="btn">På</button><button onclick="plug('${d.did}',false)" class="btn">Av</button></div>`:''}</div>`)});
+ if(pl==='arendal')shList().forEach(c=>T.push(shellyCard(c)));
+ gdList('drivhus').filter(c=>ghHome(c.site,c.name)===pl&&c.rows.length).forEach(c=>T.push(gardenaCard(c)));
+ if(!T.length)return null;
+ const b=el(grid(T.join(''))+`<div style="margin-top:10px"><button class="btn" data-go="drivhus">Åpne hele drivhusfanen</button></div>`);b.querySelector('[data-go]').onclick=()=>go('drivhus');
+ return sec('drivhus-i','Drivhus '+PLACES[pl],T.length+' enheter',b,{open:true})}
 function placeView(pl){const w=document.createElement('div');
  w.appendChild(placeHero(pl));
- const list=[pl==='drivhus'?secDrivTemp():null,secKlima(pl),secVarme(pl),secStrom(pl),secHage(pl),pl==='drivhus'?secShelly():null,secAqara(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
+ const list=[pl==='drivhus'?secDrivTemp():null,secKlima(pl),secVarme(pl),secStrom(pl),secHage(pl),pl==='drivhus'?secShelly():null,secAqara(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);if(pl!=='drivhus'){const g=secDrivhusIn(pl);if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
  if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
@@ -514,7 +524,7 @@ function devs(){const D=[],HMd=(HM&&HM.devices)||[],sub=(...a)=>a.filter(Boolean
   const btns=k==='mowing'||k==='returning'?[home]:k==='paused'?[resume,home]:k==='error'?[home]:k==='unknown'?[start,home]:[start];
   D.push({key:'mw:'+dv,grp:'Hage og vanning',pl:placeOf(c.site,c.name),name:c.name,ic:'mower',on:k==='mowing'||k==='returning',tone:k==='error'?'bad':k==='mowing'?'ok':k==='paused'?'warn':'',st:mowLab(I),sub:sub(bat!=null?'Batteri '+nf(bat,0)+' %':'',I.stuck?'⚠ '+I.stuck:'oppdatert '+ago(l.t)),btns})});
  ((GD&&GD.devices)||[]).filter(c=>c.kind==='valve'&&c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),off=l.link==='OFFLINE',open=!!l.act&&l.act!=='CLOSED';
-  D.push({key:'gd:'+c.id,grp:'Hage og vanning',pl:placeOf(c.site,c.name),name:c.name,ic:'drop',on:!off&&open,tone:off?'warn':open?'ok':'',st:off?'Frakoblet':open?'Vanner':'Lukket',sub:sub(l.batt!=null?'Batteri '+l.batt+' %':'','oppdatert '+ago(l.t)),
+  D.push({key:'gd:'+c.id,grp:'Hage og vanning',pl:placeOf(c.site,c.name),gh:ghHome(c.site,c.name),name:c.name,ic:'drop',on:!off&&open,tone:off?'warn':open?'ok':'',st:off?'Frakoblet':open?'Vanner':'Lukket',sub:sub(l.batt!=null?'Batteri '+l.batt+' %':'','oppdatert '+ago(l.t)),
    btns:off?[]:[open?{t:'Stopp',cls:'danger',run:()=>act(null,{act:'gardena',id:c.id,cmd:'stop',q:'Stoppe vanning: '+c.name+'?'})}:{t:'Vann 10 min',cls:'pri',run:()=>act(null,{act:'gardena',id:c.id,cmd:'start',minutes:10,q:'Starte vanning i 10 minutter: '+c.name+'?'})}]})});
  ((AX&&AX.rooms)||[]).filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.target==null)return;
   D.push({key:'ax:'+c.id,grp:'Varme',pl:placeOf(c.home,c.name),name:c.name,ic:'flame',on:!!l.on,st:l.temp==null?'–':nf(l.temp,1)+' °C',sub:sub('Panelovn · innstilt '+nf(l.target,1)+' °C',l.on?'':'av','oppdatert '+ago(l.t)),
@@ -533,10 +543,10 @@ function devs(){const D=[],HMd=(HM&&HM.devices)||[],sub=(...a)=>a.filter(Boolean
    btns:[on?{t:'Slå av',cls:'danger',run:()=>act(null,{act:'tuya',cmd:'off',q:'Slå av varmepumpa i Arendal?'})}:{t:'Slå på',cls:'pri',run:()=>act(null,{act:'tuya',cmd:'on',q:'Slå på varmepumpa i Arendal?'})}],
    step:{v:cur,min:5,max:80,s:1,u:'°C',set:v=>act(null,{act:'tuya',cmd:'temp',value:v,q:'Varmepumpe Arendal: sette innstilt temperatur til '+v+' °C?'})}})}}
  ((AQ&&AQ.devices)||[]).filter(d=>PLUGS[d.did]&&d.rows.length).forEach(d=>{const l=lastOf(d.rows),on=l.on===true,nm=PLUGS[d.did];
-  D.push({key:'aq:'+d.did,grp:'Lys og stikk',pl:placeOf(d.site,d.name),name:d.name,ic:/lys/i.test(nm)?'bulb':/vent/i.test(nm)?'fan':'flame',on,st:on?'På':'Av',sub:sub(on&&l.power!=null?nf(l.power,0)+' W':'','oppdatert '+ago(l.t)),
+  D.push({gh:'oslo',key:'aq:'+d.did,grp:'Lys og stikk',pl:placeOf(d.site,d.name),name:d.name,ic:/lys/i.test(nm)?'bulb':/vent/i.test(nm)?'fan':'flame',on,st:on?'På':'Av',sub:sub(on&&l.power!=null?nf(l.power,0)+' W':'','oppdatert '+ago(l.t)),
    btns:[on?{t:'Slå av',cls:'danger',run:()=>plug(d.did,false)}:{t:'Slå på',cls:'pri',run:()=>plug(d.did,true)}]})});
  shList().filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),on=!!l.on;
-  D.push({key:'sh:'+c.id,grp:'Lys og stikk',pl:'drivhus',name:c.name,ic:/lys/i.test(c.name)?'bulb':/vifte|vent/i.test(c.name)?'fan':'power',on,st:on?'På':'Av',sub:sub(on&&l.w!=null?nf(l.w,0)+' W':'','oppdatert '+ago(l.t)),
+  D.push({gh:'arendal',key:'sh:'+c.id,grp:'Lys og stikk',pl:'drivhus',name:c.name,ic:/lys/i.test(c.name)?'bulb':/vifte|vent/i.test(c.name)?'fan':'power',on,st:on?'På':'Av',sub:sub(on&&l.w!=null?nf(l.w,0)+' W':'','oppdatert '+ago(l.t)),
    btns:[on?{t:'Slå av',cls:'danger',run:()=>act(null,{act:'shelly',cid:c.id,ch:c.ch,on:false,q:'Slå AV '+c.name+'?'})}:{t:'Slå på',cls:'pri',run:()=>act(null,{act:'shelly',cid:c.id,ch:c.ch,on:true,q:'Slå PÅ '+c.name+'?'})}]})});
  ((ZP&&ZP.chargers)||[]).filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),m=l.m,chg=m===3,lab=l.on===0?'Frakoblet':ZMODE[m]||'Ukjent';
   D.push({key:'zp:'+c.id,grp:'Elbil',pl:placeOf(c.site,c.name),name:c.name||'Lader',ic:'car',on:chg,st:lab,sub:sub(chg&&l.w!=null?nf(l.w/1000,1)+' kW':'',l.kwh!=null?nf(l.kwh,1)+' kWh denne økten':'','oppdatert '+ago(l.t)),
@@ -556,7 +566,7 @@ async function refreshLive(){toast('Henter status …');await Promise.all([liveP
 function styringView(){const w=document.createElement('div'),D=devs(),pf=ls.get('sh-spl','alle');
  const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Styring</h1><span class="chip">${D.length} enheter</span></div><div class="hi">Status nå og knapper. Oppdateres av seg selv.</div><div class="fl">${['alle','oslo','arendal','drivhus'].map(p=>`<button class="fb ${pf===p?'on':''}" data-p="${p}">${p==='alle'?'Alle':PLACES[p]}</button>`).join('')}<button class="fb rf" id="rf">Oppdater</button></div></div>`);
  hero.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ls.set('sh-spl',b.dataset.p);render()});hero.querySelector('#rf').onclick=refreshLive;w.appendChild(hero);
- const G={};D.filter(d=>pf==='alle'||d.pl===pf).forEach(d=>(G[d.grp]=G[d.grp]||[]).push(d));
+ const G={};D.filter(d=>pf==='alle'||d.pl===pf||d.gh===pf).forEach(d=>(G[d.grp]=G[d.grp]||[]).push(d));
  if(!Object.keys(G).length)w.appendChild(el(waiting('Ingen styrbare enheter funnet ennå.')));
  GRP.forEach(g=>{if(!G[g])return;w.appendChild(el(`<h3 class="gh">${g}</h3>`));const gr=document.createElement('div');gr.className='dg';
   G[g].sort((a,b)=>(PLORD[a.pl]-PLORD[b.pl])||a.name.localeCompare(b.name,'nb')).forEach(d=>gr.appendChild(stCard(d)));w.appendChild(gr)});
