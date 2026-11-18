@@ -1,6 +1,6 @@
 name: Homey-status
 # Homey sender enhetsstatus (repository_dispatch, type homey). Kun lagring og publisering av homey.json,
-# ikke de andre samlerne (de går i collect.yml hver 3. time).
+# ikke de andre samlerne (disse startes herfra hvert kvarter via steget nederst; cron i collect.yml er reserve).
 on:
   repository_dispatch:
     types: [homey]
@@ -29,7 +29,7 @@ jobs:
       - run: python scripts/upload_site.py
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-      - name: Start Hent målinger hvis siste kjøring er over 2 timer gammel
+      - name: Start Hent målinger hvis siste kjøring er over 10 min gammel
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -37,7 +37,7 @@ jobs:
           age=999999
           if [ -n "$last" ]; then age=$(( $(date +%s) - $(date -d "$last" +%s) )); fi
           echo "Siste Hent målinger: ${age}s siden"
-          if [ "$age" -gt 7200 ]; then
+          if [ "$age" -gt 600 ]; then
             gh api -X POST "repos/${{ github.repository }}/actions/workflows/collect.yml/dispatches" -f ref=main
             echo "Startet Hent målinger"
           fi
