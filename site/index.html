@@ -186,6 +186,14 @@ const SERIES=()=>{const by={};ALL.filter(r=>r.kind!=='heatpump').forEach(r=>{(by
  ((AQ&&AQ.devices)||[]).forEach(d=>{const rows=d.rows.filter(r=>r.temp!=null).map(r=>({t:new Date(r.t),temp:r.temp,hum:r.hum,batt:null,site:d.site}));if(rows.length)by[d.name]=rows});
  return Object.entries(by).map(([name,rows],i)=>({name,color:PAL[i%PAL.length],rows,pl:placeOf(rows[rows.length-1].site,name)}))};
 const sensors=pl=>SERIES().filter(s=>s.pl===pl);
+/* frost-anslag: lineær trend siste 3 t; krever ≥6 målinger, fall ≥0,5 °C og -0,15 °C/t eller brattere; bare anslag ≤6 t */
+const ETA_H=6;
+function frostEta(s){const l=lastOf(s.rows);if(!l||l.temp==null||l.temp<=FROST)return null;const t0=new Date(l.t).getTime()-3*3600000;
+ const P=s.rows.filter(r=>r.temp!=null&&new Date(r.t).getTime()>=t0).map(r=>[(new Date(r.t).getTime()-t0)/3600000,r.temp]);if(P.length<6)return null;
+ const n=P.length,mx=P.reduce((a,p)=>a+p[0],0)/n,my=P.reduce((a,p)=>a+p[1],0)/n,sxx=P.reduce((a,p)=>a+(p[0]-mx)**2,0);if(!sxx)return null;
+ const k=P.reduce((a,p)=>a+(p[0]-mx)*(p[1]-my),0)/sxx;if(k>-0.15||P[0][1]-P[n-1][1]<0.5)return null;
+ const h=(l.temp-FROST)/-k;return h<=ETA_H?{h,rate:-k}:null}
+const etaTxt=e=>e.h<1?'under 1 t':'ca. '+nf(e.h,e.h<3?1:0)+' t';
 const hmList=(pl,kind)=>((HM&&HM.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl&&(!kind||c.kind===kind));
 const gdList=pl=>((GD&&GD.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl);
 const axAvg=pl=>axList(pl).filter(c=>!(pl==='oslo'&&/vaskerom/i.test(c.name)));
@@ -216,7 +224,8 @@ function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
  lo-=pad;hi+=pad;if(hi===lo)hi=lo+1;
  const X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b),d0=(key==='hum'||key==='pw')?0:1;
  let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,d0)}</text>`}
- for(let i=0;i<=3;i++){const t=t0+(t1-t0)*i/3;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==3?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</text>`}
+ {const nT=W<520?2:3,span=t1-t0,fo=span>96*3600000?(W<520?{day:'numeric',month:'short'}:{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):{weekday:'short',hour:'2-digit',minute:'2-digit'};
+ for(let i=0;i<=nT;i++){const t=t0+span*i/nT;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==nT?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',fo)}</text>`}}
  if(refLine!=null)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(refLine)}" y2="${Y(refLine)}" stroke="#e08363" stroke-dasharray="4 4"/><text x="${W-m.r}" y="${Y(refLine)-4}" text-anchor="end" fill="#e08363" font-size="11">Frost ${refLine} °C</text>`;
  const lines=sets.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" points="${s.pts.map(p=>X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}"/>`+(s.pts.length===1?`<circle cx="${X(s.pts[0].t)}" cy="${Y(s.pts[0].v)}" r="4" fill="${s.color}"/>`:'')).join('');
  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf over tid">${g}${lines}<line id="${id}-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="${id}-tip"></div>`;
@@ -422,7 +431,7 @@ function secDrivTemp(){
  const sel=ls.get('sh-tsel',{}),last=all.map(s=>s.pts[s.pts.length-1]).filter(Boolean);
  const b=el(`<div class="sel" id="sel-dt"></div>${chartBlock('dt')}`);
  const draw=()=>{const S=mk(),s0=since();const box=document.getElementById('sel-dt');if(!box)return;
-  box.innerHTML=S.map(s=>{const l=s.pts[s.pts.length-1];return `<label class="chk"><input type="checkbox" data-n="${esc(s.name)}" ${sel[s.name]===false?'':'checked'}><i style="background:${s.color}"></i>${esc(s.name)}${l?` <b>${nf(l.v,1)} °C</b>`:''}</label>`}).join('');
+  box.innerHTML=S.map(s=>{const l=s.pts[s.pts.length-1];return `<label class="chk"><input type="checkbox" data-n="${esc(s.name)}" ${sel[s.name]===false?'':'checked'}><i style="background:${s.color}"></i>${esc(s.name)}${l?` <b>${nf(l.v,1)} °C</b>`:''}${(()=>{const sr=sensors('drivhus').find(x=>x.name===s.name),e=sr&&frostEta(sr);return e?` <span class="warn">↘ 0 °C om ${etaTxt(e)}</span>`:''})()}</label>`}).join('');
   box.querySelectorAll('input').forEach(i=>i.onchange=()=>{sel[i.dataset.n]=i.checked;ls.set('sh-tsel',sel);draw()});
   drawLine('ch-dt','leg-dt','tb-dt',S.filter(s=>sel[s.name]!==false).map(s=>({...s,pts:s.pts.filter(p=>p.t>s0)})).filter(s=>s.pts.length),'t','°C',FROST,1)};
  return sec('dtemp','Temperaturer i alle drivhus',all.length+' målere',b,{open:true,draw})}
@@ -453,7 +462,8 @@ function leaveChecks(pl){const C=[],add=(lvl,txt,t)=>C.push({lvl,txt,t});
  {const ax=axList(pl).map(c=>lastOf(c.rows)).filter(l=>l&&l.on&&l.target!=null);if(ax.length){const m=ax.reduce((a,l)=>a+l.target,0)/ax.length;add('info',`${ax.length} panelovner står på, innstilt snitt ${nf(m,1)} °C`,maxT(ax,x=>new Date(x.t).getTime()))}}
  SERIES().filter(x=>x.pl==='drivhus'&&ghHome(x.rows[x.rows.length-1].site,x.name)===pl).forEach(x=>{const l=lastOf(x.rows);if(l.temp==null)return;
   const heat=pl==='oslo'?((AQ&&AQ.devices)||[]).find(d=>PLUGS[d.did]&&/varme/i.test(d.name)):null,hon=heat&&lastOf(heat.rows)?lastOf(heat.rows).on:null;
-  if(l.temp<=WARN_NEAR&&hon===false)add('warn',`${esc(x.name)} er ${nf(l.temp)} °C og varmen er <b>av</b>`,l.t);
+  const e=frostEta(x);if(e)add('warn',`${esc(x.name)} faller og kan nå 0 °C om <b>${etaTxt(e)}</b>${hon===false?' – varmen er av':''}`,l.t);
+  else if(l.temp<=WARN_NEAR&&hon===false)add('warn',`${esc(x.name)} er ${nf(l.temp)} °C og varmen er <b>av</b>`,l.t);
   else if(l.temp<=FROST)add('warn',`${esc(x.name)} har frost: ${nf(l.temp)} °C`,l.t);
   else add('ok',`${esc(x.name)}: ${nf(l.temp)} °C${hon===true?', varmen er på':''}`,l.t)});
  return C}
@@ -476,6 +486,7 @@ function alerts(all){const A=[];
  SERIES().forEach(s=>{const l=s.rows[s.rows.length-1],pl=s.pl;
   if(l.temp!=null&&l.temp<=FROST)A.push({k:'frost:'+s.name,pl,lvl:'bad',txt:`Frost i ${esc(s.name)}: ${nf(l.temp)} °C`});
   else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({k:'nearfrost:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} er nær frost: ${nf(l.temp)} °C`});
+  {const e=frostEta(s);if(e)A.push({k:'frosteta:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} faller ${nf(e.rate,1)} °C/t og kan nå 0 °C om ${etaTxt(e)} (anslag)`})}
   if((Date.now()-l.t)/60000>STALE_MIN)A.push({k:'stale:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} har ikke sendt måling siden ${fmt(l.t)}`});
   if(l.batt!=null&&l.batt<LOW_BATT)A.push({k:'batt:'+s.name,pl,lvl:'warn',txt:`Lavt batteri i ${esc(s.name)} (${nf(l.batt,0)} %)`})});
  ['oslo','arendal','drivhus'].forEach(pl=>{
@@ -606,11 +617,11 @@ function styringView(){const w=document.createElement('div'),D=devs(),pf=ls.get(
  GRP.forEach(g=>{if(!G[g])return;w.appendChild(el(`<h3 class="gh">${g}</h3>`));const gr=document.createElement('div');gr.className='dg';
   G[g].sort((a,b)=>(PLORD[a.pl]-PLORD[b.pl])||a.name.localeCompare(b.name,'nb')).forEach(d=>gr.appendChild(stCard(d)));w.appendChild(gr)});
  return w}
-function placeHero(pl){const A=alerts().filter(a=>a.pl===pl&&a.lvl!=='info'),S=sensors(pl),chips=[];
+function placeHero(pl){const A=alerts().filter(a=>a.pl===pl&&a.lvl!=='info'),S=sensors(pl),chips=[],LW=pl==='drivhus'?0:(()=>{try{return leaveChecks(pl).filter(c=>c.lvl==='warn').length}catch(e){return 0}})();
  const t=S.map(s=>lastOf(s.rows).temp).filter(x=>x!=null);if(t.length)chips.push(['Snitt temperatur',nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C']);
  const pu=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl),pr=pu&&pu.enabled?lastOf(pu.rows):null;if(pr&&pr.w!=null)chips.push(['Effekt nå',nf(pr.w,0)+' W']);
  const cls=A.length?(A.some(a=>a.lvl==='bad')?'bad':'warn'):'ok';
- return el(`<div class="hero"><div class="hl"><span class="hd"></span><h1>${PLACES[pl]}</h1><span class="chip ${cls}">${A.length?A.length+(A.length===1?' varsel':' varsler'):'Alt OK'}</span></div>${chips.length?`<div class="hc">${chips.map(([l,v])=>`<div class="hk"><span>${l}</span><b>${v}</b></div>`).join('')}</div>`:''}</div>`)}
+ return el(`<div class="hero"><div class="hl"><span class="hd"></span><h1>${PLACES[pl]}</h1><span class="chip ${A.length?cls:LW?'warn':'ok'}">${A.length?A.length+(A.length===1?' varsel':' varsler'):LW?LW+' å sjekke':'Alt OK'}</span></div>${chips.length?`<div class="hc">${chips.map(([l,v])=>`<div class="hk"><span>${l}</span><b>${v}</b></div>`).join('')}</div>`:''}</div>`)}
 /* ---------- app ---------- */
 const TABS=[['oversikt','Oversikt','grid'],['styring','Styring','sliders'],['oslo','Oslo','city'],['arendal','Arendal','house'],['drivhus','Drivhus','leaf']];
 function go(t){TAB=t;history.replaceState(null,'','#'+t);render();scrollTo(0,0)}
