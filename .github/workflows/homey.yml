@@ -6,6 +6,7 @@ on:
     types: [homey]
 permissions:
   contents: read
+  actions: write
 concurrency:
   group: homey
   cancel-in-progress: false
@@ -28,3 +29,15 @@ jobs:
       - run: python scripts/upload_site.py
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - name: Start Hent målinger hvis siste kjøring er over 2 timer gammel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh api "repos/${{ github.repository }}/actions/workflows/collect.yml/runs?per_page=1" --jq '.workflow_runs[0].created_at // empty')
+          age=999999
+          if [ -n "$last" ]; then age=$(( $(date +%s) - $(date -d "$last" +%s) )); fi
+          echo "Siste Hent målinger: ${age}s siden"
+          if [ "$age" -gt 7200 ]; then
+            gh api -X POST "repos/${{ github.repository }}/actions/workflows/collect.yml/dispatches" -f ref=main
+            echo "Startet Hent målinger"
+          fi
