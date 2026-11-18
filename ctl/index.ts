@@ -93,7 +93,7 @@ async function setPlug(did: string, on: boolean) {
   return { code: r.code, message: r.messageDetail || r.message || null };
 }
 
-// Låser terrassedøren (Yale) via en Homey-webhook. Kun "lås" – aldri opplåsing herfra.
+// Låser terrassedøren (Yale) via en Homey-webhook. Låsing er standard; opplåsing (unlock: true) tillates bare når HOMEY_UNLOCK_URL er satt, og logges i ctl_log.
 async function lockTerrasse(email: string, unlock = false, door = 'terrasse'): Promise<[unknown, number]> {
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
   const url = (await sql('select value from ctl_secrets where name = $1', [(unlock ? 'HOMEY_UNLOCK_URL' : 'HOMEY_LOCK_URL') + (door === 'inngang' ? '_INNGANG' : '')]))[0]?.value;
@@ -353,6 +353,13 @@ function cors(req: Request): Record<string, string> {
 const json = (req: Request, body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
+// Sammenligning uten tidsavhengighet (for push-token).
+function safeEq(a: string, b: string): boolean {
+  let d = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return d === 0;
+}
+
 export default {
   async fetch(req: Request) {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
@@ -360,7 +367,7 @@ export default {
     if (req.method === 'POST' && req.headers.get('x-push-token')) {
       // Homey rapporterer låsestatus (kun terrassedøren). Eget token, ikke Google-innlogging.
       const tok = (await sql("select value from ctl_secrets where name = 'HOMEY_PUSH_TOKEN'"))[0]?.value;
-      if (!tok || req.headers.get('x-push-token') !== tok) return json(req, { error: 'unauthorized' }, 401);
+      if (!tok || !safeEq(req.headers.get('x-push-token') ?? '', tok)) return json(req, { error: 'unauthorized' }, 401);
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
       if (typeof b.dev === 'string' && ['a1', 'a3', 'daikin'].includes(b.dev)) {
         await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');

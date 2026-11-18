@@ -18,8 +18,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install requests "psycopg[binary]"
-      - run: python scripts/miele.py token "${{ inputs.code }}" "${{ inputs.redirect }}"
+      - run: python scripts/miele.py token "$INPUT_CODE" "$INPUT_REDIRECT"
         env:
+          INPUT_CODE: ${{ inputs.code }}
+          INPUT_REDIRECT: ${{ inputs.redirect }}
           MIELE_CLIENT_ID: ${{ secrets.MIELE_CLIENT_ID }}
           MIELE_CLIENT_SECRET: ${{ secrets.MIELE_CLIENT_SECRET }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
