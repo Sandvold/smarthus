@@ -3,8 +3,6 @@ on:
   schedule:
     - cron: "23 */3 * * *"
   workflow_dispatch:
-  repository_dispatch:
-    types: [homey]
 permissions:
   contents: read
 concurrency:
@@ -19,10 +17,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests "psycopg[binary]"
-      - if: github.event_name == 'repository_dispatch'
-        run: python scripts/ingest_homey.py "$GITHUB_EVENT_PATH"
-        env:
-          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/collect.py
         continue-on-error: true
         env:

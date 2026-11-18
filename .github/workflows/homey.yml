@@ -1,0 +1,30 @@
+name: Homey-status
+# Homey sender enhetsstatus (repository_dispatch, type homey). Kun lagring og publisering av homey.json,
+# ikke de andre samlerne (de går i collect.yml hver 3. time).
+on:
+  repository_dispatch:
+    types: [homey]
+permissions:
+  contents: read
+concurrency:
+  group: homey
+  cancel-in-progress: false
+jobs:
+  homey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "psycopg[binary]"
+      - run: python scripts/ingest_homey.py "$GITHUB_EVENT_PATH"
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/export_homey.py
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/upload_site.py
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
