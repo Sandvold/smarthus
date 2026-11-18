@@ -5,55 +5,111 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smarthus</title>
 <style>
-:root{--bg:#0f1110;--card:#181b1a;--tile:#1f2321;--fg:#f0efec;--mut:#9aa39d;--grid:#2a2f2d;--warn:#d8a747;--bad:#e08363;--ok:#93a877;--acc:#7eaddb}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,sans-serif;margin:0;padding:16px;max-width:1100px;margin-inline:auto}
-h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 8px}h3{font-size:14px;color:var(--mut);font-weight:600;margin:16px 0 6px}
-header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:8px}
-select,input,button{font:inherit;color:var(--fg)}
-select,input[type=text]{background:var(--card);border:1px solid var(--grid);border-radius:8px;padding:8px 10px}
-.nav{position:sticky;top:0;z-index:5;background:#0f1110ee;backdrop-filter:blur(6px);display:flex;gap:6px;overflow-x:auto;padding:8px 16px;margin:0 -16px 14px;border-bottom:1px solid var(--grid)}
-.nav button{background:var(--card);border:1px solid var(--grid);border-radius:999px;padding:8px 16px;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center}
-.nav button.on{background:#7eaddb22;border-color:var(--acc);color:var(--acc)}
-.pill{font-size:12px;border-radius:999px;padding:1px 8px;background:var(--bad);color:#111}.pill.w{background:var(--warn)}.pill.g{background:var(--grid);color:var(--mut)}
+:root{--bg:#0a0d0c;--card:#141917;--tile:#1a211f;--fg:#f2f1ee;--mut:#98a39d;--grid:#262e2b;--warn:#e3b252;--bad:#f0866a;--ok:#8fc58a;--acc:#7eaddb;--oslo:#7eaddb;--arendal:#8fc58a;--drivhus:#e3b252;--pl:var(--acc)}
+body[data-tab=oslo]{--pl:var(--oslo)}body[data-tab=arendal]{--pl:var(--arendal)}body[data-tab=drivhus]{--pl:var(--drivhus)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{background:radial-gradient(900px 420px at 88% -8%,#24485a55,transparent 62%),radial-gradient(800px 460px at -8% 6%,#2f5a3544,transparent 58%),var(--bg);background-attachment:fixed;color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;padding:14px 14px 120px;max-width:1100px;margin-inline:auto}
+h1{font-size:22px;margin:0;letter-spacing:-.02em}h2{font-size:16px;margin:0 0 8px}h3{font-size:12px;color:var(--mut);font-weight:600;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.07em}
+button,select,input{font:inherit;color:var(--fg)}button{cursor:pointer}
+select,input[type=text]{background:#ffffff0a;border:1px solid var(--grid);border-radius:10px;padding:8px 10px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0 14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;letter-spacing:-.02em}
+.logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--oslo),var(--arendal) 60%,var(--drivhus));display:grid;place-items:center;box-shadow:0 6px 18px #0008}
+.logo svg{width:20px;height:20px;stroke:#0c1210;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.top .s{text-align:right}
+.top select{padding:5px 8px;font-size:13px}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));z-index:20;display:flex;gap:2px;background:#101614e8;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid #ffffff14;border-radius:24px;padding:6px;box-shadow:0 14px 40px #000b;max-width:calc(100% - 16px)}
+.nav button{background:none;border:0;border-radius:18px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--mut);min-width:62px;position:relative;transition:background .15s,color .15s}
+.nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button.on{background:#ffffff14;color:var(--fg)}
+.nav button.on svg{stroke:var(--pl)}
+.pill{position:absolute;top:2px;right:8px;font-size:10px;border-radius:999px;padding:0 6px;background:var(--bad);color:#111;font-weight:700}.pill.w{background:var(--warn)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:6px}
-.c,.tile{background:var(--tile);border-radius:10px;padding:12px}
-.tile .n{font-size:26px;line-height:1.15}
-.big{font-size:32px;line-height:1.1}
+.c,.tile{background:linear-gradient(160deg,#1f2825,#161c1a);border:1px solid #ffffff0d;border-radius:14px;padding:13px}
+.tile .n{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+.big{font-size:34px;font-weight:600;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
 .s{color:var(--mut);font-size:13px}
 .badge{display:inline-block;font-size:13px;border-radius:999px;padding:2px 10px;margin-top:6px;border:1px solid currentColor}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
-.lede{font-size:18px;line-height:1.5;max-width:62ch;margin:0 0 16px}
-details.sec{background:var(--card);border-radius:12px;margin:0 0 10px;color:var(--fg);font-size:inherit}
-details.sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px;min-height:48px}
+.lede{font-size:17px;line-height:1.5;max-width:62ch;margin:0 0 16px;color:#d9dcd8}
+.hero{position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--pl) 26%,#141917),#141917 70%);border:1px solid color-mix(in srgb,var(--pl) 35%,transparent);border-radius:20px;padding:16px 16px 14px;margin:0 0 14px}
+.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--pl) 40%,transparent),transparent 70%);pointer-events:none}
+.hero .hl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hero .hd{width:10px;height:10px;border-radius:50%;background:var(--pl);box-shadow:0 0 12px var(--pl)}
+.hero .hi{font-size:13px;color:var(--mut);margin-top:4px;text-transform:capitalize}
+.hero .hc{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:12px}
+.hero .hk span{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.hero .hk b{font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.chip{font-size:12px;border-radius:999px;padding:3px 11px;border:1px solid currentColor;margin-left:auto;font-weight:600}
+.chip:not(.ok):not(.warn):not(.bad){color:var(--mut)}
+details.sec{background:linear-gradient(180deg,#171d1b,#131816);border:1px solid #ffffff0b;border-radius:18px;margin:0 0 10px;color:var(--fg)}
+details.sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 16px;min-height:52px}
 details.sec>summary::-webkit-details-marker{display:none}
-details.sec .t{font-weight:600;font-size:16px}
+details.sec .t{font-weight:650;font-size:16px;display:flex;align-items:center;gap:9px}
+details.sec .t::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--pl);flex:none}
 details.sec .sub{color:var(--mut);font-size:13px;margin-left:auto;text-align:right}
-details.sec .chev{width:10px;height:10px;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-left:4px}
+details.sec .chev{width:9px;height:9px;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-left:4px}
 details.sec[open]>summary .chev{transform:rotate(45deg)}
-details.sec>.body{padding:0 14px 14px}
+details.sec>.body{padding:0 16px 16px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--mut);margin-bottom:6px}
 .legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
 .chart{position:relative}svg{width:100%;height:240px;display:block;touch-action:pan-y}
 .tip{position:absolute;pointer-events:none;background:#000d;border:1px solid var(--grid);border-radius:8px;padding:6px 10px;font-size:13px;display:none;white-space:nowrap}
 details.mini{margin-top:8px;color:var(--mut);font-size:13px}table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:3px 8px 3px 0}
-.pc{background:var(--card);border:1px solid var(--grid);border-radius:12px;padding:14px;text-align:left;cursor:pointer;width:100%}
-.pc:hover{border-color:var(--acc)}.pc h2{display:flex;justify-content:space-between;align-items:center}
+.pc{background:linear-gradient(150deg,color-mix(in srgb,var(--pl) 14%,#171d1b),#141917 65%);border:1px solid color-mix(in srgb,var(--pl) 28%,transparent);border-radius:18px;padding:16px;text-align:left;cursor:pointer;width:100%;transition:transform .12s,border-color .12s}
+.pc:hover{border-color:var(--pl)}.pc:active{transform:scale(.99)}
+.pc h2{display:flex;justify-content:space-between;align-items:center;font-size:19px;letter-spacing:-.01em;margin-bottom:6px}
 .pc div{font-size:14px;margin-top:3px}
-.al{display:flex;gap:8px;padding:6px 0;font-size:15px;border-bottom:1px solid var(--grid)}.al:last-child{border:0;}.al .x{background:none;border:1px solid var(--grid);border-radius:8px;color:var(--mut);padding:2px 10px;cursor:pointer;font-size:13px;align-self:center}
-.add{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.add input{flex:1;min-width:200px}
-.add button{background:var(--acc);color:#111;border:0;border-radius:8px;padding:8px 16px;cursor:pointer}
-.empty{border:1px dashed var(--grid);border-radius:10px;padding:12px;color:var(--mut);font-size:14px}
-.lv{display:inline-block;font-size:11px;padding:1px 8px;border-radius:9px;margin-left:6px;border:1px solid #3a4248;color:#cfd6dc}.lv.l{border-color:#3f6b4a;color:#9ccaa6}.lv.m{border-color:#a8873a;color:#e0c277}.lv.h{border-color:#a65a47;color:#e69a87}
-.ct dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:6px 12px}.ct dt{color:#8b959d;font-size:12px}.ct dd{margin:0;font-size:13px}.ct .src{font-size:11px;color:#7f8a93;margin-top:8px}
+.al{display:flex;gap:8px;padding:8px 0;font-size:15px;border-bottom:1px solid var(--grid)}.al:last-child{border:0}.al .x{background:none;border:1px solid var(--grid);border-radius:8px;color:var(--mut);padding:2px 10px;font-size:13px;align-self:center}
+.empty{border:1px dashed var(--grid);border-radius:12px;padding:12px;color:var(--mut);font-size:14px}
 .sel{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 10px}.chk{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}.chk input{width:18px;height:18px}.chk i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.btn{font:inherit;font-size:14px;padding:8px 14px;border-radius:11px;border:1px solid #ffffff1f;background:#ffffff0d;color:var(--fg);transition:background .12s,transform .08s}
+.btn:hover{background:#ffffff18}.btn:active{transform:scale(.97)}
+.btn.pri{background:color-mix(in srgb,var(--pl) 80%,#fff 0%);border-color:transparent;color:#0b0f0d;font-weight:650}
+.btn.danger{border-color:color-mix(in srgb,var(--bad) 60%,transparent);color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.btn.sq{width:38px;padding:8px 0;font-size:18px;line-height:1}
+.btn:disabled{opacity:.45;pointer-events:none}
+/* styring */
+.fl{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.fb{background:#ffffff0d;border:1px solid #ffffff14;border-radius:999px;padding:6px 14px;font-size:14px;color:var(--mut)}
+.fb.on{background:color-mix(in srgb,var(--acc) 22%,transparent);border-color:var(--acc);color:var(--fg)}.fb.rf{margin-left:auto}
+.gh{margin:20px 2px 8px}
+.dg{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.dc{--pl:var(--acc);position:relative;display:flex;flex-direction:column;gap:6px;background:linear-gradient(160deg,#1f2825,#161c1a);border:1px solid #ffffff0d;border-radius:18px;padding:13px;transition:border-color .2s,box-shadow .2s}
+.dc.on{border-color:color-mix(in srgb,var(--pl) 55%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--pl) 25%,transparent),0 8px 26px color-mix(in srgb,var(--pl) 14%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--pl) 16%,#1f2825),#161c1a)}
+.dc-top{display:flex;align-items:center;gap:9px}
+.dc-ic{width:32px;height:32px;border-radius:10px;background:#ffffff10;display:grid;place-items:center;flex:none;color:var(--mut)}
+.dc.on .dc-ic{background:color-mix(in srgb,var(--pl) 30%,transparent);color:var(--pl)}
+.dc-ic svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;height:19px}
+.dc-nm{min-width:0;line-height:1.2}.dc-nm b{display:block;font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dc-nm span{font-size:11px;color:var(--mut)}
+.dc-dot{width:9px;height:9px;border-radius:50%;background:#59615d;margin-left:auto;flex:none}
+.dc.ok .dc-dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}.dc.warn .dc-dot{background:var(--warn);box-shadow:0 0 8px var(--warn)}.dc.bad .dc-dot{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+.dc-st{font-size:26px;font-weight:650;letter-spacing:-.02em;line-height:1.1;margin-top:2px;font-variant-numeric:tabular-nums}
+.dc-sub{font-size:12px;color:var(--mut);min-height:16px}
+.dc-ctl{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:4px}
+.dc-btns{display:flex;gap:6px;flex-wrap:wrap}.dc-btns .btn{flex:1;min-width:70px;padding:9px 8px}
+.stp{display:grid;grid-template-columns:38px 1fr 38px;gap:6px;align-items:center}
+.stp .sv{text-align:center;font-weight:600;font-variant-numeric:tabular-nums}.stp [data-sset]{grid-column:1/-1}
+.dc.busy::after{content:"";position:absolute;inset:0;border-radius:18px;background:linear-gradient(100deg,transparent 30%,#ffffff14 50%,transparent 70%);background-size:200% 100%;animation:sh 1.1s linear infinite;pointer-events:none}
+@keyframes sh{from{background-position:200% 0}to{background-position:-200% 0}}
+/* toast og bekreftelse */
+.toast{position:fixed;left:50%;transform:translate(-50%,10px);bottom:96px;z-index:40;background:#1d2623;border:1px solid #ffffff1c;border-radius:14px;padding:10px 16px;font-size:14px;box-shadow:0 12px 32px #000b;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100% - 28px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}.toast.bad{border-color:var(--bad);color:var(--bad)}.toast.warn{border-color:var(--warn)}
+.ov{position:fixed;inset:0;z-index:50;background:#000a;display:flex;align-items:flex-end;justify-content:center;animation:fi .15s}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.sheet{background:#151b19;border:1px solid #ffffff1a;border-radius:22px 22px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));width:100%;max-width:480px;animation:up .18s}
+@keyframes up{from{transform:translateY(30px)}to{transform:none}}
+.sheet p{margin:0 0 16px;font-size:17px;white-space:pre-line}.sheet .row{display:flex;gap:10px}.sheet .btn{flex:1;padding:13px}
+@media(min-width:700px){.ov{align-items:center}.sheet{border-radius:22px}.dg{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}}
 </style>
 </head>
 <body>
-<header><h1>Smarthus</h1>
-<label class="s">Periode for grafer <select id="range"><option value="24">Siste 24 timer</option><option value="72">Siste 3 dager</option><option value="168" selected>Siste 7 dager</option><option value="336">Siste 14 dager</option></select></label></header>
+<div class="top"><div class="brand"><span class="logo"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h14V10"/></svg></span>Smarthus</div>
+<div id="rw"><label class="s">Grafer <select id="range"><option value="24">24 timer</option><option value="72">3 dager</option><option value="168" selected>7 dager</option><option value="336">14 dager</option></select></label><div class="s" id="upd"></div></div></div>
 <nav class="nav" id="nav"></nav>
+<div class="toast" id="toast"></div>
 <main id="main">Laster…</main>
 <details class="mini" style="margin-top:20px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Døgn regnes som de siste 24 timene. Kostnad per kWh er et anslag på 1,1 kr med Norgespris, nett og avgifter. Siden oppdateres omtrent hvert 15. minutt.</p></details>
 <script>
@@ -71,6 +127,53 @@ const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div c
 const grid=h=>`<div class="cards">${h}</div>`;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const el=(h)=>{const d=document.createElement('div');d.innerHTML=h;return d};
+const ICO={grid:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+ sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+ city:'<path d="M4 20V9l5-3v14M9 20V4l7 3v13M16 20v-8l4 2v6M3 20h18"/>',
+ house:'<path d="M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6"/>',
+ leaf:'<path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19c3-5 6-8 10-10"/>',
+ lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+ mower:'<rect x="3" y="10" width="14" height="6" rx="2"/><circle cx="7" cy="18" r="2"/><circle cx="15" cy="18" r="2"/><path d="M17 12h4M8 10V6h4"/>',
+ drop:'<path d="M12 3c4 5 6 8 6 11a6 6 0 01-12 0c0-3 2-6 6-11z"/>',
+ power:'<path d="M12 3v8M7.5 6.5a7 7 0 109 0"/>',
+ bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
+ fan:'<circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7 2 0 2 3 0 5M14 12c4 0 7 1 7 4 0 2-3 2-5 0M12 14c0 4-1 7-4 7-2 0-2-3 0-5M10 12c-4 0-7-1-7-4 0-2 3-2 5 0"/>',
+ flame:'<path d="M12 3c1 4 5 6 5 11a5 5 0 01-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4 0-7 1-10z"/>',
+ wind:'<path d="M3 9h11a3 3 0 10-3-3M3 15h15a3 3 0 11-3 3M3 12h7"/>',
+ car:'<path d="M5 17V7a2 2 0 012-2h6a2 2 0 012 2v10M4 20h12M15 9h2a2 2 0 012 2v5a1.5 1.5 0 003 0V9l-2-2"/>'};
+const icon=n=>`<svg viewBox="0 0 24 24" aria-hidden="true">${ICO[n]||ICO.power}</svg>`;
+const sleep=ms=>new Promise(z=>setTimeout(z,ms));
+const lastOf=a=>a&&a.length?a[a.length-1]:null;
+const BUSY={},PEND={};
+let _toastT=null;
+function toast(t,tone){const e=document.getElementById('toast');if(!e)return;e.textContent=t;e.className='toast show'+(tone?' '+tone:'');clearTimeout(_toastT);_toastT=setTimeout(()=>{e.className='toast'},tone==='bad'?7000:4500)}
+function ask(text,okLabel){return new Promise(res=>{const o=document.createElement('div');o.className='ov';
+ o.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><p></p><div class="row"><button class="btn" data-n>Avbryt</button><button class="btn pri" data-y></button></div></div>`;
+ o.querySelector('p').textContent=text;o.querySelector('[data-y]').textContent=okLabel||'Ja, utfør';
+ const done=v=>{document.removeEventListener('keydown',kd);o.remove();res(v)},kd=e=>{if(e.key==='Escape')done(false)};
+ o.onclick=e=>{if(e.target===o)done(false)};o.querySelector('[data-n]').onclick=()=>done(false);o.querySelector('[data-y]').onclick=()=>done(true);
+ document.addEventListener('keydown',kd);document.body.appendChild(o);o.querySelector('[data-y]').focus()})}
+function softRender(){clearTimeout(softRender.t);softRender.t=setTimeout(()=>{const a=document.activeElement;
+ if(a&&/^(SELECT|INPUT)$/.test(a.tagName)&&a.closest&&a.closest('#main')){softRender();return}
+ const y=scrollY;render();scrollTo(0,y)},80)}
+function setBusy(k,v){if(v)BUSY[k]=1;else delete BUSY[k];softRender()}
+/* ---------- live status: skriv ny tilstand inn i dataene, så alle visninger viser det samme ---------- */
+function pushRow(c,patch,ts){const l=lastOf(c&&c.rows);if(!l)return false;if(ts&&new Date(ts)<=new Date(l.t))return false;
+ Object.keys(patch).forEach(k=>patch[k]===undefined&&delete patch[k]);
+ if(!Object.keys(patch).length||Object.keys(patch).every(k=>l[k]===patch[k]))return false;
+ c.rows.push(Object.assign({},l,patch,{t:ts||new Date().toISOString()}));return true}
+const injAq=(did,s,ts)=>{const d=AQ&&(AQ.devices||[]).find(x=>x.did===did);return !!d&&!!s&&pushRow(d,{on:s.on==null?undefined:s.on,power:s.power==null?undefined:s.power},ts)};
+const injShelly=(id,s,ts)=>{const c=SH&&(SH.channels||[]).find(x=>x.id===id);return !!c&&!!s&&pushRow(c,{on:s.on==null?undefined:!!s.on,w:s.power==null?undefined:s.power},ts)};
+const injAdax=(id,target,ts)=>{const c=AX&&(AX.rooms||[]).find(x=>String(x.id)===String(id));return !!c&&target!=null&&pushRow(c,{target},ts)};
+const injGd=(id,state)=>{const c=GD&&(GD.devices||[]).find(x=>x.id===id);return !!c&&state!=null&&pushRow(c,{act:state})};
+const injZp=(id,m)=>{const c=ZP&&(ZP.chargers||[]).find(x=>x.id===id);return !!c&&m!=null&&pushRow(c,{m})};
+const injMt=(serial,j)=>{const c=MT&&(MT.thermostats||[]).find(x=>String(x.serial)===String(serial));return !!c&&pushRow(c,{mode:j.mode==null?undefined:j.mode,set:j.set==null?undefined:j.set})};
+function injNested(c,patch){const l=lastOf(c&&c.rows);if(!l)return false;Object.keys(patch).forEach(k=>patch[k]===undefined&&delete patch[k]);const d=l.d||{};
+ if(!Object.keys(patch).length||Object.keys(patch).every(k=>d[k]===patch[k]))return false;c.rows.push(Object.assign({},l,{d:Object.assign({},d,patch),t:new Date().toISOString(),av:true}));return true}
+const injDk=p=>injNested(((HM&&HM.devices)||[]).find(c=>c.kind==='daikin'),p);
+const injMower=(dv,status)=>{const c=((HM&&HM.devices)||[]).find(x=>x.kind==='mower'&&(dv==='a3'?/A3/:/A1/).test(x.name));return !!c&&!!status&&injNested(c,{mower_status:String(status)})};
+function injHp(patch){const r=ALL.filter(x=>x.kind==='heatpump'),l=lastOf(r);if(!l)return false;Object.keys(patch).forEach(k=>patch[k]===undefined&&delete patch[k]);const p=l.props||{};
+ if(!Object.keys(patch).length||Object.keys(patch).every(k=>p[k]===patch[k]))return false;ALL.push(Object.assign({},l,{ts:new Date().toISOString(),props:Object.assign({},p,patch)}));return true}
 function sec(key,title,sub,body,o={}){
  const d=document.createElement('details');d.className='sec';const k=TAB+'/'+key;
  d.open=k in OPEN?OPEN[k]:o.open!==false;
@@ -150,9 +253,9 @@ function homeyCard(c){if(c.kind==='mower')return mowerCard(c);const l=c.rows[c.r
  else if(c.kind==='mower'){const st=Object.entries(d).find(([k,v])=>typeof v==='string'&&/state|status|mode/i.test(k));main=st?String(st[1]).replace(/_/g,' '):(d.measure_battery!=null?nf(d.measure_battery,0)+' %':'–')}
  const extra=Object.entries(d).filter(([k])=>k!=='locked'&&!(c.kind==='lock'&&k==='alarm_contact')&&!HIDE.test(k)&&!(c.kind==='daikin'&&k==='measure_temperature')&&!(c.kind==='mower'&&k==='mower_status')).slice(0,6).map(([k,v])=>(HNAME[k]||k.replace(/^(measure_|alarm_|meter_)/,'').replace(/^temperature\./,'').replace(/_/g,' '))+': '+(typeof v==='boolean'?(v?'ja':'nei'):typeof v==='number'?nf(v,v%1?1:0):String(v).replace(/_/g,' '))).join(' · ');
  return `<div class="tile"><div class="s">${esc(c.name)}</div><div class="n" style="font-size:24px">${main}</div><div class="s">${extra}</div><div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}</div></div>`}
-function ctlBtns(key,items){return '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+items.map(([t,o])=>`<button onclick='act(this,${JSON.stringify(o).replace(/'/g,"&#39;")})' style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${t}</button>`).join('')+`</div><div class="s" data-am="${key}"></div>`}
+function ctlBtns(key,items){return '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+items.map(([t,o])=>`<button onclick='act(this,${JSON.stringify(o).replace(/'/g,"&#39;")})' class="btn">${t}</button>`).join('')+`</div><div class="s" data-am="${key}"></div>`}
 function adaxCtl(c,cur){const o=[];for(let v=5;v<=30;v++)o.push(v);if(!o.includes(cur))o.push(cur);o.sort((a,b)=>a-b);
- return `<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===cur?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick="adaxSet(this,'${c.id}','${esc(String(c.name).replace(/['\\]/g,''))}')" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Sett</button></div><div class="s" data-am="a${c.id}"></div>`}
+ return `<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><select>${o.map(v=>`<option value="${v}"${v===cur?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick="adaxSet(this,'${c.id}','${esc(String(c.name).replace(/['\\]/g,''))}')" class="btn">Sett</button></div><div class="s" data-am="a${c.id}"></div>`}
 function adaxSet(b,id,name){const v=Number(b.previousElementSibling.value);act(b,{act:'adax',room:id,target:v,q:name+': sette innstilt temperatur til '+nf(v,v%1?1:0)+' °C?'})}
 function gardenaCard(c){const l=c.rows[c.rows.length-1],off=l.link==='OFFLINE';
  const main=c.kind==='sensor'?(l.temp==null?'–':nf(l.temp,0)+' °C jord'):(l.act==='CLOSED'?'Ventil lukket':l.act||'–');
@@ -207,12 +310,12 @@ function mowerCard(c){const l=c.rows[c.rows.length-1],stale=Date.now()-new Date(
  <div class="legend" style="margin-top:6px">${Object.keys(MLAB).filter(x=>sg.some(g=>g.k===x)).map(x=>`<span><i class="dot" style="background:${MCOL[x]};width:10px;height:10px"></i>${MLAB[x]}</span>`).join('')}</div>
  ${mowCtl(c)}<div class="s"${stale?' style="color:#d8a747"':''}>${stale?'Frakoblet · ':''}oppdatert ${ago(l.t)}${l.av===false?'':''}</div></div>`}
 function mowCtl(c){const dv=/A3/.test(c.name)?'a3':/A1/.test(c.name)?'a1':null;if(!dv)return '';const n=c.name;
- return `<div class="s" data-ms="${dv}" style="margin-top:8px">Nåstatus: henter fra Homey …</div>`+ctlBtns('h'+dv,[['Start klipping',{act:'homey',dev:dv,cmd:'start',q:n+': starte klipping?'}],['Fortsett',{act:'homey',dev:dv,cmd:'resume',q:n+': fortsette klippingen?'}],['Hjem til lader',{act:'homey',dev:dv,cmd:'dock',q:n+': sende klipperen tilbake til ladestasjonen?'}]])}
+ return ctlBtns('h'+dv,[['Start klipping',{act:'homey',dev:dv,cmd:'start',q:n+': starte klipping?'}],['Fortsett',{act:'homey',dev:dv,cmd:'resume',q:n+': fortsette klippingen?'}],['Hjem til lader',{act:'homey',dev:dv,cmd:'dock',q:n+': sende klipperen tilbake til ladestasjonen?'}]])}
 function daikinCtl(c){const d=(c.rows[c.rows.length-1].d)||{},cur=typeof d.target_temperature==='number'?d.target_temperature:21,o=[];for(let v=16;v<=30;v+=0.5)o.push(v);if(!o.includes(cur))o.push(cur);o.sort((a,b)=>a-b);
- const bs='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer';
- return `<div class="tile"><div class="s">Styring Daikin</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"on",q:"Slå på Daikin?"})' style="${bs}">På</button><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"off",q:"Slå av Daikin?"})' style="${bs}">Av</button><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===cur?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick="daikinSet(this)" style="${bs}">Sett</button></div><div class="s" data-am="hdaikin"></div></div>`}
-function hpCtl(cur){const bs='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer',o=[];for(let v=5;v<=80;v++)o.push(v);const c=typeof cur==='number'?cur:45;
- return `<div class="tile"><div class="s">Styring varmepumpe</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick='act(this,{act:"tuya",cmd:"on",q:"Slå på varmepumpa i Arendal?"})' style="${bs}">På</button><button onclick='act(this,{act:"tuya",cmd:"off",q:"Slå av varmepumpa i Arendal?"})' style="${bs}">Av</button><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===c?' selected':''}>${v} °C</option>`).join('')}</select><button onclick="hpSet(this)" style="${bs}">Sett</button></div><div class="s" data-am="htuya"></div></div>`}
+ return `<div class="tile"><div class="s">Styring Daikin</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"on",q:"Slå på Daikin?"})' class="btn">På</button><button onclick='act(this,{act:"homey",dev:"daikin",cmd:"off",q:"Slå av Daikin?"})' class="btn">Av</button><select>${o.map(v=>`<option value="${v}"${v===cur?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick="daikinSet(this)" class="btn">Sett</button></div><div class="s" data-am="hdaikin"></div></div>`}
+function hpCtl(cur){
+ const o=[];for(let v=5;v<=80;v++)o.push(v);const c=typeof cur==='number'?cur:45;
+ return `<div class="tile"><div class="s">Styring varmepumpe</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick='act(this,{act:"tuya",cmd:"on",q:"Slå på varmepumpa i Arendal?"})' class="btn">På</button><button onclick='act(this,{act:"tuya",cmd:"off",q:"Slå av varmepumpa i Arendal?"})' class="btn">Av</button><select>${o.map(v=>`<option value="${v}"${v===c?' selected':''}>${v} °C</option>`).join('')}</select><button onclick="hpSet(this)" class="btn">Sett</button></div><div class="s" data-am="htuya"></div></div>`}
 function hpSet(b){const v=Number(b.previousElementSibling.value);act(b,{act:'tuya',cmd:'temp',value:v,q:'Varmepumpe Arendal: sette innstilt temperatur til '+v+' °C?'})}
 function daikinSet(b){const v=Number(b.previousElementSibling.value);act(b,{act:'homey',dev:'daikin',cmd:'temp',value:v,q:'Daikin: sette innstilt temperatur til '+nf(v,v%1?1:0)+' °C?'})}
 function lockHist(c){const since=Date.now()-hours*3600000,R=c.rows.filter(r=>new Date(r.t).getTime()>since);if(!R.length)return '';
@@ -220,9 +323,10 @@ function lockHist(c){const since=Date.now()-hours*3600000,R=c.rows.filter(r=>new
  const un=sg.filter(x=>x.k==='u').reduce((a,x)=>a+(x.t1-x.t0),0);
  return `<div class="tile" style="grid-column:1/-1"><div class="s">${esc(c.name)}: låsestatus siste ${hours>=168?Math.round(hours/24)+' dager':hours+' timer'}</div>${strip(sg,{l:'#3f6b4a',u:'#e08363'},{l:'Låst',u:'Ulåst'})}
  <div class="s" style="margin-top:6px">${ch.length?`${ch.length} endringer, ulåst totalt ${mins(un)}. Siste: ${ch.slice(-3).reverse().map(x=>(x.k==='u'?'låst opp ':'låst ')+fmt(new Date(x.t))).join(' · ')}`:'Ingen endringer, låst hele perioden'}</div></div>`}
-function mtCtl(t,l){const bs='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer',o=[];for(let v=10;v<=35;v+=0.5)o.push(v);const c=l.set!=null?l.set:(l.room!=null?Math.round(l.room*2)/2:21);if(!o.includes(c))o.push(c);o.sort((a,b)=>a-b);const sr=JSON.stringify(t.serial);
+function mtCtl(t,l){
+ const o=[];for(let v=10;v<=35;v+=0.5)o.push(v);const c=l.set!=null?l.set:(l.room!=null?Math.round(l.room*2)/2:21);if(!o.includes(c))o.push(c);o.sort((a,b)=>a-b);const sr=JSON.stringify(t.serial);
  if(!t.serial)return '';
- return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#222;color:inherit">${o.map(v=>`<option value="${v}"${v===c?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick='mtSet(this,${sr},${esc(JSON.stringify(t.name))})' style="${bs}">Sett manuelt</button><button onclick='act(this,{act:"microtemp",serial:${sr},cmd:"schedule",q:"${String(t.name).replace(/["\\]/g,'')}: gå tilbake til timeplan?"})' style="${bs}">Timeplan</button></div><div class="s" data-am="mt${t.serial}"></div>`}
+ return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select>${o.map(v=>`<option value="${v}"${v===c?' selected':''}>${nf(v,v%1?1:0)} °C</option>`).join('')}</select><button onclick='mtSet(this,${sr},${esc(JSON.stringify(t.name))})' class="btn">Sett manuelt</button><button onclick='act(this,{act:"microtemp",serial:${sr},cmd:"schedule",q:"${String(t.name).replace(/["\\]/g,'')}: gå tilbake til timeplan?"})' class="btn">Timeplan</button></div><div class="s" data-am="mt${t.serial}"></div>`}
 function mtSet(b,serial,name){const v=Number(b.previousElementSibling.value);act(b,{act:'microtemp',serial,cmd:'temp',value:v,q:name+': sette temperaturen manuelt til '+nf(v,v%1?1:0)+' °C?'})}
 function saDevs(){if(!SA)return[];const o=[];(SA.gateways||[]).forEach(g=>(g.devices||[]).forEach(d=>{const h=d.history||{},dt=d.details||{};const last=k=>{const a=h[k];return a&&a.length?a[0]:null};const ct=last('current_temperature');if(!ct)return;const sc=x=>{const n=Number(x);return Math.abs(n)>100?n/100:n},hs=last('heating_setpoint'),hu=last('humidity'),rs=last('running_state');let heat=null;if(rs){try{const j=typeof rs[1]==='string'?JSON.parse(rs[1]):rs[1];heat=!!(j&&j.heating)}catch(e){}}o.push({name:dt.name||d.code,on:dt.connected!==false,t:sc(ct[1]),at:ct[0],set:hs?sc(hs[1]):null,hum:hu?Number(hu[1]):null,heat,series:(h.current_temperature||[]).map(r=>({t:new Date(r[0]).getTime(),v:sc(r[1])})).reverse()})}));return o}
 function saBlock(pl){if(pl!=='arendal'||!SA)return null;const D=saDevs();if(!D.length)return SA.error?{html:waiting('Salus: '+SA.error),draw:()=>{},sub:'feil'}:null;
@@ -292,7 +396,7 @@ function secHage(pl){let h='',sub=[];const g=gdList(pl),m=hmList(pl,'mower');
  if(!h)return null;return sec('hage',pl==='drivhus'?'Vanning':'Hage',sub.join(' · '),el(h),{open:pl==='drivhus'||m.length>0})}
 function secLaas(pl){const L=hmList(pl,'lock');if(!L.length)return null;
  const st=L.map(c=>{const d=c.rows[c.rows.length-1].d||{};return d.locked===false?'ulåst':'låst'});
- const dn=pl==='oslo'?['terrasse','Terrasedør']:pl==='arendal'?['inngang','Inngangsdør']:null;const tc=dn&&L.find(c=>c.name===dn[1]);const bs0='font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer';const btn=tc?`<div class="tile"><div class="s">${dn[1]} (Yale)</div><div style="margin-top:8px"><button onclick="lockTerrasse(this,false,'${dn[0]}')" style="${bs0}">Lås</button> <button onclick="lockTerrasse(this,true,'${dn[0]}')" style="${bs0}">Lås opp</button></div><div class="s" data-pm="${dn[0]}"></div></div>`:'';
+ const dn=pl==='oslo'?['terrasse','Terrasedør']:pl==='arendal'?['inngang','Inngangsdør']:null;const tc=dn&&L.find(c=>c.name===dn[1]);const btn=tc?`<div class="tile"><div class="s">${dn[1]} (Yale)</div><div style="margin-top:8px"><button onclick="lockTerrasse(this,false,'${dn[0]}')" class="btn">Lås</button> <button onclick="lockTerrasse(this,true,'${dn[0]}')" class="btn">Lås opp</button></div><div class="s" data-pm="${dn[0]}"></div></div>`:'';
  return sec('laas','Lås og dører',L.map((c,i)=>c.name+' '+st[i]).join(' · '),el(grid(L.map(homeyCard).join('')+btn+L.map(lockHist).join(''))),{open:false})}
 function secPlan(key,title,t){return sec(key,title,'ikke koblet ennå',el(waiting(t)),{open:false})}
 function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===pl;
@@ -306,7 +410,7 @@ function secKjokken(pl){let h='',sub=[];const mine=d=>placeOf(d.site,d.name)===p
 function secAqara(pl){if(!AQ)return null;const D=(AQ.devices||[]).filter(d=>placeOf(d.site,d.name)===pl);
  if(!D.length)return AQ.error&&pl==='drivhus'?sec('aqara','Drivhus Oslo (Aqara)',AQ.error,el(waiting('Aqara: '+AQ.error)),{open:false}):null;
  const cards=D.map(d=>{const l=d.rows[d.rows.length-1];const parts=[];if(l.temp!=null)parts.push(nf(l.temp,1)+' °C');if(l.hum!=null)parts.push(nf(l.hum,0)+' % fukt');if(l.power!=null)parts.push(nf(l.power,0)+' W');
-  return `<div class="tile"><div class="s">${esc(d.name)}</div><div class="n" data-bn="${d.did}">${parts[0]||(l.on==null?'–':l.on?'På':'Av')}</div><div class="s" data-bs="${d.did}" data-kwh="${l.kwh!=null?nf(l.kwh,2):''}">${parts.slice(1).join(' · ')}${l.on!=null?(parts.length>1?' · ':'')+(l.on?'på':'av'):''}${l.kwh!=null?' · '+nf(l.kwh,2)+' kWh totalt':''}</div><div class="s">oppdatert ${ago(l.t)}</div>${PLUGS[d.did]?`<div style="margin-top:8px;display:flex;gap:6px"><button onclick="plug('${d.did}',true,this)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">På</button><button onclick="plug('${d.did}',false,this)" style="font:inherit;padding:5px 12px;border-radius:6px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">Av</button></div><div class="s" data-pm="${d.did}"></div><div class="s" data-lv="${d.did}"></div>`:''}</div>`}).join('');
+  return `<div class="tile"><div class="s">${esc(d.name)}</div><div class="n" data-bn="${d.did}">${parts[0]||(l.on==null?'–':l.on?'På':'Av')}</div><div class="s" data-bs="${d.did}" data-kwh="${l.kwh!=null?nf(l.kwh,2):''}">${parts.slice(1).join(' · ')}${l.on!=null?(parts.length>1?' · ':'')+(l.on?'på':'av'):''}${l.kwh!=null?' · '+nf(l.kwh,2)+' kWh totalt':''}</div><div class="s">oppdatert ${ago(l.t)}</div>${PLUGS[d.did]?`<div style="margin-top:8px;display:flex;gap:6px"><button onclick="plug('${d.did}',true,this)" class="btn">På</button><button onclick="plug('${d.did}',false,this)" class="btn">Av</button></div><div class="s" data-pm="${d.did}"></div><div class="s" data-lv="${d.did}"></div>`:''}</div>`}).join('');
  return sec('aqara'+pl,'Drivhus Oslo (Aqara)',D.length+' enheter',el(grid(cards)),{open:false})}
 function secDrivTemp(){
  const since=()=>Date.now()-hours*3600000;let k=0;
@@ -321,7 +425,8 @@ function secDrivTemp(){
   drawLine('ch-dt','leg-dt','tb-dt',S.filter(s=>sel[s.name]!==false).map(s=>({...s,pts:s.pts.filter(p=>p.t>s0)})).filter(s=>s.pts.length),'t','°C',FROST,1)};
  return sec('dtemp','Temperaturer i alle drivhus',all.length+' målere',b,{open:true,draw})}
 function placeView(pl){const w=document.createElement('div');
- const list=[pl==='drivhus'?secDrivTemp():null,secKlima(pl),secVarme(pl),secStrom(pl),pl==='drivhus'?secShelly():null,secHage(pl),secLaas(pl),secKjokken(pl),secAqara(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
+ w.appendChild(placeHero(pl));
+ const list=[pl==='drivhus'?secDrivTemp():null,secKlima(pl),secVarme(pl),secStrom(pl),secHage(pl),pl==='drivhus'?secShelly():null,secAqara(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
  if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
@@ -379,26 +484,96 @@ function secSystemer(){
  const ic={ok:'<span class="ok">● koblet</span>',wait:'<span class="warn">● venter</span>',todo:'<span class="s">○ mangler</span>'};
  return sec('sys','Datakilder',rows.filter(r=>r[1]==='ok').length+' av '+rows.length+' koblet',el('<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td>${ic[r[1]]}</td><td class="s">${r[2]}</td></tr>`).join('')+'</table>'),{open:false})}
 function overview(){const w=document.createElement('div'),A=alerts();
- w.appendChild(el(lede()));
+ const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Hjemme nå</h1><span class="chip ${A.some(a=>a.lvl==='bad')?'bad':A.some(a=>a.lvl!=='info')?'warn':'ok'}">${A.filter(a=>a.lvl!=='info').length?A.filter(a=>a.lvl!=='info').length+(A.filter(a=>a.lvl!=='info').length===1?' varsel':' varsler'):'Alt OK'}</span></div>${lede().replace('class="lede"','class="lede" style="margin:10px 0 0"')}</div>`);w.appendChild(hero);
  const AA=alerts(true),real=A.filter(a=>a.lvl!=='info'),hidn=AA.filter(a=>a.hid);
  const ic={bad:'<span class="bad">⚠</span>',warn:'<span class="warn">▲</span>',info:'<span class="s">ⓘ</span>'};
  const ab=el((A.length?A.map(a=>`<div class="al">${ic[a.lvl]}<span style="flex:1">${a.txt}<span class="s"> · ${PLACES[a.pl]}</span></span><button class="x" data-k="${a.k}" title="Skjul dette varselet">Skjul</button></div>`).join(''):'<div class="s">Ingen varsler.</div>')
   +(hidn.length?`<details class="mini"><summary>${hidn.length} skjulte</summary>${hidn.map(a=>`<div class="al"><span class="s" style="flex:1">${a.txt} · ${PLACES[a.pl]}</span><button class="x" data-k="${a.k}" data-show="1">Vis igjen</button></div>`).join('')}</details>`:''));
  ab.querySelectorAll('button.x').forEach(b=>b.onclick=()=>{const h=ls.get('sh-hid',{});if(b.dataset.show)delete h[b.dataset.k];else h[b.dataset.k]=1;ls.set('sh-hid',h);render()});
- w.appendChild(sec('alerts','Varsler',real.length?real.length+(real.length===1?' varsel':' varsler'):'alt ser normalt ut',ab,{open:real.length>0||A.length>0}));
+ const alertSec=sec('alerts','Varsler',real.length?real.length+(real.length===1?' varsel':' varsler'):'alt ser normalt ut',ab,{open:real.length>0});
+ if(real.length)w.appendChild(alertSec);
  const cards=el(`<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">${['oslo','arendal','drivhus'].map(p=>placeCard(p,A)).join('')}</div>`);
  cards.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));w.appendChild(cards);
+ if(!real.length)w.appendChild(alertSec);
  const hs=((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length);
  if(hs.length)w.appendChild(sec('kwh','Strømforbruk',hs.map(h=>nf(pwStats(h).k24,0)+' kWh '+PLACES[placeOf(h.site,h.name)]).join(' · '),el(grid(hs.map(h=>{const s=pwStats(h);return tile(h.name+' siste 24 t',nf(s.k24,1),'kWh')+tile(h.name+' 7 dager',nf(s.k7,1),'kWh')}).join('')))));
  w.appendChild(secSystemer());return w}
+/* ---------- styring: kompakte kort for alle styrbare enheter ---------- */
+const GRP=['Dører','Hage og vanning','Varme','Lys og stikk','Elbil'],PLORD={oslo:0,arendal:1,drivhus:2};
+const mowLab=I=>{const d=I.d,k=I.last.k;return k==='docked'?(String(d.charging_status||'').includes('complete')?'På lader (full)':String(d.charging_status||'')==='charging'?'Lader':'På lader'):MLAB[k]};
+function devs(){const D=[],HMd=(HM&&HM.devices)||[],sub=(...a)=>a.filter(Boolean).join(' · ');
+ [['oslo','terrasse','Terrasedør'],['arendal','inngang','Inngangsdør']].forEach(([pl,door,nm])=>{const c=HMd.find(x=>x.name===nm&&x.kind==='lock'),l=lastOf(c&&c.rows);if(!l)return;
+  const d=l.d||{},locked=d.locked!==false;
+  D.push({key:'lk:'+door,grp:'Dører',pl,name:nm,ic:'lock',on:locked,tone:locked?'ok':'warn',st:locked?'Låst':'Ulåst',sub:sub(d.alarm_contact?'Dørsensor: åpen':'','oppdatert '+ago(l.t)),
+   btns:[locked?{t:'Lås opp',cls:'danger',run:()=>lockTerrasse(null,true,door)}:{t:'Lås',cls:'pri',run:()=>lockTerrasse(null,false,door)}]})});
+ HMd.filter(c=>c.kind==='mower'&&c.rows.length).forEach(c=>{const dv=/A3/.test(c.name)?'a3':/A1/.test(c.name)?'a1':null,I=dv&&mowerInfo(c);if(!I)return;
+  const k=I.last.k,l=lastOf(c.rows),bat=I.d.measure_battery,q=t=>c.name+': '+t;
+  const go=(cmd,txt,t,cls)=>({t,cls,run:()=>act(null,{act:'homey',dev:dv,cmd,q:q(txt)})});
+  const home=go('dock','sende klipperen tilbake til ladestasjonen?','Hjem til lader',k==='mowing'||k==='returning'?'pri':''),start=go('start','starte klipping?','Start klipping','pri'),resume=go('resume','fortsette klippingen?','Fortsett','pri');
+  const btns=k==='mowing'||k==='returning'?[home]:k==='paused'?[resume,home]:k==='error'?[home]:k==='unknown'?[start,home]:[start];
+  D.push({key:'mw:'+dv,grp:'Hage og vanning',pl:placeOf(c.site,c.name),name:c.name,ic:'mower',on:k==='mowing'||k==='returning',tone:k==='error'?'bad':k==='mowing'?'ok':k==='paused'?'warn':'',st:mowLab(I),sub:sub(bat!=null?'Batteri '+nf(bat,0)+' %':'',I.stuck?'⚠ '+I.stuck:'oppdatert '+ago(l.t)),btns})});
+ ((GD&&GD.devices)||[]).filter(c=>c.kind==='valve'&&c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),off=l.link==='OFFLINE',open=!!l.act&&l.act!=='CLOSED';
+  D.push({key:'gd:'+c.id,grp:'Hage og vanning',pl:placeOf(c.site,c.name),name:c.name,ic:'drop',on:!off&&open,tone:off?'warn':open?'ok':'',st:off?'Frakoblet':open?'Vanner':'Lukket',sub:sub(l.batt!=null?'Batteri '+l.batt+' %':'','oppdatert '+ago(l.t)),
+   btns:off?[]:[open?{t:'Stopp',cls:'danger',run:()=>act(null,{act:'gardena',id:c.id,cmd:'stop',q:'Stoppe vanning: '+c.name+'?'})}:{t:'Vann 10 min',cls:'pri',run:()=>act(null,{act:'gardena',id:c.id,cmd:'start',minutes:10,q:'Starte vanning i 10 minutter: '+c.name+'?'})}]})});
+ ((AX&&AX.rooms)||[]).filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.target==null)return;
+  D.push({key:'ax:'+c.id,grp:'Varme',pl:placeOf(c.home,c.name),name:c.name,ic:'flame',on:!!l.on,st:l.temp==null?'–':nf(l.temp,1)+' °C',sub:sub('Panelovn · innstilt '+nf(l.target,1)+' °C',l.on?'':'av','oppdatert '+ago(l.t)),
+   step:{v:l.target,min:5,max:30,s:1,u:'°C',set:v=>act(null,{act:'adax',room:c.id,target:v,q:c.name+': sette innstilt temperatur til '+nf(v,v%1?1:0)+' °C?'})}})});
+ ((MT&&MT.thermostats)||[]).filter(t=>t.serial&&t.rows.length).forEach(t=>{const l=lastOf(t.rows),cur=l.set!=null?l.set:(l.room!=null?Math.round(l.room*2)/2:21);
+  D.push({key:'mt:'+t.serial,grp:'Varme',pl:placeOf(t.site,t.name),name:t.name,ic:'flame',on:!!l.heat,st:l.room==null?'–':nf(l.room,1)+' °C',sub:sub('Gulvvarme',l.mode===3?'manuell '+nf(l.set,1)+' °C':l.mode===1?'følger timeplan':'modus '+l.mode,'oppdatert '+ago(l.t)),
+   btns:[{t:'Timeplan',run:()=>act(null,{act:'microtemp',serial:t.serial,cmd:'schedule',q:t.name+': gå tilbake til timeplan?'})}],
+   step:{v:cur,min:10,max:35,s:.5,u:'°C',set:v=>act(null,{act:'microtemp',serial:t.serial,cmd:'temp',value:v,q:t.name+': sette temperaturen manuelt til '+nf(v,v%1?1:0)+' °C?'})}})});
+ HMd.filter(c=>c.kind==='daikin'&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),d=l.d||{},on=d.onoff,cur=typeof d.target_temperature==='number'?d.target_temperature:21;
+  const sw=v=>({t:v?'Slå på':'Slå av',cls:v?'pri':'danger',run:()=>act(null,{act:'homey',dev:'daikin',cmd:v?'on':'off',q:v?'Slå på Daikin?':'Slå av Daikin?'})});
+  D.push({key:'dk',grp:'Varme',pl:placeOf(c.site,c.name),name:c.name||'Daikin',ic:'wind',on:on===true,st:d.measure_temperature!=null?nf(d.measure_temperature,1)+' °C':(on===true?'På':on===false?'Av':'–'),sub:sub('Varmepumpe',on===true?'på':on===false?'av':'','innstilt '+nf(cur,1)+' °C','oppdatert '+ago(l.t)),
+   btns:on===true?[sw(false)]:on===false?[sw(true)]:[sw(true),sw(false)],
+   step:{v:cur,min:16,max:30,s:.5,u:'°C',set:v=>act(null,{act:'homey',dev:'daikin',cmd:'temp',value:v,q:'Daikin: sette innstilt temperatur til '+nf(v,v%1?1:0)+' °C?'})}})});
+ {const r=hpRows(),l=lastOf(r);if(l){const p=l.p,on=p.switch===true,cur=typeof p.temp_set==='number'?p.temp_set:45;
+  D.push({key:'hp',grp:'Varme',pl:'arendal',name:'Varmepumpe',ic:'wind',on,tone:p.fault?'warn':'',st:on?(p.compressor_state===true?'Går':'På'):'Av',sub:sub('Innstilt '+nf(cur,0)+' °C',p.temp_bottom!=null?'retur '+nf(p.temp_bottom,0)+' °C':'','oppdatert '+ago(l.t)),
+   btns:[on?{t:'Slå av',cls:'danger',run:()=>act(null,{act:'tuya',cmd:'off',q:'Slå av varmepumpa i Arendal?'})}:{t:'Slå på',cls:'pri',run:()=>act(null,{act:'tuya',cmd:'on',q:'Slå på varmepumpa i Arendal?'})}],
+   step:{v:cur,min:5,max:80,s:1,u:'°C',set:v=>act(null,{act:'tuya',cmd:'temp',value:v,q:'Varmepumpe Arendal: sette innstilt temperatur til '+v+' °C?'})}})}}
+ ((AQ&&AQ.devices)||[]).filter(d=>PLUGS[d.did]&&d.rows.length).forEach(d=>{const l=lastOf(d.rows),on=l.on===true,nm=PLUGS[d.did];
+  D.push({key:'aq:'+d.did,grp:'Lys og stikk',pl:placeOf(d.site,d.name),name:d.name,ic:/lys/i.test(nm)?'bulb':/vent/i.test(nm)?'fan':'flame',on,st:on?'På':'Av',sub:sub(on&&l.power!=null?nf(l.power,0)+' W':'','oppdatert '+ago(l.t)),
+   btns:[on?{t:'Slå av',cls:'danger',run:()=>plug(d.did,false)}:{t:'Slå på',cls:'pri',run:()=>plug(d.did,true)}]})});
+ shList().filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),on=!!l.on;
+  D.push({key:'sh:'+c.id,grp:'Lys og stikk',pl:'drivhus',name:c.name,ic:/lys/i.test(c.name)?'bulb':/vifte|vent/i.test(c.name)?'fan':'power',on,st:on?'På':'Av',sub:sub(on&&l.w!=null?nf(l.w,0)+' W':'','oppdatert '+ago(l.t)),
+   btns:[on?{t:'Slå av',cls:'danger',run:()=>act(null,{act:'shelly',cid:c.id,ch:c.ch,on:false,q:'Slå AV '+c.name+'?'})}:{t:'Slå på',cls:'pri',run:()=>act(null,{act:'shelly',cid:c.id,ch:c.ch,on:true,q:'Slå PÅ '+c.name+'?'})}]})});
+ ((ZP&&ZP.chargers)||[]).filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),m=l.m,chg=m===3,lab=l.on===0?'Frakoblet':ZMODE[m]||'Ukjent';
+  D.push({key:'zp:'+c.id,grp:'Elbil',pl:placeOf(c.site,c.name),name:c.name||'Lader',ic:'car',on:chg,st:lab,sub:sub(chg&&l.w!=null?nf(l.w/1000,1)+' kW':'',l.kwh!=null?nf(l.kwh,1)+' kWh denne økten':'','oppdatert '+ago(l.t)),
+   btns:l.on===0||m===1?[]:[chg?{t:'Pause lading',cls:'danger',run:()=>act(null,{act:'zaptec',id:c.id,cmd:'pause',q:'Pause ladingen?'})}:{t:'Fortsett lading',cls:'pri',run:()=>act(null,{act:'zaptec',id:c.id,cmd:'resume',q:'Fortsette ladingen?'})}]})});
+ return D}
+function stCard(d){const k=d.key,bz=!!BUSY[k],dis=bz?' disabled':'';
+ const stp=d.step?`<div class="stp"><button class="btn sq" data-sd="-1"${dis} aria-label="Ned">−</button><span class="sv"></span><button class="btn sq" data-sd="1"${dis} aria-label="Opp">+</button><button class="btn pri" data-sset${dis}>Sett</button></div>`:'';
+ const bt=(d.btns||[]).map((b,i)=>`<button class="btn ${b.cls||''}" data-i="${i}"${dis}>${esc(b.t)}</button>`).join('');
+ const e=el(`<div class="dc ${d.on?'on':''} ${d.tone||''} ${bz?'busy':''}" style="--pl:var(--${d.pl})"><div class="dc-top"><span class="dc-ic">${icon(d.ic)}</span><div class="dc-nm"><b>${esc(d.name)}</b><span>${PLACES[d.pl]}</span></div><i class="dc-dot"></i></div><div class="dc-st">${esc(d.st)}</div><div class="dc-sub">${esc(d.sub||'')}</div>${bt||stp?`<div class="dc-ctl">${stp}${bt?`<div class="dc-btns">${bt}</div>`:''}</div>`:''}</div>`).firstChild;
+ e.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>d.btns[+b.dataset.i].run(b));
+ if(d.step){const S=d.step,sv=e.querySelector('.sv'),setB=e.querySelector('[data-sset]'),cur=()=>PEND[k]!=null?PEND[k]:S.v;
+  const paint=()=>{sv.textContent=nf(cur(),S.s%1?1:0)+' '+S.u;setB.disabled=bz||Math.abs(cur()-S.v)<1e-9};paint();
+  e.querySelectorAll('[data-sd]').forEach(b=>b.onclick=()=>{PEND[k]=Math.min(S.max,Math.max(S.min,Math.round((cur()+(+b.dataset.sd)*S.s)*100)/100));paint()});
+  setB.onclick=()=>{const v=cur();delete PEND[k];S.set(v)}}
+ return e}
+async function refreshLive(){toast('Henter status …');await Promise.all([livePlugs().catch(()=>{}),mowerLive().catch(()=>{})]);softRender();toast('Status oppdatert '+new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}))}
+function styringView(){const w=document.createElement('div'),D=devs(),pf=ls.get('sh-spl','alle');
+ const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Styring</h1><span class="chip">${D.length} enheter</span></div><div class="hi">Status nå og knapper. Oppdateres av seg selv.</div><div class="fl">${['alle','oslo','arendal','drivhus'].map(p=>`<button class="fb ${pf===p?'on':''}" data-p="${p}">${p==='alle'?'Alle':PLACES[p]}</button>`).join('')}<button class="fb rf" id="rf">Oppdater</button></div></div>`);
+ hero.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ls.set('sh-spl',b.dataset.p);render()});hero.querySelector('#rf').onclick=refreshLive;w.appendChild(hero);
+ const G={};D.filter(d=>pf==='alle'||d.pl===pf).forEach(d=>(G[d.grp]=G[d.grp]||[]).push(d));
+ if(!Object.keys(G).length)w.appendChild(el(waiting('Ingen styrbare enheter funnet ennå.')));
+ GRP.forEach(g=>{if(!G[g])return;w.appendChild(el(`<h3 class="gh">${g}</h3>`));const gr=document.createElement('div');gr.className='dg';
+  G[g].sort((a,b)=>(PLORD[a.pl]-PLORD[b.pl])||a.name.localeCompare(b.name,'nb')).forEach(d=>gr.appendChild(stCard(d)));w.appendChild(gr)});
+ return w}
+function placeHero(pl){const A=alerts().filter(a=>a.pl===pl&&a.lvl!=='info'),S=sensors(pl),chips=[];
+ const t=S.map(s=>lastOf(s.rows).temp).filter(x=>x!=null);if(t.length)chips.push(['Snitt temperatur',nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C']);
+ const pu=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl),pr=pu&&pu.enabled?lastOf(pu.rows):null;if(pr&&pr.w!=null)chips.push(['Effekt nå',nf(pr.w,0)+' W']);
+ const cls=A.length?(A.some(a=>a.lvl==='bad')?'bad':'warn'):'ok';
+ return el(`<div class="hero"><div class="hl"><span class="hd"></span><h1>${PLACES[pl]}</h1><span class="chip ${cls}">${A.length?A.length+(A.length===1?' varsel':' varsler'):'Alt OK'}</span></div>${chips.length?`<div class="hc">${chips.map(([l,v])=>`<div class="hk"><span>${l}</span><b>${v}</b></div>`).join('')}</div>`:''}</div>`)}
 /* ---------- app ---------- */
-const TABS=[['oversikt','Oversikt'],['oslo','Oslo'],['arendal','Arendal'],['drivhus','Drivhus']];
+const TABS=[['oversikt','Oversikt','grid'],['styring','Styring','sliders'],['oslo','Oslo','city'],['arendal','Arendal','house'],['drivhus','Drivhus','leaf']];
 function go(t){TAB=t;history.replaceState(null,'','#'+t);render();scrollTo(0,0)}
 function nav(){const n=alerts().filter(a=>a.lvl!=='info').length;
- document.getElementById('nav').innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${k===TAB?'on':''}">${l}${k==='oversikt'&&n?`<span class="pill w">${n}</span>`:''}</button>`).join('');
+ document.getElementById('nav').innerHTML=TABS.map(([k,l,ic])=>`<button data-t="${k}" class="${k===TAB?'on':''}">${icon(ic)}<span>${l}</span>${k==='oversikt'&&n?`<span class="pill w">${n}</span>`:''}</button>`).join('');
  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.t))}
-function render(){if(!TABS.some(t=>t[0]===TAB))TAB='oversikt';nav();const m=document.getElementById('main');m.innerHTML='';
- m.appendChild(TAB==='oversikt'?overview():placeView(TAB));
+function render(){if(!TABS.some(t=>t[0]===TAB))TAB='oversikt';nav();document.body.dataset.tab=TAB;const m=document.getElementById('main');m.innerHTML='';
+ m.appendChild(TAB==='oversikt'?overview():TAB==='styring'?styringView():placeView(TAB));
+ {const u=document.getElementById('upd'),mx=ALL.reduce((a,r)=>{const t=new Date(r.ts).getTime();return t>a?t:a},0);if(u)u.textContent=mx?'Data '+ago(mx):''}
  m.querySelectorAll('details.sec').forEach(d=>{if(d.open&&d._draw)d._draw()})}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
@@ -414,64 +589,60 @@ async function getTok(){const isJ=t=>typeof t==='string'&&t.split('.').length===
  return isJ(t)?t:null}
 async function ctlCall(method,body,q){const t=await getTok();if(!t)return{ok:false,status:401,j:{error:'ikke innlogget'}};
  try{const r=await fetch(CTL_URL+(q||''),{method,headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return{ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}}catch(e){return{ok:false,status:0,j:{error:'ingen kontakt'}}}}
-function applyTile(did,s,ts){const bn=document.querySelector('[data-bn="'+did+'"]'),bt=document.querySelector('[data-bs="'+did+'"]');if(!s||!bn||!bt)return;bn.textContent=s.power!=null?nf(s.power,0)+' W':(s.on==null?'–':s.on?'På':'Av');const kw=bt.dataset.kwh;bt.textContent=(s.on==null?'':s.on?'på':'av')+(kw?(s.on==null?'':' · ')+kw+' kWh totalt':'')+' · '+(ts?'sist sjekket '+new Date(ts).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}):'oppdatert nå')}
 function injectLock(s,nm){const d=((HM&&HM.devices)||[]).find(x=>x.name===(nm||'Terrasedør'));if(!d||!d.rows||!d.rows.length||!s||!s.ts)return false;
  const last=d.rows[d.rows.length-1];if(new Date(s.ts)<=new Date(last.t))return false;
  d.rows.push({d:Object.assign({},last.d,{locked:!!s.on}),t:s.ts,av:true});return true}
-async function mowerLive(){for(const dv of ['a1','a3']){const e=document.querySelector('[data-ms="'+dv+'"]');if(!e)continue;
- const r=await ctlCall('POST',{act:'homey',dev:dv,cmd:'status'});const e2=document.querySelector('[data-ms="'+dv+'"]');if(!e2)continue;
- e2.textContent=r.ok&&r.j.status?'Nåstatus: '+String(r.j.status).replace(/_/g,' ')+' (kl. '+new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'})+')':'Nåstatus: ingen svar fra Homey ('+(r.j.error||'timeout')+')'}}
-async function livePlugs(){const g=await ctlCall('GET',undefined,'?cached=1');if(!(g.ok&&g.j.plugs))return;
- {let ch=injectLock(g.j.plugs.terrasse);ch=injectLock(g.j.plugs.inngang,'Inngangsdør')||ch;if(ch)render()}
- for(const [did,s] of Object.entries(g.j.plugs)){if(did.startsWith('adax:')){const id=did.slice(5),c=AX&&(AX.rooms||[]).find(x=>String(x.id)===id),last=c&&c.rows&&c.rows.length?new Date(c.rows[c.rows.length-1].t).getTime():0;if(s.ts&&new Date(s.ts).getTime()>last)applyAdax(id,s);continue}
-  if(did.startsWith('shelly:')){const id=did.slice(7),c=SH&&(SH.channels||[]).find(x=>x.id===id),last=c&&c.rows&&c.rows.length?new Date(c.rows[c.rows.length-1].t).getTime():0;if(s.ts&&new Date(s.ts).getTime()>last)applyShelly(id,s);continue}
-  const d=AQ&&(AQ.devices||[]).find(x=>x.did===did);const last=d&&d.rows&&d.rows.length?new Date(d.rows[d.rows.length-1].t).getTime():0;
-  if(s.ts&&new Date(s.ts).getTime()>last)applyTile(did,s,s.ts)}}
-async function plug(did,on,b){const nm=PLUGS[did];if(!nm)return;if(!confirm('Slå '+(on?'PÅ ':'AV ')+nm+'?'))return;
- const msg=document.querySelector('[data-pm="'+did+'"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
+const hhmmNow=()=>new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+async function mowerLive(){let ch=false;
+ for(const dv of ['a1','a3']){const r=await ctlCall('POST',{act:'homey',dev:dv,cmd:'status'});if(r.ok&&r.j.status&&injMower(dv,r.j.status))ch=true}
+ if(ch)softRender()}
+async function livePlugs(){const g=await ctlCall('GET',undefined,'?cached=1');if(!(g.ok&&g.j.plugs))return;let ch=false;
+ for(const [k,s] of Object.entries(g.j.plugs)){if(!s)continue;
+  if(k==='terrasse'){if(injectLock(s))ch=true}
+  else if(k==='inngang'){if(injectLock(s,'Inngangsdør'))ch=true}
+  else if(k.startsWith('adax:')){if(injAdax(k.slice(5),s.power,s.ts))ch=true}
+  else if(k.startsWith('shelly:')){if(injShelly(k.slice(7),{on:s.on,power:s.power},s.ts))ch=true}
+  else if(injAq(k,s,s.ts))ch=true}
+ if(ch)softRender()}
+const LIVE={};
+async function plug(did,on){const nm=PLUGS[did],k='aq:'+did;if(!nm||BUSY[k])return;
+ if(!await ask('Slå '+(on?'PÅ ':'AV ')+nm+'?',on?'Slå på':'Slå av'))return;
+ LIVE[did]=(LIVE[did]||0)+1;const my=LIVE[did];setBusy(k,1);toast('Sender …');
  const r=await ctlCall('POST',{did,on});
- if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);bs.forEach(x=>x.disabled=false);return}
- msg.textContent='Sendt. Sjekker …';await new Promise(z=>setTimeout(z,2000));
- const lv=document.querySelector('[data-lv="'+did+'"]');
+ if(!r.ok){setBusy(k,0);toast('Feilet: '+(r.j.error||r.status),'bad');return}
+ await sleep(2000);
  const one=async()=>{const g=await ctlCall('GET',undefined,'?did='+did);return g.ok&&g.j.plugs&&g.j.plugs[did]};
- const st=await one();
- msg.textContent=st&&st.on!=null?(st.on===on?'Bekreftet: '+(on?'på':'av'):'Enheten svarte ikke ennå (står '+(st.on?'på':'av')+')'):'Sendt (kunne ikke bekrefte)';
- bs.forEach(x=>x.disabled=false);
- const tile=s=>applyTile(did,s);
- const show=s=>{tile(s);if(lv&&s)lv.textContent='Sanntid: '+(s.power!=null?nf(s.power,0)+' W':'–')+' · '+(s.on==null?'ukjent':s.on?'på':'av')+' ('+new Date().toLocaleTimeString('nb-NO')+')'};
- show(st);
- if(on){const my=lv&&(lv._run=(lv._run||0)+1);for(let i=0;i<24&&lv&&lv._run===my&&document.body.contains(lv);i++){await new Promise(z=>setTimeout(z,5000));if(lv._run!==my)break;const s2=await one();if(!s2||s2.on===false){show(s2);break}show(s2)}}
- else if(lv){lv._run=(lv._run||0)+1}}
-async function lockTerrasse(b,unlock,door){door=door||'terrasse';const nm=door==='inngang'?'Inngangsdør':'Terrasedør',tc=(HM&&HM.devices||[]).find(x=>x.name===nm),d=tc&&tc.rows&&tc.rows.length?tc.rows[tc.rows.length-1].d||{}:{};
- if(unlock){if(!confirm('Låse OPP '+(door==='inngang'?'inngangsdøren':'terrassedøren')+'?'))return}
- else if(!confirm('Låse '+(door==='inngang'?'inngangsdøren':'terrassedøren')+'?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':'')))return;
- const msg=document.querySelector('[data-pm="'+door+'"]'),bs=b.parentNode.querySelectorAll('button');bs.forEach(x=>x.disabled=true);msg.textContent='Sender …';
- const t0=Date.now()-2000,want=!unlock;const r=await ctlCall('POST',unlock?{lock:door,unlock:true}:{lock:door});
- if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);bs.forEach(x=>x.disabled=false);return}
- msg.textContent='Sendt til Homey. Venter på statusrapport …';
- for(let i=0;i<10;i++){await new Promise(z=>setTimeout(z,3000));const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs[door];
-  if(s&&s.ts&&new Date(s.ts).getTime()>t0){const tm=new Date(s.ts).toLocaleTimeString('nb-NO');const txt=(!!s.on)===want?'Bekreftet: '+(s.on?'låst':'ulåst')+' ('+tm+')':(s.on?'Døren står fortsatt låst':'Døren står fortsatt ulåst')+' ('+tm+')';
-   injectLock(s,nm);render();const m2=document.querySelector('[data-pm="'+door+'"]');if(m2)m2.textContent=txt;return}}
- msg.textContent='Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.';bs.forEach(x=>x.disabled=false)}
-function applyAdax(id,s){const e=document.querySelector('[data-at="'+id+'"]');if(e&&s&&s.power!=null)e.textContent=nf(s.power,1)}
-function applyShelly(id,s){const e=document.querySelector('[data-sn="'+id+'"]');if(e&&s)e.textContent=(s.on?'På':'Av')+(s.power!=null?' · '+nf(s.power,0)+' W':'')}
-async function act(b,o){if(!confirm(o.q||'Utføre?'))return;const body=Object.assign({},o);delete body.q;delete body.cid;
- const key=o.act==='microtemp'?'mt'+o.serial:o.act==='tuya'?'tuya':o.act==='homey'?'h'+o.dev:o.act==='shelly'?'s'+o.cid:o.act==='adax'?'a'+o.room:o.act==='gardena'?'g'+o.id:'z'+o.id;
- const bs=b.parentNode.querySelectorAll('button'),msg=b.parentNode.nextElementSibling;bs.forEach(x=>x.disabled=true);if(msg)msg.textContent='Sender …';
- const r=await ctlCall('POST',body);bs.forEach(x=>x.disabled=false);
- if(!msg)return;
- if(!r.ok){msg.textContent='Feilet: '+(r.j.error||r.status);return}
- const j=r.j,tm=new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});let t;
- if(o.act==='shelly'&&j.state!=null)applyShelly(o.cid,{on:j.state,power:j.power});
- if(o.act==='adax'){const e=document.querySelector('[data-at="'+o.room+'"]');if(e)e.textContent=nf(o.target,1)}
- if(o.act==='shelly')t=j.state==null?'Sendt (kunne ikke bekrefte)':j.state===o.on?'Bekreftet: '+(o.on?'på':'av'):'Enheten svarte ikke ennå (står '+(j.state?'på':'av')+')';
- else if(o.act==='adax')t=j.state!=null&&Math.abs(j.state-o.target)<0.01?'Bekreftet: innstilt '+nf(j.state,1)+' °C':'Sendt til Adax. Ovnen kan bruke litt tid på å følge etter';
- else if(o.act==='gardena')t=o.cmd==='start'?(j.state&&j.state!=='CLOSED'?'Bekreftet: vanner':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå'):(j.state==='CLOSED'?'Bekreftet: stoppet':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå');
- else if(o.act==='microtemp')t=j.mode===3?'Bekreftet: manuell, '+nf(j.set,1)+' °C':j.mode===1?'Bekreftet: følger timeplan':'Sendt. Modus nå '+j.mode;
- else if(o.act==='tuya')t='Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+j.temp+' °C':'');
- else if(o.act==='homey')t=j.status?(o.dev==='daikin'?'Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+nf(j.temp,1)+' °C':''):'Klipperen melder: '+String(j.status).replace(/_/g,' ')):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt';
- else t=o.cmd==='pause'?(j.state===5?'Bekreftet: pauset':'Sendt. Laderen viser modus '+j.state+' ennå'):(j.state===3?'Bekreftet: lader':'Sendt. Laderen viser modus '+j.state+' ennå');
- msg.textContent=t+' ('+tm+')'}
+ const st=await one();let t;
+ if(st&&st.on!=null){injAq(did,st);t=st.on===on?'Bekreftet: '+nm+' er '+(on?'på':'av'):'Enheten svarte ikke ennå (står '+(st.on?'på':'av')+')'}else t='Sendt (kunne ikke bekrefte)';
+ setBusy(k,0);toast(t+' ('+hhmmNow()+')',st&&st.on===on?'':'warn');
+ if(on&&st&&st.on){for(let i=0;i<24&&LIVE[did]===my;i++){await sleep(5000);if(LIVE[did]!==my)break;const s2=await one();if(!s2)break;if(injAq(did,s2))softRender();if(s2.on===false)break}}}
+async function lockTerrasse(b,unlock,door){door=door||'terrasse';const nm=door==='inngang'?'Inngangsdør':'Terrasedør',k='lk:'+door,tc=(HM&&HM.devices||[]).find(x=>x.name===nm),d=lastOf(tc&&tc.rows)?lastOf(tc.rows).d||{}:{};
+ if(BUSY[k])return;const dn=door==='inngang'?'inngangsdøren':'terrassedøren';
+ const ok=unlock?await ask('Låse OPP '+dn+'?','Lås opp'):await ask('Låse '+dn+'?'+(d.alarm_contact?'\n\nObs: dørsensoren melder at døren kan stå åpen. Låsing mot åpen dør kan skade låsen.':''),'Lås');
+ if(!ok)return;
+ setBusy(k,1);toast('Sender til Homey …');
+ const t0=Date.now()-2000,want=!unlock,r=await ctlCall('POST',unlock?{lock:door,unlock:true}:{lock:door});
+ if(!r.ok){setBusy(k,0);toast('Feilet: '+(r.j.error||r.status),'bad');return}
+ for(let i=0;i<10;i++){await sleep(3000);const g=await ctlCall('GET',undefined,'?cached=1');const s=g.ok&&g.j.plugs&&g.j.plugs[door];
+  if(s&&s.ts&&new Date(s.ts).getTime()>t0){const tm=new Date(s.ts).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+   injectLock(s,nm);setBusy(k,0);
+   toast((!!s.on)===want?'Bekreftet: '+nm+' er '+(s.on?'låst':'ulåst')+' ('+tm+')':nm+' står fortsatt '+(s.on?'låst':'ulåst')+' ('+tm+')',(!!s.on)===want?'':'warn');return}}
+ setBusy(k,0);toast('Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.','warn')}
+async function act(b,o){const key=o.act==='microtemp'?'mt:'+o.serial:o.act==='tuya'?'hp':o.act==='homey'?(o.dev==='daikin'?'dk':'mw:'+o.dev):o.act==='shelly'?'sh:'+o.cid:o.act==='adax'?'ax:'+o.room:o.act==='gardena'?'gd:'+o.id:'zp:'+o.id;
+ if(BUSY[key])return;if(!await ask(o.q||'Utføre?'))return;const body=Object.assign({},o);delete body.q;delete body.cid;
+ setBusy(key,1);toast('Sender …');
+ const r=await ctlCall('POST',body);
+ if(!r.ok){setBusy(key,0);toast('Feilet: '+(r.j.error||r.status),'bad');return}
+ const j=r.j;let t;
+ if(o.act==='shelly'){if(j.state!=null)injShelly(o.cid,{on:j.state,power:j.power});t=j.state==null?'Sendt (kunne ikke bekrefte)':j.state===o.on?'Bekreftet: '+(o.on?'på':'av'):'Enheten svarte ikke ennå (står '+(j.state?'på':'av')+')'}
+ else if(o.act==='adax'){injAdax(o.room,j.state!=null?j.state:o.target);t=j.state!=null&&Math.abs(j.state-o.target)<0.01?'Bekreftet: innstilt '+nf(j.state,1)+' °C':'Sendt til Adax. Ovnen kan bruke litt tid på å følge etter'}
+ else if(o.act==='gardena'){if(j.state)injGd(o.id,j.state);t=o.cmd==='start'?(j.state&&j.state!=='CLOSED'?'Bekreftet: vanner':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå'):(j.state==='CLOSED'?'Bekreftet: stoppet':'Sendt. Ventilen viser '+(j.state||'ukjent')+' ennå')}
+ else if(o.act==='microtemp'){injMt(o.serial,j);t=j.mode===3?'Bekreftet: manuell, '+nf(j.set,1)+' °C':j.mode===1?'Bekreftet: følger timeplan':'Sendt. Modus nå '+j.mode}
+ else if(o.act==='tuya'){injHp({switch:j.on===undefined?undefined:!!j.on,temp_set:j.temp==null?undefined:j.temp});t='Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+j.temp+' °C':'')}
+ else if(o.act==='homey'){if(o.dev==='daikin'){injDk({onoff:j.on==null?undefined:!!j.on,target_temperature:j.temp==null?undefined:j.temp});t=j.status?'Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+nf(j.temp,1)+' °C':''):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt'}
+  else{if(j.status)injMower(o.dev,j.status);t=j.status?'Klipperen melder: '+String(j.status).replace(/_/g,' '):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt'}}
+ else{if(j.state!=null)injZp(o.id,j.state);t=o.cmd==='pause'?(j.state===5?'Bekreftet: pauset':'Sendt. Laderen viser modus '+j.state+' ennå'):(j.state===3?'Bekreftet: lader':'Sendt. Laderen viser modus '+j.state+' ennå')}
+ setBusy(key,0);toast(t+' ('+hhmmNow()+')',/^(Bekreftet|Klipperen melder)/.test(t)?'':'warn')}
 window.act=act;window.daikinSet=daikinSet;window.hpSet=hpSet;window.mtSet=mtSet;
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
@@ -479,7 +650,7 @@ const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
 function loginScreen(msg,out){const m=document.getElementById('main');
  m.innerHTML=`<div style="max-width:340px;margin:70px auto;text-align:center"><h2 style="margin:0 0 6px">Smarthus</h2><p class="s" style="margin:0 0 20px">${msg||'Logg inn for å se dataene.'}</p><button id="lg" style="font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${out?'Logg ut':'Logg inn med Google'}</button></div>`;
  document.getElementById('lg').onclick=async()=>{try{if(out){await AUTHC.signOut();location.reload()}else await AUTHC.signIn.social({provider:'google',callbackURL:location.origin+location.pathname})}catch(e){loginScreen('Feil: '+(e&&e.message||e))}}}
-function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa])=>{SA=sa;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000)}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa])=>{SA=sa;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
  const lo=document.createElement('p');lo.className='s';lo.style.textAlign='center';lo.innerHTML='<a href="#" id="lo">Logg ut</a>';document.body.appendChild(lo);document.getElementById('lo').onclick=async e=>{e.preventDefault();try{await AUTHC.signOut()}catch(x){}location.reload()}}
 (async()=>{const m=document.getElementById('main');m.textContent='Laster …';
  try{AUTHC=(await import('https://esm.sh/@neon/auth@0.8.2')).createAuthClient(AUTH_URL)}catch(e){loginScreen('Kunne ikke laste innloggingen. Prøv igjen senere.');return}
