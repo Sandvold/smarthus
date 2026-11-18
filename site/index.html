@@ -42,9 +42,6 @@ details.mini{margin-top:8px;color:var(--mut);font-size:13px}table{border-collaps
 .pc:hover{border-color:var(--acc)}.pc h2{display:flex;justify-content:space-between;align-items:center}
 .pc div{font-size:14px;margin-top:3px}
 .al{display:flex;gap:8px;padding:6px 0;font-size:15px;border-bottom:1px solid var(--grid)}.al:last-child{border:0;}.al .x{background:none;border:1px solid var(--grid);border-radius:8px;color:var(--mut);padding:2px 10px;cursor:pointer;font-size:13px;align-self:center}
-.todo label{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--grid);align-items:flex-start;cursor:pointer}
-.todo input[type=checkbox]{width:20px;height:20px;margin-top:2px;flex:none}
-.todo .d .x{text-decoration:line-through;color:var(--mut)}
 .add{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.add input{flex:1;min-width:200px}
 .add button{background:var(--acc);color:#111;border:0;border-radius:8px;padding:8px 16px;cursor:pointer}
 .empty{border:1px dashed var(--grid);border-radius:10px;padding:12px;color:var(--mut);font-size:14px}
@@ -394,176 +391,14 @@ function overview(){const w=document.createElement('div'),A=alerts();
  const hs=((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length);
  if(hs.length)w.appendChild(sec('kwh','Strømforbruk',hs.map(h=>nf(pwStats(h).k24,0)+' kWh '+PLACES[placeOf(h.site,h.name)]).join(' · '),el(grid(hs.map(h=>{const s=pwStats(h);return tile(h.name+' siste 24 t',nf(s.k24,1),'kWh')+tile(h.name+' 7 dager',nf(s.k7,1),'kWh')}).join('')))));
  w.appendChild(secSystemer());return w}
-/* ---------- gjøremål ---------- */
-
-const CTRL=[
- ['Gardena: klippere og vannstyring','Arendal og Oslo','l','Lett',
-  'Status, batteri og tilkobling (har vi allerede).',
-  'Start klipping (valgfri varighet), gjenoppta timeplan, parker til neste oppgave, parker til videre beskjed. Ventiler på Water Control: åpne med varighet og lukke.',
-  'Vi har allerede nøkkel og innlogging. Kommandoene er enkle POST-kall. «Parker til videre beskjed» kansellerer timeplanen, så den bør ha en bekreftelse.',
-  'Gardena har fire klippekommandoer, og ventiler kan åpnes med varighet.','42-1,46-1,45-1,49-1'],
- ['Dreame-klipper','Homey','m','Middels',
-  'Status og batteri via Homey (har vi).',
-  'Start, pause, gjenoppta og returner til lading. Appen MOVA & Dreame Mower for Homey har flowkort for dette, og også for klippehøyde.',
-  'Går via Homey (Web API eller en flow vi trigger). Jeg vet ikke hvilken Homey-app du bruker til Dreame, og appen finnes som testversjon, så dette må avklares.',
-  'Flowkortene for å returnere til lading, pause og gjenoppta finnes i appen.','193-1,206-1,200-1'],
- ['Daikin varmepumpe','Oslo, via Homey','m','Middels',
-  'Temperatur inne og ute, innstilling og energimåler (har vi).',
-  'På/av, måltemperatur og modus via Homey-appen Daikin ONECTA.',
-  'Fungerer ulikt for ulike modeller. Brukere melder om problemer med å sette temperatur på Altherma. Jeg vet ikke hvilken modell du har, så vi må teste.',
-  'ONECTA-appen har kort for å sette temperatur og modus.','220-1,212-1,211-1,215-1'],
- ['Yale-låser','Homey','m','Middels, men følsomt',
-  'Låst/ulåst og historikk (har vi).',
-  'Låse og låse opp via Homey Yale Access-appen.',
-  'Teknisk likt andre Homey-enheter. Siden er i dag offentlig, så åpne-knappen bør ikke komme før innlogging er på plass. Å bare låse er tryggere å starte med.',
-  'Homey-integrasjonen støtter fjernlåsing.','246-1,250-1'],
- ['Adax panelovner','Oslo og Arendal','l','Lett',
-  'Måltemperatur og romtemperatur (har vi).',
-  'Sette måltemperatur per rom. Generasjon 2 har også lokal API.',
-  'Vi har allerede cloud-nøkler. Temperatur sendes i hundredeler grader (2400 = 24 °C). Skyen kan være forsinket.',
-  'Adax API: set_room_target_temperature.','74-1,80-1,71-1,82-1'],
- ['Smart Life (Tuya): termostat i drivhus og varmepumpe','Arendal','m','Middels',
-  'Temperatur, innstilling og batteri (har vi). Varmepumpen rapporterer 0 W.',
-  'Sende kommandoer med POST mot /commands. Hvilke kommandoer som finnes, avhenger av enheten.',
-  'Noen enheter tillater bare på/av via skyen, ikke temperatur, så vi må hente enhetens instruksjonssett først. Kvoten er 26 000 kall i måneden, og vi bruker 3 per kjøring.',
-  'Brukere melder at skyen av og til bare lar dem slå på og av.','158-1,157-1,162-1'],
- ['Shelly: 4-punkts stikk','Oppvarmet drivhus','l','Lett',
-  'Effekt og status per kanal (har vi).',
-  'Slå hver kanal av og på, også med auto-av-timer (vekstlys, vifte, to uttak).',
-  'Enkleste styringen. Maks ett kall per sekund, så vi må sette kommandoer i kø.',
-  'Cloud-API har set/switch med timer.','140-1,148-1,152-1'],
- ['Aqara: stikk og viftestyring','Drivhus Oslo','l','Lett',
-  'Temperatur, fukt, effekt, energi og på/av (har vi, hver 15. min).',
-  'Slå stikkene av og på. Temperatur- og fuktsensoren og hubben kan bare leses.',
-  'En bruker bekrefter at lesing og skriving av 4.1.85 fungerer på samme stikkmodell som du har (lumi.plug.maeu01).',
-  'Skriving skjer med intent write.resource.device.','176-1,175-1'],
- ['Zaptec-lader','Arendal, to ladere','m','Middels',
-  'Effekt, modus og tilkoblingsstatus (har vi). Ingen bil koblet ennå, så visningen er ikke testet.',
-  'Pause og gjenoppta lading, avslutt økt og start laderen på nytt. Alternativt begrense strømstyrken.',
-  'Krever eier- eller servicetilgang. Brukeren du la inn må ha det. Bruk én metode om gangen, ikke både pause/gjenoppta og strømgrense. Pro-laderne trenger nyere fastvare.',
-  'Kommando 506 stopper, 507 gjenopptar, 10001 avslutter, 102 starter på nytt.','57-1,56-1,55-1'],
- ['Microtemp gulvvarme','Oslo','m','Middels, uoffisiell',
-  'Rom, gulv, innstilling og varmer eller ikke (har vi).',
-  'Sette manuell måltemperatur.',
-  'Det finnes ingen offisiell dokumentasjon, så API-et er reverse-engineeret og kan endres. Andre integrasjoner støtter å sette manuell måltemperatur, så det er sannsynlig, men uprøvd hos oss.',
-  'openHAB-bindingen har feltet for manuell måltemperatur.','227-1,224-1,233-1'],
- ['LG-ovn','Oslo','h','Vanskelig og risikabelt',
-  'Dukker opp, men viser ingen tilstand akkurat nå (trolig dvale).',
-  'Forvarm, start og stopp. Kokemodus som BAKE finnes i profilen.',
-  'Fjernstyring må være slått på i ovnen. Ovnen må settes opp for fjernstart ved panelet med lukket dør. Jeg har ikke verifisert at temperatur kan angis i selve kommandoen. Fjernstart av ovn er sikkerhetsfølsomt, så jeg anbefaler å starte med bare «stopp».',
-  'Profilen har PREHEATING, START og STOP.','89-1,93-1,99-1,94-1'],
- ['LG-vaskemaskin','Arendal','m','Middels',
-  'Status og antall programmer (har vi). Fjernstyring står i dag av.',
-  'Ikke undersøkt nok til å love noe. Fjernstart krever trolig at fjernstyring slås på på maskinen.',
-  'Jeg har ikke funnet dokumentasjon for akkurat denne modellen, så merk dette som uvisst.',
-  'openHAB-bindingen nevner fjernstart og stopp for vaskemaskiner.','90-1'],
- ['Miele-kjøleskap','Oslo','l','Lett når tilgang finnes',
-  'Venter på at Miele aktiverer klienten. Koden for innhenting er klar.',
-  'Sette måltemperatur, slå supercooling av og på, og party- og ferie-modus.',
-  'Den offisielle API-en er begrenset sammenlignet med Miele-appen, så noe i appen vil ikke finnes her. Selve kommandoen er et PUT-kall mot /actions.',
-  'Handlingen targetTemperature finnes for kjøleapparater.','119-1,110-1,105-1,108-1'],
- ['Tibber og Pulse','Oslo','l','Ikke aktuelt',
-  'Priser, forbruk per time og sanntidseffekt (har vi).',
-  'Ingenting å styre. Dette er bare lesing.',
-  'Strøm kan styres indirekte ved at vi slår av laster (varmekabler, lader) når prisen er høy.',
-  '','']
-]
-const CTRL_ORDER=[
- ['1. Innlogging og trygg bakside','Uten innlogging kan vi ikke ha knapper. Siden er statisk, og nøkler kan ikke ligge i den. Det trengs en liten tjeneste som holder nøklene og tar imot kommandoer.'],
- ['2. Enkle på/av','Aqara-stikk og Shelly. Lav risiko og rask nytte.'],
- ['3. Klippere og vanning','Gardena start, parker og ventiler. Så Dreame via Homey.'],
- ['4. Zaptec','Pause og gjenoppta lading, når bil er koblet til slik at vi kan teste.'],
- ['5. Varme','Adax, Microtemp, Tuya-termostat og Daikin. Måltemperatur, med grenser så noe ikke kan settes ekstremt.'],
- ['6. Lås, ovn og kjøleskap','Sist, fordi de er mest følsomme. Start med å låse og stoppe, ikke åpne og starte.']
-];
-const CTRL_ARK=[
- ['Hvor bor nøklene?','Nøklene ligger i dag som GitHub-secrets. En offentlig statisk side kan ikke bruke dem. Jeg vurderer at en liten tjeneste i skyen, for eksempel en Cloudflare Worker bak Cloudflare Access (innlogging), er den enkleste løsningen. Dette er min vurdering og ikke noe jeg har sjekket mot dokumentasjon i dag.'],
- ['Hurtighet','Kommandoer rett fra tjenesten til leverandørens sky tar noen sekunder. Å gå via GitHub Actions eller en kø som Homey henter fra, tar fra ca. ett minutt og oppover. Min anbefaling er direkte kall.'],
- ['Homey som felles inngang','Homey Web API er en HTTP-API for å styre enheter og starte flows, men krever en egen server eller frontend. Det kan dekke Daikin, Yale og Dreame med ett oppsett. Tilgang skjer med et personlig token, lokalt på nettverket eller via skyen.'],
- ['Sikkerhetsregler','Bekreftelse for alt som er vanskelig å angre (åpne lås, ovn, «parker uten timeplan»). Grenser på temperaturer. Logg på alt som sendes. Ingen kommandoer fra siden før innlogging.']
-];
-const CTRL_SRC=[['Gardena API (kommandoer)','https://github.com/py-smart-gardena/hass-gardena-smart-system'],['Zaptec: kommandoer','https://docs.zaptec.com/reference/api_chargers_id_sendcommand_commandid_post'],['Zaptec: pause og gjenoppta','https://docs.zaptec.com/docs/approaches-to-start-and-stop-charging-during-a-session'],['Adax API','https://adax.no/wi-fi/api-development/'],['Shelly Cloud Control API','https://shelly-api-docs.shelly.cloud/cloud-control-api/communication-v2'],['Aqara: skriving av stikk (forum)','https://forum.aqara.com/t/request-to-open-open-api-resources-for-lumi-switch-agl009-lumi-switch-agl010-lumi-switch-agl011/308171'],['LG ThinQ: ovnsprofil','https://thinq.developer.lge.com/en/cloud/docs/thinq-connect/device-profile/Oven'],['Miele 3rd Party API','https://developer.miele.com/docs/general-concept'],['Homey Web API','https://api.developer.homey.app/llms-full.txt'],['Homey: MOVA & Dreame Mower','https://homey.app/en-ch/app/com.mova-dreame.mower/MOVA-&-Dreame-Mower/'],['Homey: Daikin ONECTA','https://homey.app/en-il/app/climate.onecta.daikin/']];
-function ctrlView(){const w=document.createElement('div');
- w.appendChild(el('<p class="s">Oversikt over hva vi kan lese og styre per enhet, hvor vanskelig det er og hva som er usikkert. Kildene er dokumentasjon og brukerrapporter fra nettet, ikke egne tester på dine enheter. Alt merket «usikkert» må prøves før vi lover det.</p>'));
- const arch=el('<div class="ct">'+CTRL_ARK.map(a=>`<p><b>${a[0]}.</b> ${a[1]}</p>`).join('')+'</div>');
- w.appendChild(sec('ctrl-ark','Hvordan styring kan bygges','Innlogging, hastighet og sikkerhet',arch,{open:true}));
- CTRL.forEach((c,i)=>{const [n,sted,lv,vtxt,les,styr,merk,hint]=c;
-  const b=el(`<div class="ct"><dl><dt>Sted</dt><dd>${sted}</dd><dt>Leser vi nå</dt><dd>${les}</dd><dt>Kan styres</dt><dd>${styr}</dd><dt>Vanskelighet</dt><dd>${vtxt}</dd><dt>Merknad</dt><dd>${merk}</dd></dl>${hint?`<div class="src">Støtte: ${hint}</div>`:''}</div>`);
-  w.appendChild(sec('ctrl'+i,n,`${vtxt} · ${sted}`,b,{open:false}))});
- w.appendChild(sec('ctrl-ord','Anbefalt rekkefølge','Fra enklest og tryggest',el('<div class="ct">'+CTRL_ORDER.map(o=>`<p><b>${o[0]}.</b> ${o[1]}</p>`).join('')+'</div>'),{open:true}));
- w.appendChild(sec('ctrl-kilder','Kilder','Dokumentasjon og forum',el('<div class="ct">'+CTRL_SRC.map(s=>`<p><a href="${s[1]}" target="_blank" rel="noopener">${s[0]}</a></p>`).join('')+'</div>'),{open:false}));
- return w}
-const TODO=[
- ['Datakilder','itc','Inkbird ITC-308 i innerdrivhuset','Ikke koblet til Tuya-prosjektet. Må legges til for å få temperatur og styring.'],
- ['Datakilder','mill','Mill-ovner','Finn ut hvilken generasjon. Gen 3 har lokalt API, ellers må det søkes om API-nøkkel.'],
- ['Datakilder','salus','Salus gulvvarme (Arendal)','Trenger modell på gateway og termostater. Kan kreve lokal relé i Arendal.'],
- ['Datakilder','pulse-ar','Tibber Pulse i Arendal','Pulse er aktiv i Oslo, men ikke i Arendal-hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'],
- ['Datakilder','hp-effekt','Effekt på varmepumpen i Arendal','Pumpen rapporterer 0 W. Trenger Pulse i Arendal og/eller en egen måler (for eksempel Shelly EM) på pumpens kurs. Pulse-historikk samles nå for kalibrering.'],
- ['Datakilder','miele','Miele-kjøleskap: venter på aktivering','Koden er ferdig. Miele svarer «Client not found» på klienten din, trolig fordi den ikke er aktivert ennå. Prøv innloggingslenken igjen senere, og spør Miele-støtten hvis det vedvarer. Så kjører vi godkjenning én gang.'],
- ['Datakilder','lg','LG: ovnen viser ingen tilstand','Ovnen er koblet, men sender ingenting i hvilemodus. Sjekk når den er i bruk. Vaskemaskinen har fjernstyring avslått.'],
- ['Datakilder','zaptec-test','Zaptec: test med bil tilkoblet','Visningen er ikke prøvd med ekte lading. Koble til bilen og sjekk effekt, modus og to ladere.'],
- ['Datakilder','klipper-flow','Raskere klipperstatus','Homey-hendelser har nå egen lett workflow, så det er billig å sende ofte. Gjenstår: Homey-flow som sender med en gang klipperen endrer status.'],
- ['Datakilder','a1','Dreame A1 viser tilgjengelig i Homey, offline i appen','Sjekk om Homey viser gammel status.'],
- ['Dashboard','alarm','Varsler på mobil eller e-post','Frost, lavt batteri, ulåst dør og frakoblede enheter.'],
- ['Dashboard','kost','Ekte strømkostnad fra Tibber','Bytt ut anslaget på 1,1 kr/kWh. Sjekk Norgespris-vilkår for 2027.'],
- ['Styring','ctl-sensitiv','LG-ovn og Miele-kjøleskap','Lås (terrasse og inngang) er gjort. Gjenstår: ovn og kjøleskap. Start med å stoppe, ikke starte. Ovn kan bare fjernstartes når den er satt opp for det ved panelet.'],
- ['Sikkerhet','aqara-rot','Slett eller roter gamle Aqara-nøkler','Nøkler fra det første prosjektet (Drivhus) har vært vist i samtalen. Slett dem i Aqara-portalen når de ikke brukes.'],
- ['Sikkerhet','login','Innlogging / privat hosting','Data og styring ligger bak innlogging. Selve siden (HTML) er fortsatt offentlig. Vurder å flytte den bak innlogging også.'],
- ['Sikkerhet','repo-privat','Gjør GitHub-repoet privat','Repoet er offentlig og inneholder adresser, dørnavn og enhets-ID-er, og Actions-loggene er synlige. Gjør det privat, eller legg bare site/index.html i et eget offentlig repo (Pages fra privat repo krever betalt plan).'],
- ['Sikkerhet','email-verified','Sjekk e-postbekreftelse i innloggingen','ctl bruker e-post fra tokenet uten å sjekke email_verified. Test først at Neon Auth sender claimet, så legg inn sjekken. Slå av e-post/passord-registrering i Neon Auth hvis bare Google skal brukes.'],
- ['Sikkerhet','data-fn','Ta data-funksjonen inn i repoet og test den','Kall uten token skal gi 401 og Google-konto utenfor tillatelseslisten skal gi 403. Funksjonen ligger bare i Neon.'],
- ['Sikkerhet','csp','Innholdssikkerhetsregler og lokal kopi av @neon/auth','Siden henter @neon/auth fra esm.sh uten integritetssjekk. Bundle det selv og legg på Content-Security-Policy.'],
- ['Sikkerhet','tok','Minimal tilgang på GitHub-token i HomeyScript','Fine-grained token kun for dette repoet, med kort utløpstid. Slå på branch protection på main.']];
-const DONE=[
- ['Kontroll av prosjektet: uavhengig gjennomgang og rettelser (pull request 1 og 2)','18. nov'],
- ['Homey-hendelser har egen workflow som bare lagrer Homey-data og publiserer homey.json','18. nov'],
- ['Innhentingssteg stopper ikke lenger hverandre ved feil','18. nov'],
- ['ctl deployet med tidskonstant sjekk av push-token','18. nov'],
- ['Escaping av enhetsnavn og tilstander på siden mot skripting (XSS)','18. nov'],
- ['Styring bak innlogging: Aqara, Shelly, Gardena, Dreame, Zaptec, Adax, Microtemp, Tuya, Daikin og lås','18. nov'],
- ['Styringsoversikt per enhet med vanskelighetsgrad og anbefalt rekkefølge (fanen Styring)','17. nov'],
- ['Miele: innhenting og godkjenningsflyt bygget (venter på aktivering hos Miele)','17. nov'],
- ['Kjøkken-seksjon (ovn og kjøleskap) og vaskemaskin i Arendal','17. nov'],
- ['Aqara: signaturfeil funnet og rettet (App Key skal legges til uten &)','17. nov'],
- ['Aqara: hub, stikk og temperatursensor i Oslo','17. nov'],
- ['LG: vaskemaskin (Arendal) og ovn (Oslo)','17. nov'],
- ['Zaptec: to ladere i Arendal koblet inn','17. nov'],
- ['Microtemp: gulvvarme i Oslo (rom, gulv, innstilling)','17. nov'],
- ['Layout med faner for Oslo, Arendal og Drivhus, sammenleggbare seksjoner og oversikt','17. nov'],
- ['Varsler med mulighet til å skjule enkeltvarsler','17. nov'],
- ['Innsamling: GitHub-cron hvert 3. time, og Homey sender status via egen workflow','17. nov'],
- ['Smart Life (Tuya): termostat i oppvarmet drivhus og varmepumpe i Arendal',''],
- ['Shelly: 4-punkts stikk i innerdrivhus (vekstlys, ventilasjonsvifte, to uttak)',''],
- ['Tibber: forbruk per time og døgn med historikk i Neon, kostnadsanslag med Norgespris',''],
- ['Tibber Pulse: sanntidseffekt for Oslo','17. nov'],
- ['Adax: panelovner i Oslo og Arendal',''],
- ['Gardena: to kontoer (Oslo og Arendal), med batteri og tilkobling',''],
- ['Homey: Dreame-klippere, Yale-låser og Daikin i Oslo',''],
- ['Daikin: historikk for temperaturer og energi fra måleren','17. nov'],
- ['Låser: tidslinje for låst og ulåst og liste over endringer','17. nov'],
- ['Klippere: status, klippetid, siste økt, og varsel når den står fast','17. nov'],
- ['Zaptec: innhenting og visning er kodet, venter bare på innlogging','17. nov'],
- ['Microtemp undersøkt: uoffisiell sky-integrasjon, trenger modell og API-nøkkel','17. nov']];
-function todoView(){const w=document.createElement('div'),done=ls.get('sh-done',{}),extra=ls.get('sh-extra',[]);
- const all=TODO.map(([c,id,t,n])=>({c,id,t,n})).concat(extra);const cats=[...new Set(['Datakilder','Dashboard','Sikkerhet',...all.map(x=>x.c)])];
- w.appendChild(el(`<p class="s">Avkrysninger og egne punkter lagres bare i denne nettleseren. Skriv til meg hvis noe skal inn i den faste listen.</p>`));
- cats.forEach(c=>{const L=all.filter(x=>x.c===c);if(!L.length)return;const n=L.filter(x=>done[x.id]).length;
-  const b=el(`<div class="todo">${L.map(x=>`<label><input type="checkbox" data-id="${x.id}" ${done[x.id]?'checked':''}><span class="d"><span class="${done[x.id]?'x':''}">${x.t}</span>${x.n?`<div class="s">${x.n}</div>`:''}</span></label>`).join('')}</div>`);
-  b.querySelectorAll('input').forEach(i=>i.onchange=()=>{done[i.dataset.id]=i.checked;ls.set('sh-done',done);render()});
-  w.appendChild(sec('todo-'+c,c,`${n} av ${L.length} gjort`,b))});
- const f=el(`<div class="add"><input type="text" id="nt" placeholder="Nytt punkt"><select id="nc">${cats.map(c=>`<option>${c}</option>`).join('')}</select><button id="na">Legg til</button></div>`);
- f.querySelector('#na').onclick=()=>{const t=f.querySelector('#nt').value.trim();if(!t)return;extra.push({c:f.querySelector('#nc').value,id:'x'+Date.now(),t,n:''});ls.set('sh-extra',extra);render()};
- w.appendChild(f);
- w.appendChild(sec('done','Ferdig',DONE.length+' punkter',el('<div class="todo">'+DONE.map(x=>`<label style="cursor:default"><input type="checkbox" checked disabled><span class="d"><span class="x">${x[0]}</span>${x[1]?`<div class="s">${x[1]}</div>`:''}</span></label>`).join('')+'</div>'),{open:false}));return w}
-const todoOpen=()=>{const done=ls.get('sh-done',{});return TODO.filter(x=>!done[x[1]]).length+ls.get('sh-extra',[]).filter(x=>!done[x.id]).length};
 /* ---------- app ---------- */
-const TABS=[['oversikt','Oversikt'],['oslo','Oslo'],['arendal','Arendal'],['drivhus','Drivhus'],['styring','Styring'],['todo','Gjøremål']];
+const TABS=[['oversikt','Oversikt'],['oslo','Oslo'],['arendal','Arendal'],['drivhus','Drivhus']];
 function go(t){TAB=t;history.replaceState(null,'','#'+t);render();scrollTo(0,0)}
 function nav(){const n=alerts().filter(a=>a.lvl!=='info').length;
- document.getElementById('nav').innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${k===TAB?'on':''}">${l}${k==='oversikt'&&n?`<span class="pill w">${n}</span>`:''}${k==='todo'?`<span class="pill g">${todoOpen()}</span>`:''}</button>`).join('');
+ document.getElementById('nav').innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${k===TAB?'on':''}">${l}${k==='oversikt'&&n?`<span class="pill w">${n}</span>`:''}</button>`).join('');
  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.t))}
 function render(){if(!TABS.some(t=>t[0]===TAB))TAB='oversikt';nav();const m=document.getElementById('main');m.innerHTML='';
- m.appendChild(TAB==='oversikt'?overview():TAB==='todo'?todoView():TAB==='styring'?ctrlView():placeView(TAB));
+ m.appendChild(TAB==='oversikt'?overview():placeView(TAB));
  m.querySelectorAll('details.sec').forEach(d=>{if(d.open&&d._draw)d._draw()})}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
