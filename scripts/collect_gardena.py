@@ -21,14 +21,25 @@ for idx, (cid, sec) in enumerate(ACCOUNTS):
             d = devs.setdefault(x["id"], {"site": site_name})
             if x["type"] == "COMMON": d.update(name=a.get("name"), model=a.get("modelType"), batt=a.get("batteryLevel"), link=a.get("rfLinkState"))
             elif x["type"] == "SENSOR": d.update(kind="sensor", soil_hum=a.get("soilHumidity"), soil_temp=a.get("soilTemperature"))
-            elif x["type"] == "VALVE": d.update(kind="valve", activity=a.get("activity"))
+            elif x["type"] == "VALVE": d.update(kind="valve", activity=a.get("activity"), vname=a.get("name"))
 with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
     con.execute("""create table if not exists gardena_readings (ts timestamptz not null default now(), device_id text,
         name text, kind text, site text, soil_hum numeric, soil_temp numeric, activity text, battery int, link text)""")
+    # Flerventil-styring (id "<enhet>:1", ":2"): COMMON ligger på enhets-id uten suffiks, og ventilen har eget navn
+    for did, d in devs.items():
+        if d.get("kind") != "valve" or ":" not in did: continue
+        base = devs.get(did.split(":")[0]) or {}
+        for k in ("batt", "link", "model"):
+            if d.get(k) is None: d[k] = base.get(k)
+        if not d.get("name"):
+            vn, bn = d.get("vname"), base.get("name")
+            d["name"] = (bn + " – " + vn if bn and vn and vn != bn else vn or (bn and bn + " ventil " + did.split(":")[1]) or "Ventil " + did.split(":")[1])
     for did, d in devs.items():
         if "kind" not in d: continue
         con.execute("insert into gardena_readings (device_id,name,kind,site,soil_hum,soil_temp,activity,battery,link) values (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (did, d.get("name"), d["kind"], d.get("site"), d.get("soil_hum"), d.get("soil_temp"), d.get("activity"), d.get("batt"), d.get("link")))
+    for did, d in devs.items():
+        if d.get("name"): con.execute("update gardena_readings set name=%s where device_id=%s and name is null", (d["name"], did))
     for did, d in devs.items():
         con.execute("update gardena_readings set site=%s where device_id=%s and site is distinct from %s", (d.get("site"), did, d.get("site")))
     rows = con.execute("select device_id,name,kind,ts,soil_hum,soil_temp,activity,battery,link from gardena_readings where ts > now() - interval '14 days' order by ts").fetchall()
