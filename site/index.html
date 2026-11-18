@@ -436,9 +436,37 @@ function secDrivhusIn(pl){const T=[];
  if(!T.length)return null;
  const b=el(grid(T.join(''))+`<div style="margin-top:10px"><button class="btn" data-go="drivhus">Åpne hele drivhusfanen</button></div>`);b.querySelector('[data-go]').onclick=()=>go('drivhus');
  return sec('drivhus-i','Drivhus '+PLACES[pl],T.length+' enheter',b,{open:true})}
+/* ---------- før du drar: samlet sjekk per sted (bare lesing) ---------- */
+function leaveChecks(pl){const C=[],add=(lvl,txt,t)=>C.push({lvl,txt,t});
+ hmList(pl,'lock').forEach(c=>{const l=lastOf(c.rows),d=l.d||{},nm=esc(c.name);
+  if(d.locked===false)add('warn',`${nm} er <b>ulåst</b>`,l.t);else add('ok',`${nm} er låst`,l.t);
+  if(d.alarm_contact===true)add('warn',`${nm}: dørsensoren melder <b>åpen</b>`,l.t)});
+ gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.act&&l.act!=='CLOSED'&&l.link!=='OFFLINE')add('warn',`Vanning går: <b>${esc(c.name)}</b>`,l.t)});
+ {const v=gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length);if(v.length&&!C.some(x=>/Vanning går/.test(x.txt)))add('ok','Ingen vanning går',maxT(v.map(c=>lastOf(c.rows)),x=>new Date(x.t).getTime()))}
+ hmList(pl,'mower').forEach(c=>{const I=mowerInfo(c);if(!I)return;const k=I.last.k,l=lastOf(c.rows);
+  if(k==='error'||I.stuck)add('warn',`${esc(c.name)}: <b>${esc(I.stuck||'feil')}</b>`,l.t);else if(k==='mowing'||k==='returning')add('info',`${esc(c.name)} er ute og klipper`,l.t);else add('ok',`${esc(c.name)}: ${esc(mowLab(I).toLowerCase())}`,l.t)});
+ ((LG&&LG.devices)||[]).filter(d=>placeOf(d.site,d.name)===pl&&d.rows&&d.rows.length).forEach(d=>{const l=lastOf(d.rows),s=l.s||{},k=Object.keys(s).find(x=>/runState\.currentState$/.test(x));if(!k)return;const st=String(s[k]);
+  const nm=/oven/i.test(d.type||d.name)?'Ovnen':/wash/i.test(d.type||'')?'Vaskemaskinen':esc(d.name);
+  if(/POWER_OFF|^END$|INITIAL|SLEEP/i.test(st))add('ok',`${nm} er av`,l.t);else add('warn',`${nm} går (${esc(st.toLowerCase().replace(/_/g,' '))})`,l.t)});
+ ((ZP&&ZP.chargers)||[]).filter(c=>placeOf(c.site,c.name)===pl&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.m===3)add('info',`${esc(c.name)} lader bilen (${nf((l.w||0)/1000,1)} kW)`,l.t)});
+ hmList(pl,'daikin').forEach(c=>{const l=lastOf(c.rows),d=l.d||{};if(d.onoff===true)add('info',`Daikin står på, innstilt ${nf(d.target_temperature,1)} °C`,l.t)});
+ {const ax=axList(pl).map(c=>lastOf(c.rows)).filter(l=>l&&l.on&&l.target!=null);if(ax.length){const m=ax.reduce((a,l)=>a+l.target,0)/ax.length;add('info',`${ax.length} panelovner står på, innstilt snitt ${nf(m,1)} °C`,maxT(ax,x=>new Date(x.t).getTime()))}}
+ SERIES().filter(x=>x.pl==='drivhus'&&ghHome(x.rows[x.rows.length-1].site,x.name)===pl).forEach(x=>{const l=lastOf(x.rows);if(l.temp==null)return;
+  const heat=pl==='oslo'?((AQ&&AQ.devices)||[]).find(d=>PLUGS[d.did]&&/varme/i.test(d.name)):null,hon=heat&&lastOf(heat.rows)?lastOf(heat.rows).on:null;
+  if(l.temp<=WARN_NEAR&&hon===false)add('warn',`${esc(x.name)} er ${nf(l.temp)} °C og varmen er <b>av</b>`,l.t);
+  else if(l.temp<=FROST)add('warn',`${esc(x.name)} har frost: ${nf(l.temp)} °C`,l.t);
+  else add('ok',`${esc(x.name)}: ${nf(l.temp)} °C${hon===true?', varmen er på':''}`,l.t)});
+ return C}
+function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if(!C.length)return null;
+ const w=C.filter(c=>c.lvl==='warn').length,ok=C.filter(c=>c.lvl==='ok').length,ord={warn:0,info:1,ok:2},ic={ok:'<span class="ok">✓</span>',warn:'<span class="warn">▲</span>',info:'<span class="s">ⓘ</span>'};
+ const b=el(C.sort((a,b)=>ord[a.lvl]-ord[b.lvl]).map(c=>`<div class="al">${ic[c.lvl]}<span style="flex:1">${c.txt}${c.t?`<span class="s"> · ${ago(c.t)}</span>`:''}</span></div>`).join('')
+  +`<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn" data-sty>Åpne Styring for ${PLACES[pl]}</button><span class="s">Sjekken leser bare data, og noen målinger kan være opptil 15 min gamle.</span></div>`);
+ b.querySelector('[data-sty]').onclick=()=>{ls.set('sh-spl',pl);go('styring')};
+ return sec('avreise','Før du drar',w?w+(w===1?' ting å sjekke':' ting å sjekke'):'alt klart · '+ok+' sjekket',b,{open:w>0})}
+const safe=(f,nm)=>{try{return f()}catch(e){console.error(nm,e);return el(waiting('Kunne ikke vise '+nm+' ('+esc(e.message)+')')).firstChild}};
 function placeView(pl){const w=document.createElement('div');
- w.appendChild(placeHero(pl));
- const list=[pl==='drivhus'?secDrivTemp():null,secKlima(pl),secVarme(pl),secStrom(pl),secHage(pl),pl==='drivhus'?secShelly():null,secAqara(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);if(pl!=='drivhus'){const g=secDrivhusIn(pl);if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
+ w.appendChild(placeHero(pl));{const a=safe(()=>secAvreise(pl),'Før du drar');if(a)w.appendChild(a)}
+ const list=[pl==='drivhus'?()=>secDrivTemp():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
  if(pl==='arendal')w.appendChild(secPlan('mill','Mill-ovner','Ikke koblet ennå. Trenger å vite hvilken generasjon Mill-ovnene er.'));
