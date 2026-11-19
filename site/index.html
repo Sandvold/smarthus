@@ -399,7 +399,7 @@ function secVarme(pl){let h='',sub=[],draw=null;
  if(!h)return null;return sec('varme','Varme',sub.join(' · '),el(h),{draw})}
 let VWD=null;
 const vwState=c=>{const k=String(c||'').replace(/^CHARGE_STATE_/,'');return({NOT_READY_FOR_CHARGING:'Ikke koblet til',READY_FOR_CHARGING:'Koblet til, lader ikke',CHARGING:'Lader',CHARGING_COMPLETED:'Ferdig ladet',CHARGING_ERROR:'Ladefeil',CHARGING_STOPPED:'Lading stoppet'})[k]||(k?k.toLowerCase().replace(/_/g,' '):'ukjent')};
-function secBil(pl){if(pl!=='arendal'||!VWD)return null;
+function secBil(){if(!VWD)return null;
  if(!(VWD.rows||[]).length)return sec('bil','Elbil (ID.4)',VWD.error?'feil':'venter på data',el(waiting(VWD.error?'Ingen data fra bilen: '+esc(VWD.error):'Ingen målinger fra bilen ennå.')),{open:!!VWD.error});
  const R=VWD.rows.map(r=>({...r,t:new Date(r.t)})),l=R[R.length-1],old=Date.now()-l.t>3*3600000;
  const b=el(`<div class="s ${old||VWD.error?'warn':''}" style="margin-bottom:8px">Målt ${ago(l.t)}${old?' – bilen har ikke sendt nye data på en stund (den kan sove)':''}${VWD.error?' · siste henting feilet: '+esc(VWD.error):''}</div>`
@@ -557,7 +557,7 @@ function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if
 const safe=(f,nm)=>{try{return f()}catch(e){console.error(nm,e);return el(waiting('Kunne ikke vise '+nm+' ('+esc(e.message)+')')).firstChild}};
 function placeView(pl){const w=document.createElement('div');
  w.appendChild(placeHero(pl));{const a=safe(()=>secAvreise(pl),'Før du drar');if(a)w.appendChild(a)}
- const list=[pl==='drivhus'?()=>secDrivTemp():null,pl==='drivhus'?()=>secDrivStrom():null,pl==='drivhus'?()=>secDrivDogn():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secBil(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
+ const list=[pl==='drivhus'?()=>secDrivTemp():null,pl==='drivhus'?()=>secDrivStrom():null,pl==='drivhus'?()=>secDrivDogn():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
  if(pl==='arendal')w.appendChild(secPlan('mill','Mill-ovner','Ikke koblet ennå. Trenger å vite hvilken generasjon Mill-ovnene er.'));
@@ -664,6 +664,7 @@ function overview(){const w=document.createElement('div'),A=alerts();
   const lag=s.lag>3*3600000?` <span class="s">· data til ${new Date(s.tmax).toLocaleString('nb-NO',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</span>`:'';
   const ch=s.ch==null?'':`<span class="${s.ch>0?'up':'dn'}">${s.ch>0?'↑':'↓'} ${Math.abs(s.ch)} %</span> <span class="s">mot uka før</span>`;
   return `<div class="h" style="color:var(--${pl})">${PLACES[pl]}${lag}</div><span class="s">Siste døgn</span><b>${nf(s.k24,1)} kWh</b><span>${kr(s.c24)}</span><span class="s">7 dager</span><b>${nf(s.k7,0)} kWh</b><span>${kr(s.c7)}</span><span class="s" style="grid-column:1/-1">${ch}${s.kr?` · snitt ${nf(s.kr,2)} kr/kWh`:''}</span>${(()=>{const e=effekt(h);return e?`<span class="s" style="grid-column:1/-1">${effTxt(e)}</span>`:''})()}`}).join('')}</div><div class="s" style="margin-top:8px">Effekttrinn er et anslag med vanlig trinninndeling (${TRINN.join(', ')} kW); grensene kan variere mellom nettselskap.</div>`)));
+ {const sb=safe(secBil,'Elbil');if(sb)w.appendChild(sb)}
  w.insertBefore(safe(secSince,'Siden sist'),cards.nextSibling);w.appendChild(secSystemer());return w}
 /* ---------- styring: kompakte kort for alle styrbare enheter ---------- */
 const GRP=['Dører','Hage og vanning','Varme','Lys og stikk','Elbil'],PLORD={oslo:0,arendal:1,drivhus:2};
