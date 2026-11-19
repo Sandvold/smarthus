@@ -150,7 +150,7 @@ let _toastT=null;
 function toast(t,tone){const e=document.getElementById('toast');if(!e)return;e.textContent=t;e.className='toast show'+(tone?' '+tone:'');clearTimeout(_toastT);_toastT=setTimeout(()=>{e.className='toast'},tone==='bad'?7000:4500)}
 function ask(text,okLabel){return new Promise(res=>{const o=document.createElement('div');o.className='ov';
  o.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><p></p><div class="row"><button class="btn" data-n>Avbryt</button><button class="btn pri" data-y></button></div></div>`;
- o.querySelector('p').textContent=text;o.querySelector('[data-y]').textContent=okLabel||'Ja, utfør';
+ o.querySelector('p').textContent=text;o.querySelector('p').style.whiteSpace='pre-line';o.querySelector('[data-y]').textContent=okLabel||'Ja, utfør';
  const done=v=>{document.removeEventListener('keydown',kd);o.remove();res(v)},kd=e=>{if(e.key==='Escape')done(false)};
  o.onclick=e=>{if(e.target===o)done(false)};o.querySelector('[data-n]').onclick=()=>done(false);o.querySelector('[data-y]').onclick=()=>done(true);
  document.addEventListener('keydown',kd);document.body.appendChild(o);o.querySelector('[data-y]').focus()})}
@@ -490,8 +490,15 @@ function leaveChecks(pl){const C=[],add=(lvl,txt,t)=>C.push({lvl,txt,t});
  hmList(pl,'lock').forEach(c=>{const l=lastOf(c.rows),d=l.d||{},nm=esc(c.name);
   if(d.locked===false)add('warn',`${nm} er <b>ulåst</b>`,l.t);else add('ok',`${nm} er låst`,l.t);
   if(d.alarm_contact===true)add('warn',`${nm}: dørsensoren melder <b>åpen</b>`,l.t)});
- gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.act&&l.act!=='CLOSED'&&l.link!=='OFFLINE')add('warn',`Vanning går: <b>${esc(c.name)}</b>`,l.t)});
- {const v=gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length);if(v.length&&!C.some(x=>/Vanning går/.test(x.txt)))add('ok','Ingen vanning går',maxT(v.map(c=>lastOf(c.rows)),x=>new Date(x.t).getTime()))}
+ {const T=x=>x?new Date(x).getTime():0,gd=gdList(pl).filter(c=>c.rows.length),gOff=gd.filter(c=>{const l=lastOf(c.rows);return l.link==='OFFLINE'||Date.now()-T(l.t)>3*3600000}),
+   hmOff=hmList(pl).filter(c=>{const l=lastOf(c.rows);return l&&(l.av===false||Date.now()-T(l.t)>3*3600000)}),
+   snOff=sensors(pl).filter(x=>Date.now()-x.rows[x.rows.length-1].t>90*60000);
+  if(GD&&GD.error)add('warn','Ingen tilgang til Gardena: '+esc(GD.error),null);
+  gOff.forEach(c=>add('warn',`Ingen kontakt med Gardena: <b>${esc(c.name)}</b>`,lastOf(c.rows).t));
+  hmOff.forEach(c=>add('warn',`Ingen kontakt med <b>${esc(c.name)}</b> (Homey)`,lastOf(c.rows).t));
+  snOff.forEach(x=>add('warn',`Ingen ny måling fra <b>${esc(x.name)}</b>`,x.rows[x.rows.length-1].t));
+  if(gd.length&&!gOff.length&&!(GD&&GD.error))add('ok','Gardena svarer',maxT(gd.map(c=>lastOf(c.rows)),x=>new Date(x.t).getTime()));
+  if(sensors(pl).length&&!snOff.length)add('ok','Sensorene sender',maxT(sensors(pl).map(x=>x.rows[x.rows.length-1]),x=>x.t.getTime()))}
  hmList(pl,'mower').forEach(c=>{const I=mowerInfo(c);if(!I)return;const k=I.last.k,l=lastOf(c.rows);
   if(k==='error'||I.stuck)add('warn',`${esc(c.name)}: <b>${esc(I.stuck||'feil')}</b>`,l.t);else if(k==='mowing'||k==='returning')add('info',`${esc(c.name)} er ute og klipper`,l.t);else add('ok',`${esc(c.name)}: ${esc(mowLab(I).toLowerCase())}`,l.t)});
  ((LG&&LG.devices)||[]).filter(d=>placeOf(d.site,d.name)===pl&&d.rows&&d.rows.length).forEach(d=>{const l=lastOf(d.rows),s=l.s||{},k=Object.keys(s).find(x=>/runState\.currentState$/.test(x));if(!k)return;const st=String(s[k]);
@@ -502,15 +509,33 @@ function leaveChecks(pl){const C=[],add=(lvl,txt,t)=>C.push({lvl,txt,t});
  {const ax=axList(pl).map(c=>lastOf(c.rows)).filter(l=>l&&l.on&&l.target!=null);if(ax.length){const m=ax.reduce((a,l)=>a+l.target,0)/ax.length;add('info',`${ax.length} panelovner står på, innstilt snitt ${nf(m,1)} °C`,maxT(ax,x=>new Date(x.t).getTime()))}}
  SERIES().filter(x=>x.pl==='drivhus'&&ghHome(x.rows[x.rows.length-1].site,x.name)===pl).forEach(x=>{const l=lastOf(x.rows);if(l.temp==null)return;
   const heat=pl==='oslo'?((AQ&&AQ.devices)||[]).find(d=>PLUGS[d.did]&&/varme/i.test(d.name)):null,hon=heat&&lastOf(heat.rows)?lastOf(heat.rows).on:null;
+  if(Date.now()-l.t>90*60000)add('warn',`Ingen ny måling fra <b>${esc(x.name)}</b>`,l.t);
   const e=frostEta(x);if(e)add('warn',`${esc(x.name)} faller og kan nå 0 °C om <b>${etaTxt(e)}</b>${hon===false?' – varmen er av':''}`,l.t);
   else if(l.temp<=WARN_NEAR&&hon===false)add('warn',`${esc(x.name)} er ${nf(l.temp)} °C og varmen er <b>av</b>`,l.t);
   else if(l.temp<=FROST)add('warn',`${esc(x.name)} har frost: ${nf(l.temp)} °C`,l.t);
   else add('ok',`${esc(x.name)}: ${nf(l.temp)} °C${hon===true?', varmen er på':''}`,l.t)});
  return C}
+const CLOSE={oslo:{mt:12,ax:12,dk:14}};
+function closeSteps(pl){const c=CLOSE[pl],S=[];if(!c)return S;
+ ((MT&&MT.thermostats)||[]).filter(t=>placeOf(t.site,t.name)===pl&&t.serial).forEach(t=>S.push({txt:`${t.name} til ${c.mt} °C`,o:{act:'microtemp',serial:t.serial,cmd:'temp',value:c.mt}}));
+ axList(pl).forEach(r=>S.push({txt:`${r.name} (Adax) til ${c.ax} °C`,o:{act:'adax',room:r.id,target:c.ax}}));
+ hmList(pl,'daikin').slice(0,1).forEach(()=>S.push({txt:`Daikin til ${c.dk} °C`,o:{act:'homey',dev:'daikin',cmd:'temp',value:c.dk}}));
+ if(pl==='oslo'){const d=lastOf(((HM&&HM.devices)||[]).find(x=>x.name==='Terrasedør'&&x.kind==='lock')?.rows);if(d&&d.d&&d.d.locked===false)S.push({txt:'Låse terrassedøren',lock:'terrasse',open:!!d.d.alarm_contact})}
+ return S}
+async function closeUp(b,pl){const S=closeSteps(pl);if(!S.length)return;
+ if(!await ask('Stenge '+PLACES[pl]+'?\n\n'+S.map(x=>'• '+x.txt+(x.open?' (dørsensoren melder åpen, hoppes over)':'')).join('\n'),'Steng'))return;
+ b&&(b.disabled=true);const res=[];
+ for(const x of S){
+  if(x.lock){if(x.open){res.push('✗ '+x.txt+': hoppet over, døren er åpen');continue}
+   const r=await ctlCall('POST',{lock:x.lock});res.push(r.ok?'✓ '+x.txt+' (sendt)':'✗ '+x.txt+': '+(r.j.error||r.status));continue}
+  const ok=await act(null,x.o,true);res.push((ok?'✓ ':'✗ ')+x.txt)}
+ b&&(b.disabled=false);await ask('Resultat:\n\n'+res.join('\n')+'\n\nVerifiser dørlåsen i oversikten om litt.','OK')}
+window.closeUp=closeUp;
 function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if(!C.length)return null;
  const w=C.filter(c=>c.lvl==='warn').length,ok=C.filter(c=>c.lvl==='ok').length,ord={warn:0,info:1,ok:2},ic={ok:'<span class="ok">✓</span>',warn:'<span class="warn">▲</span>',info:'<span class="s">ⓘ</span>'};
  const b=el(C.sort((a,b)=>ord[a.lvl]-ord[b.lvl]).map(c=>`<div class="al">${ic[c.lvl]}<span style="flex:1">${c.txt}${c.t?`<span class="s"> · ${ago(c.t)}</span>`:''}</span></div>`).join('')
-  +`<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn" data-sty>Åpne Styring for ${PLACES[pl]}</button><span class="s">Sjekken leser bare data, og noen målinger kan være opptil 15 min gamle.</span></div>`);
+  +`<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn" data-sty>Åpne Styring for ${PLACES[pl]}</button>${closeSteps(pl).length?`<button class="btn pri" data-close>Steng ${PLACES[pl].toLowerCase()}</button>`:''}<span class="s">Sjekken leser bare data, og noen målinger kan være opptil 15 min gamle.</span></div>`);
+ const cb=b.querySelector('[data-close]');if(cb)cb.onclick=()=>closeUp(cb,pl);
  b.querySelector('[data-sty]').onclick=()=>{ls.set('sh-spl',pl);go('styring')};
  return sec('avreise','Før du drar',w?w+(w===1?' ting å sjekke':' ting å sjekke'):'alt klart · '+ok+' sjekket',b,{open:w>0})}
 const safe=(f,nm)=>{try{return f()}catch(e){console.error(nm,e);return el(waiting('Kunne ikke vise '+nm+' ('+esc(e.message)+')')).firstChild}};
@@ -754,11 +779,11 @@ async function lockTerrasse(b,unlock,door){door=door||'terrasse';const nm=door==
    injectLock(s,nm);setBusy(k,0);
    toast((!!s.on)===want?'Bekreftet: '+nm+' er '+(s.on?'låst':'ulåst')+' ('+tm+')':nm+' står fortsatt '+(s.on?'låst':'ulåst')+' ('+tm+')',(!!s.on)===want?'':'warn');return}}
  setBusy(k,0);toast('Kommando sendt, men ingen statusrapport fra Homey. Sjekk i Yale-appen.','warn')}
-async function act(b,o){const key=o.act==='microtemp'?'mt:'+o.serial:o.act==='tuya'?'hp':o.act==='homey'?(o.dev==='daikin'?'dk':'mw:'+o.dev):o.act==='shelly'?'sh:'+o.cid:o.act==='adax'?'ax:'+o.room:o.act==='gardena'?'gd:'+o.id:'zp:'+o.id;
- if(BUSY[key])return;if(!await ask(o.q||'Utføre?'))return;const body=Object.assign({},o);delete body.q;delete body.cid;
+async function act(b,o,skipAsk){const key=o.act==='microtemp'?'mt:'+o.serial:o.act==='tuya'?'hp':o.act==='homey'?(o.dev==='daikin'?'dk':'mw:'+o.dev):o.act==='shelly'?'sh:'+o.cid:o.act==='adax'?'ax:'+o.room:o.act==='gardena'?'gd:'+o.id:'zp:'+o.id;
+ if(BUSY[key])return false;if(!skipAsk&&!await ask(o.q||'Utføre?'))return false;const body=Object.assign({},o);delete body.q;delete body.cid;
  setBusy(key,1);toast('Sender …');
  const r=await ctlCall('POST',body);
- if(!r.ok){setBusy(key,0);toast('Feilet: '+(r.j.error||r.status),'bad');return}
+ if(!r.ok){setBusy(key,0);toast('Feilet: '+(r.j.error||r.status),'bad');return false}
  const j=r.j;let t;
  if(o.act==='shelly'){if(j.state!=null)injShelly(o.cid,{on:j.state,power:j.power});t=j.state==null?'Sendt (kunne ikke bekrefte)':j.state===o.on?'Bekreftet: '+(o.on?'på':'av'):'Enheten svarte ikke ennå (står '+(j.state?'på':'av')+')'}
  else if(o.act==='adax'){injAdax(o.room,j.state!=null?j.state:o.target);t=j.state!=null&&Math.abs(j.state-o.target)<0.01?'Bekreftet: innstilt '+nf(j.state,1)+' °C':'Sendt til Adax. Ovnen kan bruke litt tid på å følge etter'}
@@ -768,7 +793,7 @@ async function act(b,o){const key=o.act==='microtemp'?'mt:'+o.serial:o.act==='tu
  else if(o.act==='homey'){if(o.dev==='daikin'){injDk({onoff:j.on==null?undefined:!!j.on,target_temperature:j.temp==null?undefined:j.temp});t=j.status?'Bekreftet: '+(j.on===false?'av':'på')+(j.temp!=null?', innstilt '+nf(j.temp,1)+' °C':''):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt'}
   else{if(j.status)injMower(o.dev,j.status);t=j.status?'Klipperen melder: '+String(j.status).replace(/_/g,' '):'Sendt til Homey. Ingen statusrapport ennå, sjekk igjen om litt'}}
  else{if(j.state!=null)injZp(o.id,j.state);t=o.cmd==='pause'?(j.state===5?'Bekreftet: pauset':'Sendt. Laderen viser modus '+j.state+' ennå'):(j.state===3?'Bekreftet: lader':'Sendt. Laderen viser modus '+j.state+' ennå')}
- setBusy(key,0);toast(t+' ('+hhmmNow()+')',/^(Bekreftet|Klipperen melder)/.test(t)?'':'warn')}
+ setBusy(key,0);toast(t+' ('+hhmmNow()+')',/^(Bekreftet|Klipperen melder)/.test(t)?'':'warn');return true}
 window.act=act;window.daikinSet=daikinSet;window.hpSet=hpSet;window.mtSet=mtSet;
 window.lockTerrasse=lockTerrasse;
 window.plug=plug;
