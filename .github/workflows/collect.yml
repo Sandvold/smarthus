@@ -96,6 +96,10 @@ jobs:
         continue-on-error: true
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/export_drivhusstrom.py
+        continue-on-error: true
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/sync_ctl_secrets.py
         continue-on-error: true
         env:

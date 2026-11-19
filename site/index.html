@@ -437,6 +437,45 @@ function secDrivTemp(){
   box.querySelectorAll('input').forEach(i=>i.onchange=()=>{sel[i.dataset.n]=i.checked;ls.set('sh-tsel',sel);draw()});
   drawLine('ch-dt','leg-dt','tb-dt',S.filter(s=>sel[s.name]!==false).map(s=>({...s,pts:s.pts.filter(p=>p.t>s0)})).filter(s=>s.pts.length),'t','°C',FROST,1)};
  return sec('dtemp','Temperaturer i alle drivhus',all.length+' målere',b,{open:true,draw})}
+let STR=null;
+const osloDay=t=>new Date(t).toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});
+function secDrivStrom(){
+ const sites=(STR&&STR.sites)||[];if(!sites.length)return null;
+ const N=Math.min(60,Math.max(7,Math.ceil(hours/24))),days=[...new Set(Array.from({length:N},(_,i)=>osloDay(Date.now()-(N-1-i)*86400000)))];
+ const data=sites.map((st,si)=>{const pl=/oslo/i.test(st.name)?'oslo':'arendal';
+  const dev=st.devices.map((d,i)=>({name:d.name,color:PAL[i%PAL.length],v:days.map(x=>d.days[x]!=null?d.days[x]:null)}));
+  const tem=sensors('drivhus').filter(x=>ghHome(x.rows[x.rows.length-1].site,x.name)===pl).map((x,i)=>({name:x.name,color:PAL[(i+3)%PAL.length],
+   v:days.map(d=>{const a=x.rows.filter(r=>r.temp!=null&&osloDay(r.t)===d).map(r=>r.temp);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null})}));
+  const tot=days.map((_,i)=>dev.some(d=>d.v[i]!=null)?dev.reduce((p,d)=>p+(d.v[i]||0),0):null);
+  return{st,si,dev,tem,tot}});
+ const tiles=data.map(o=>{const have=o.tot.filter(x=>x!=null),w=o.tot.slice(-8,-1).filter(x=>x!=null),sum=w.reduce((p,q)=>p+q,0);
+  return `<div class="tile"><div class="s">${esc(o.st.name)}</div><div class="n">${nf(o.tot[o.tot.length-1]||0,2)} kWh</div><div class="s">i dag så langt · ${w.length?nf(sum/w.length,2)+' kWh/døgn siste '+w.length+' hele døgn':'ingen hele døgn ennå'}</div></div>`}).join('');
+ const b=el(grid(tiles)+data.map(o=>`<h3 style="margin:16px 0 4px;font-size:14px">${esc(o.st.name)}</h3><div class="legend" id="leg-ds${o.si}"></div><div class="chart" id="ch-ds${o.si}"></div>`).join('')
+  +`<div class="s" style="margin-top:8px">Temperatur (døgnsnitt) og strøm deler samme døgnakse, men er to paneler oppå hverandre i stedet for to y-akser, så ingen av dem fordreies. Unntak: det uoppvarmede drivhuset i Arendal har ingen strømmåler.</div>`);
+ const draw=()=>data.forEach(o=>{const host=document.getElementById('ch-ds'+o.si);if(!host)return;
+  document.getElementById('leg-ds'+o.si).innerHTML=o.tem.map(s=>`<span><i style="background:${s.color};height:3px;border-radius:2px"></i>${esc(s.name)} (°C)</span>`).join('')+o.dev.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)} (kWh)</span>`).join('');
+  const W=host.clientWidth||600,m={l:40,r:10},h1=120,h2=130,gap=26,H=h1+gap+h2+24,n=days.length,bw=(W-m.l-m.r)/n,X=i=>m.l+bw*(i+.5);
+  const tv=o.tem.flatMap(s=>s.v).filter(x=>x!=null);let lo=Math.min(...tv,FROST)-1,hi=Math.max(...tv,FROST)+1;if(!tv.length){lo=-1;hi=10}
+  const Yt=v=>h1-(v-lo)/(hi-lo)*(h1-6)-0,mx=Math.max(...o.tot.filter(x=>x!=null),0.01)*1.15,Yb=v=>h1+gap+h2-v/mx*(h2-6);
+  let g=`<text x="${m.l}" y="-0" font-size="11" fill="#9aa39d"></text>`;
+  for(let i=0;i<=2;i++){const v=lo+(hi-lo)*i/2,y=Yt(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,0)}</text>`}
+  g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Yt(FROST)}" y2="${Yt(FROST)}" stroke="#e08363" stroke-dasharray="4 4"/>`;
+  for(let i=0;i<=2;i++){const v=mx*i/2,y=Yb(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,mx<2?2:1)}</text>`}
+  g+=`<text x="${m.l}" y="${h1+gap-8}" font-size="11" fill="#9aa39d">kWh per døgn</text>`;
+  o.tem.forEach(s=>{const pts=s.v.map((v,i)=>v==null?null:[X(i),Yt(v)]);let d='',pen=false;pts.forEach(p=>{if(!p){pen=false;return}d+=(pen?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);pen=true});
+   g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`+pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.5" fill="${s.color}"/>`).join('')});
+  days.forEach((_,i)=>{let acc=0;o.dev.forEach(d=>{const v=d.v[i];if(!v)return;const y0=Yb(acc),y1=Yb(acc+v);acc+=v;g+=`<rect x="${X(i)-Math.max(1,bw*.36)}" width="${Math.max(2,bw*.72)}" y="${y1}" height="${Math.max(0,y0-y1)}" rx="2" fill="${d.color}" stroke="#141917" stroke-width="1.5"/>`})});
+  const step=Math.ceil(n/Math.max(2,Math.floor(W/60)));days.forEach((d,i)=>{if(i%step===0||i===n-1)g+=`<text x="${X(i)}" y="${H-6}" text-anchor="middle" fill="#9aa39d" font-size="11">${d.slice(8)}.${d.slice(5,7)}.</text>`});
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Temperatur og strømforbruk per døgn">${g}<rect id="ds-band-${o.si}" y="0" height="${H-24}" fill="#ffffff" opacity=".06" style="display:none"/></svg><div class="tip" id="ds-tip-${o.si}"></div>`;
+  const svg=host.querySelector('svg'),band=document.getElementById('ds-band-'+o.si),tip=document.getElementById('ds-tip-'+o.si);
+  svg.addEventListener('pointermove',e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*W,i=Math.min(n-1,Math.max(0,Math.floor((px-m.l)/bw)));
+   band.setAttribute('x',m.l+bw*i);band.setAttribute('width',bw);band.style.display='';
+   tip.innerHTML=`<div class="s">${new Date(days[i]+'T12:00:00').toLocaleDateString('nb-NO',{weekday:'short',day:'numeric',month:'short'})}</div>`
+    +o.tem.map(s=>`<div><i class="dot" style="background:${s.color}"></i>${esc(s.name)}: ${s.v[i]==null?'–':nf(s.v[i],1)+' °C'}</div>`).join('')
+    +o.dev.map(s=>`<div><i class="dot" style="background:${s.color}"></i>${esc(s.name)}: ${s.v[i]==null?'–':nf(s.v[i],2)+' kWh'}</div>`).join('')+`<div><b>Sum ${o.tot[i]==null?'–':nf(o.tot[i],2)+' kWh'}</b></div>`;
+   tip.style.display='block';tip.style.left=Math.min(Math.max(X(i)/W*r.width+10,0),r.width-tip.offsetWidth)+'px';tip.style.top='8px'});
+  svg.addEventListener('pointerleave',()=>{band.style.display='none';tip.style.display='none'})});
+ return sec('dstrom','Strøm per døgn og temperatur','kWh per drivhus',b,{open:true,draw})}
 const ghHome=(site,name)=>/oslo/i.test((site||'')+' '+(name||''))?'oslo':'arendal';
 function secDrivhusIn(pl){const T=[];
  sensors('drivhus').filter(x=>ghHome(x.rows[x.rows.length-1].site,x.name)===pl).forEach(x=>T.push(sensorCard(x)));
@@ -478,7 +517,7 @@ function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if
 const safe=(f,nm)=>{try{return f()}catch(e){console.error(nm,e);return el(waiting('Kunne ikke vise '+nm+' ('+esc(e.message)+')')).firstChild}};
 function placeView(pl){const w=document.createElement('div');
  w.appendChild(placeHero(pl));{const a=safe(()=>secAvreise(pl),'Før du drar');if(a)w.appendChild(a)}
- const list=[pl==='drivhus'?()=>secDrivTemp():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
+ const list=[pl==='drivhus'?()=>secDrivTemp():null,pl==='drivhus'?()=>secDrivStrom():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
  if(pl==='arendal')w.appendChild(secPlan('mill','Mill-ovner','Ikke koblet ennå. Trenger å vite hvilken generasjon Mill-ovnene er.'));
@@ -738,7 +777,7 @@ const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
 function loginScreen(msg,out){const m=document.getElementById('main');
  m.innerHTML=`<div style="max-width:340px;margin:70px auto;text-align:center"><h2 style="margin:0 0 6px">Smarthus</h2><p class="s" style="margin:0 0 20px">${msg||'Logg inn for å se dataene.'}</p><button id="lg" style="font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${out?'Logg ut':'Logg inn med Google'}</button></div>`;
  document.getElementById('lg').onclick=async()=>{try{if(out){await AUTHC.signOut();location.reload()}else await AUTHC.signIn.social({provider:'google',callbackURL:location.origin+location.pathname})}catch(e){loginScreen('Feil: '+(e&&e.message||e))}}}
-function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa])=>{SA=sa;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json'),J('drivhusstrom.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa,ds])=>{STR=ds;SA=sa;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
  const lo=document.createElement('p');lo.className='s';lo.style.textAlign='center';lo.innerHTML='<a href="#" id="lo">Logg ut</a>';document.body.appendChild(lo);document.getElementById('lo').onclick=async e=>{e.preventDefault();try{await AUTHC.signOut()}catch(x){}location.reload()}}
 (async()=>{const m=document.getElementById('main');m.textContent='Laster …';
  try{AUTHC=(await import('https://esm.sh/@neon/auth@0.8.2')).createAuthClient(AUTH_URL)}catch(e){loginScreen('Kunne ikke laste innloggingen. Prøv igjen senere.');return}
