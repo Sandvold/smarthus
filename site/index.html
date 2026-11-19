@@ -215,7 +215,7 @@ function chart(id,key,unit,refLine,pad,S){
  const since=Date.now()-hours*3600000;
  const sets=S.map(s=>({name:s.name,color:s.color,pts:s.rows.filter(r=>r.t>since&&r[key]!=null).map(r=>({t:r.t.getTime(),v:r[key]}))}));
  drawLine('ch-'+id,'leg-'+id,'tb-'+id,sets,key,unit,refLine,pad)}
-function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
+function drawLine(id,legId,tbId,sets,key,unit,refLine,pad,dayOnly){
  const host=document.getElementById(id);if(!host)return;
  document.getElementById(legId).innerHTML=sets.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('');
  const all=sets.flatMap(s=>s.pts);
@@ -226,7 +226,7 @@ function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
  lo-=pad;hi+=pad;if(hi===lo)hi=lo+1;
  const X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b),d0=(key==='hum'||key==='pw')?0:1;
  let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,d0)}</text>`}
- {const nT=W<520?2:3,span=t1-t0,fo=span>96*3600000?(W<520?{day:'numeric',month:'short'}:{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):{weekday:'short',hour:'2-digit',minute:'2-digit'};
+ {const nT=W<520?2:3,span=t1-t0,fo=span>96*3600000||dayOnly?(W<520||dayOnly?{day:'numeric',month:'short'}:{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):{weekday:'short',hour:'2-digit',minute:'2-digit'};
  for(let i=0;i<=nT;i++){const t=t0+span*i/nT;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==nT?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',fo)}</text>`}}
  if(refLine!=null)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(refLine)}" y2="${Y(refLine)}" stroke="#e08363" stroke-dasharray="4 4"/><text x="${W-m.r}" y="${Y(refLine)-4}" text-anchor="end" fill="#e08363" font-size="11">Frost ${refLine} °C</text>`;
  const lines=sets.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" points="${s.pts.map(p=>X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}"/>`+(s.pts.length===1?`<circle cx="${X(s.pts[0].t)}" cy="${Y(s.pts[0].v)}" r="4" fill="${s.color}"/>`:'')).join('');
@@ -235,7 +235,7 @@ function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
  const move=e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*W,t=t0+(px-m.l)/(W-m.l-m.r)*(t1-t0);
   const rows=sets.map(s=>{if(!s.pts.length)return null;let b=s.pts[0];s.pts.forEach(p=>{if(Math.abs(p.t-t)<Math.abs(b.t-t))b=p});return{s,b}}).filter(Boolean);
   if(!rows.length)return;const ref=rows[0].b.t;xl.setAttribute('x1',X(ref));xl.setAttribute('x2',X(ref));xl.style.display='';
-  tip.innerHTML=`<div class="s">${fmt(new Date(ref))}</div>`+rows.map(o=>`<div><i class="dot" style="background:${o.s.color}"></i>${esc(o.s.name)}: ${nf(o.b.v,d0)} ${unit}</div>`).join('');
+  tip.innerHTML=`<div class="s">${dayOnly?new Date(ref).toLocaleDateString('nb-NO',{weekday:'short',day:'numeric',month:'short'}):fmt(new Date(ref))}</div>`+rows.map(o=>`<div><i class="dot" style="background:${o.s.color}"></i>${esc(o.s.name)}: ${nf(o.b.v,d0)} ${unit}</div>`).join('');
   tip.style.display='block';tip.style.left=Math.min(Math.max(X(ref)/W*r.width+10,0),r.width-tip.offsetWidth)+'px';tip.style.top='8px'};
  svg.addEventListener('pointermove',move);svg.addEventListener('pointerleave',()=>{xl.style.display='none';tip.style.display='none'});
  const rows=sets.flatMap(s=>s.pts.slice(-30).reverse().map(p=>({n:s.name,t:p.t,v:p.v}))).sort((a,b)=>b.t-a.t).slice(0,40);
@@ -451,40 +451,46 @@ let STR=null;
 const osloDay=t=>new Date(t).toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});
 function secDrivStrom(){
  const sites=(STR&&STR.sites)||[];if(!sites.length)return null;
- const N=Math.min(60,Math.max(7,Math.ceil(hours/24))),days=[...new Set(Array.from({length:N},(_,i)=>osloDay(Date.now()-(N-1-i)*86400000)))];
- const data=sites.map((st,si)=>{const pl=/oslo/i.test(st.name)?'oslo':'arendal';
-  const dev=st.devices.map((d,i)=>({name:d.name,color:PAL[i%PAL.length],v:days.map(x=>d.days[x]!=null?d.days[x]:null)}));
-  const tem=sensors('drivhus').filter(x=>ghHome(x.rows[x.rows.length-1].site,x.name)===pl).map((x,i)=>({name:x.name,color:PAL[(i+3)%PAL.length],
+ const N=Math.min(60,Math.max(7,Math.ceil(hours/24))),days=[...new Set(Array.from({length:N},(_,i)=>osloDay(Date.now()-(N-1-i)*86400000)))],n=days.length;
+ const data=sites.map((st,si)=>{const pl=/oslo/i.test(st.name)?'oslo':'arendal',color=PAL[si%PAL.length];
+  const dev=st.devices.map(d=>({name:d.name,v:days.map(x=>d.days[x]!=null?d.days[x]:null)}));
+  const tem=sensors('drivhus').filter(x=>ghHome(x.rows[x.rows.length-1].site,x.name)===pl).map(x=>({name:x.name,
    v:days.map(d=>{const a=x.rows.filter(r=>r.temp!=null&&osloDay(r.t)===d).map(r=>r.temp);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null})}));
   const tot=days.map((_,i)=>dev.some(d=>d.v[i]!=null)?dev.reduce((p,d)=>p+(d.v[i]||0),0):null);
-  return{st,si,dev,tem,tot}});
- const tiles=data.map(o=>{const have=o.tot.filter(x=>x!=null),w=o.tot.slice(-8,-1).filter(x=>x!=null),sum=w.reduce((p,q)=>p+q,0);
-  return `<div class="tile"><div class="s">${esc(o.st.name)}</div><div class="n">${nf(o.tot[o.tot.length-1]||0,2)} kWh</div><div class="s">i dag så langt · ${w.length?nf(sum/w.length,2)+' kWh/døgn siste '+w.length+' hele døgn':'ingen hele døgn ennå'}</div></div>`}).join('');
- const b=el(grid(tiles)+data.map(o=>`<h3 style="margin:16px 0 4px;font-size:14px">${esc(o.st.name)}</h3><div class="legend" id="leg-ds${o.si}"></div><div class="chart" id="ch-ds${o.si}"></div>`).join('')
-  +`<div class="s" style="margin-top:8px">Søyler (kWh per døgn, venstre akse) og temperaturlinje (døgnsnitt, høyre akse) ligger i samme graf på samme døgnakse. Det uoppvarmede drivhuset i Arendal har ingen strømmåler.</div>`);
- const draw=()=>data.forEach(o=>{const host=document.getElementById('ch-ds'+o.si);if(!host)return;
-  document.getElementById('leg-ds'+o.si).innerHTML=o.tem.map(s=>`<span><i style="background:${s.color};height:3px;border-radius:2px"></i>${esc(s.name)} (°C)</span>`).join('')+o.dev.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)} (kWh)</span>`).join('');
-  const W=host.clientWidth||600,m={l:40,r:42},P=240,H=P+24,n=days.length,bw=(W-m.l-m.r)/n,X=i=>m.l+bw*(i+.5);
-  const tv=o.tem.flatMap(s=>s.v).filter(x=>x!=null);let lo=Math.min(...tv,FROST)-1,hi=Math.max(...tv,FROST)+1;if(!tv.length){lo=-1;hi=10}
-  const mx=Math.max(...o.tot.filter(x=>x!=null),0.01)*1.15,Yt=v=>P-(v-lo)/(hi-lo)*(P-8),Yb=v=>P-v/mx*(P-8),tc=o.tem.length?o.tem[0].color:'#9aa39d';
+  return{st,color,dev,tem,tot}});
+ const tiles=data.map(o=>{const w=o.tot.slice(-8,-1).filter(x=>x!=null),sum=w.reduce((p,q)=>p+q,0);
+  return `<div class="tile"><div class="s"><i class="dot" style="background:${o.color}"></i>${esc(o.st.name)}</div><div class="n">${nf(o.tot[n-1]||0,2)} kWh</div><div class="s">i dag så langt · ${w.length?nf(sum/w.length,2)+' kWh/døgn siste '+w.length+' hele døgn':'ingen hele døgn ennå'}</div></div>`}).join('');
+ const b=el(grid(tiles)+`<div class="legend" id="leg-ds"></div><div class="chart" id="ch-ds"></div>`
+  +`<div class="s" style="margin-top:8px">Søyler: strøm per døgn (kWh, venstre akse). Linjer: døgnsnitt temperatur (°C, høyre akse). Samme farge = samme drivhus. Det uoppvarmede drivhuset i Arendal har ingen strømmåler.</div>`);
+ const draw=()=>{const host=document.getElementById('ch-ds');if(!host)return;
+  document.getElementById('leg-ds').innerHTML=data.map(o=>`<span><i style="background:${o.color}"></i>${esc(o.st.name)} (kWh)</span>`).join('')+data.flatMap(o=>o.tem.map(t=>`<span><i style="background:${o.color};height:3px;border-radius:2px"></i>${esc(t.name)} (°C)</span>`)).join('');
+  const W=host.clientWidth||600,m={l:40,r:42},P=250,H=P+24,bw=(W-m.l-m.r)/n,X=i=>m.l+bw*(i+.5),ns=data.length,gw=Math.max(4,bw*.78),sw=gw/ns;
+  const tv=data.flatMap(o=>o.tem.flatMap(s=>s.v)).filter(x=>x!=null);let lo=Math.min(...tv,FROST)-1,hi=Math.max(...tv,FROST)+1;if(!tv.length){lo=-1;hi=10}
+  const mx=Math.max(...data.flatMap(o=>o.tot).filter(x=>x!=null),0.01)*1.15,Yt=v=>P-(v-lo)/(hi-lo)*(P-8),Yb=v=>P-v/mx*(P-8);
   let g='';
-  for(let i=0;i<=4;i++){const y=P-i/4*(P-8);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(mx*i/4,mx<2?2:1)}</text><text x="${W-m.r+6}" y="${y+4}" fill="${tc}" font-size="11">${nf(lo+(hi-lo)*i/4,0)}</text>`}
-  g+=`<text x="${m.l-6}" y="-0" font-size="0"></text><text x="${m.l}" y="${P+16}" font-size="0"></text>`;
-  days.forEach((_,i)=>{let acc=0;o.dev.forEach(d=>{const v=d.v[i];if(!v)return;const y0=Yb(acc),y1=Yb(acc+v);acc+=v;g+=`<rect x="${X(i)-Math.max(1,bw*.36)}" width="${Math.max(2,bw*.72)}" y="${y1}" height="${Math.max(0,y0-y1)}" rx="2" fill="${d.color}" stroke="#141917" stroke-width="1.5"/>`})});
+  for(let i=0;i<=4;i++){const y=P-i/4*(P-8);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(mx*i/4,mx<2?2:1)}</text><text x="${W-m.r+6}" y="${y+4}" fill="#9aa39d" font-size="11">${nf(lo+(hi-lo)*i/4,0)}</text>`}
+  data.forEach((o,k)=>days.forEach((_,i)=>{const v=o.tot[i];if(!v)return;const x=X(i)-gw/2+k*sw,y=Yb(v);g+=`<rect x="${x+.5}" width="${Math.max(2,sw-1)}" y="${y}" height="${Math.max(0,P-y)}" rx="2" fill="${o.color}" opacity=".75"/>`}));
   g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Yt(FROST)}" y2="${Yt(FROST)}" stroke="#e08363" stroke-dasharray="4 4"/>`;
-  o.tem.forEach(s=>{const pts=s.v.map((v,i)=>v==null?null:[X(i),Yt(v)]);let d='',pen=false;pts.forEach(p=>{if(!p){pen=false;return}d+=(pen?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);pen=true});
-   g+=`<path d="${d}" fill="none" stroke="#141917" stroke-width="5" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`+pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${s.color}" stroke="#141917" stroke-width="1.5"/>`).join('')});
+  data.forEach(o=>o.tem.forEach((s,j)=>{const pts=s.v.map((v,i)=>v==null?null:[X(i),Yt(v)]);let d='',pen=false;pts.forEach(p=>{if(!p){pen=false;return}d+=(pen?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);pen=true});
+   g+=`<path d="${d}" fill="none" stroke="#141917" stroke-width="5" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${o.color}" stroke-width="2" stroke-linejoin="round"${j?' stroke-dasharray="5 3"':''}/>`+pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${o.color}" stroke="#141917" stroke-width="1.5"/>`).join('')}));
   const step=Math.ceil(n/Math.max(2,Math.floor(W/60)));days.forEach((d,i)=>{if(i%step===0||i===n-1)g+=`<text x="${X(i)}" y="${H-6}" text-anchor="middle" fill="#9aa39d" font-size="11">${d.slice(8)}.${d.slice(5,7)}.</text>`});
-  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Temperatur og strømforbruk per døgn">${g}<rect id="ds-band-${o.si}" y="0" height="${P}" fill="#ffffff" opacity=".06" style="display:none"/></svg><div class="tip" id="ds-tip-${o.si}"></div>`;
-  const svg=host.querySelector('svg'),band=document.getElementById('ds-band-'+o.si),tip=document.getElementById('ds-tip-'+o.si);
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Strøm og temperatur per døgn i drivhusene">${g}<rect id="ds-band" y="0" height="${P}" fill="#ffffff" opacity=".06" style="display:none"/></svg><div class="tip" id="ds-tip"></div>`;
+  const svg=host.querySelector('svg'),band=document.getElementById('ds-band'),tip=document.getElementById('ds-tip');
   svg.addEventListener('pointermove',e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*W,i=Math.min(n-1,Math.max(0,Math.floor((px-m.l)/bw)));
    band.setAttribute('x',m.l+bw*i);band.setAttribute('width',bw);band.style.display='';
    tip.innerHTML=`<div class="s">${new Date(days[i]+'T12:00:00').toLocaleDateString('nb-NO',{weekday:'short',day:'numeric',month:'short'})}</div>`
-    +o.tem.map(s=>`<div><i class="dot" style="background:${s.color}"></i>${esc(s.name)}: ${s.v[i]==null?'–':nf(s.v[i],1)+' °C'}</div>`).join('')
-    +o.dev.map(s=>`<div><i class="dot" style="background:${s.color}"></i>${esc(s.name)}: ${s.v[i]==null?'–':nf(s.v[i],2)+' kWh'}</div>`).join('')+`<div><b>Sum ${o.tot[i]==null?'–':nf(o.tot[i],2)+' kWh'}</b></div>`;
+    +data.map(o=>`<div style="margin-top:4px"><i class="dot" style="background:${o.color}"></i><b>${esc(o.st.name)}</b></div>`+o.tem.map(s=>`<div>${esc(s.name)}: ${s.v[i]==null?'–':nf(s.v[i],1)+' °C'}</div>`).join('')+o.dev.map(s=>`<div>${esc(s.name)}: ${s.v[i]==null?'–':nf(s.v[i],2)+' kWh'}</div>`).join('')+`<div>Sum: <b>${o.tot[i]==null?'–':nf(o.tot[i],2)+' kWh'}</b></div>`).join('');
    tip.style.display='block';tip.style.left=Math.min(Math.max(X(i)/W*r.width+10,0),r.width-tip.offsetWidth)+'px';tip.style.top='8px'});
-  svg.addEventListener('pointerleave',()=>{band.style.display='none';tip.style.display='none'})});
- return sec('dstrom','Strøm per døgn og temperatur','kWh per drivhus',b,{open:true,draw})}
+  svg.addEventListener('pointerleave',()=>{band.style.display='none';tip.style.display='none'})};
+ return sec('dstrom','Strøm og temperatur per døgn','kWh per drivhus',b,{open:true,draw})}
+function secDrivDogn(){
+ const S=()=>sensors('drivhus').map((x,i)=>{const d={};x.rows.forEach(r=>{if(r.temp==null)return;const k=osloDay(r.t);(d[k]=d[k]||[]).push(r.temp)});
+  return{name:x.name,color:PAL[i%PAL.length],pts:Object.entries(d).sort().map(([k,a])=>({t:new Date(k+'T12:00:00').getTime(),v:a.reduce((p,q)=>p+q,0)/a.length,mn:Math.min(...a),mx:Math.max(...a)}))}}).filter(s=>s.pts.length);
+ const all=S();if(!all.length)return null;
+ const b=el(chartBlock('dd')+`<div class="s" style="margin-top:6px">Gjennomsnitt per døgn (Oslo-tid) for hvert drivhus, så du ser når det er trygt å sette ut. Siste døgn er foreløpig. Døgnets laveste og høyeste ligger i tabellen under grafen.</div>`);
+ const draw=()=>{const sets=S();drawLine('ch-dd','leg-dd','tb-dd',sets,'t','°C',FROST,1,true);
+  const tb=document.getElementById('tb-dd');if(tb)tb.innerHTML='<table><tr><th>Døgn</th><th>Drivhus</th><th>Snitt</th><th>Lavest</th><th>Høyest</th></tr>'+sets.flatMap(s=>s.pts.map(p=>({n:s.name,...p}))).sort((a,b)=>b.t-a.t).slice(0,40).map(r=>`<tr><td>${new Date(r.t).toLocaleDateString('nb-NO',{day:'numeric',month:'short'})}</td><td>${esc(r.n)}</td><td>${nf(r.v,1)} °C</td><td>${nf(r.mn,1)} °C</td><td>${nf(r.mx,1)} °C</td></tr>`).join('')+'</table>'};
+ return sec('ddogn','Døgnsnitt temperatur',all.map(s=>esc(s.name)+' '+nf(s.pts[s.pts.length-1].v,1)+' °C').join(' · '),b,{open:true,draw})}
 const ghHome=(site,name)=>/oslo/i.test((site||'')+' '+(name||''))?'oslo':'arendal';
 function secDrivhusIn(pl){const T=[];
  sensors('drivhus').filter(x=>ghHome(x.rows[x.rows.length-1].site,x.name)===pl).forEach(x=>T.push(sensorCard(x)));
@@ -551,7 +557,7 @@ function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if
 const safe=(f,nm)=>{try{return f()}catch(e){console.error(nm,e);return el(waiting('Kunne ikke vise '+nm+' ('+esc(e.message)+')')).firstChild}};
 function placeView(pl){const w=document.createElement('div');
  w.appendChild(placeHero(pl));{const a=safe(()=>secAvreise(pl),'Før du drar');if(a)w.appendChild(a)}
- const list=[pl==='drivhus'?()=>secDrivTemp():null,pl==='drivhus'?()=>secDrivStrom():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secBil(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
+ const list=[pl==='drivhus'?()=>secDrivTemp():null,pl==='drivhus'?()=>secDrivStrom():null,pl==='drivhus'?()=>secDrivDogn():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secBil(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
  if(pl==='arendal')w.appendChild(secPlan('mill','Mill-ovner','Ikke koblet ennå. Trenger å vite hvilken generasjon Mill-ovnene er.'));
