@@ -487,8 +487,8 @@ function placeView(pl){const w=document.createElement('div');
 function alerts(all){const A=[];
  SERIES().forEach(s=>{const l=s.rows[s.rows.length-1],pl=s.pl;
   if(l.temp!=null&&l.temp<=FROST)A.push({k:'frost:'+s.name,pl,lvl:'bad',txt:`Frost i ${esc(s.name)}: ${nf(l.temp)} °C`});
-  else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({k:'nearfrost:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} er nær frost: ${nf(l.temp)} °C`});
-  {const e=frostEta(s);if(e)A.push({k:'frosteta:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} faller ${nf(e.rate,1)} °C/t og kan nå 0 °C om ${etaTxt(e)} (anslag)`})}
+  else{const e=frostEta(s);if(e)A.push({k:'frosteta:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} er ${nf(l.temp)} °C, faller ${nf(e.rate,1)} °C/t og kan nå 0 °C om ${etaTxt(e)} (anslag)`});
+   else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({k:'nearfrost:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} er nær frost: ${nf(l.temp)} °C`})}
   if((Date.now()-l.t)/60000>STALE_MIN)A.push({k:'stale:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} har ikke sendt måling siden ${fmt(l.t)}`});
   if(l.batt!=null&&l.batt<LOW_BATT)A.push({k:'batt:'+s.name,pl,lvl:'warn',txt:`Lavt batteri i ${esc(s.name)} (${nf(l.batt,0)} %)`})});
  ['oslo','arendal','drivhus'].forEach(pl=>{
@@ -526,7 +526,7 @@ function lastT(arr,f){const m=maxT(arr,f);return m?'sist '+ago(m):''}
 const SRC_OLD=3*3600000;
 function srcTimes(){const tt=x=>new Date(x.t).getTime();return[maxT(ALL,r=>new Date(r.ts).getTime()),maxT(shList().flatMap(c=>c.rows),tt),maxT(((AX&&AX.rooms)||[]).flatMap(c=>c.rows),tt),maxT(((GD&&GD.devices)||[]).flatMap(c=>c.rows),tt),maxT(((HM&&HM.devices)||[]).flatMap(c=>c.rows),tt),maxT(((AQ&&AQ.devices)||[]).flatMap(c=>c.rows),tt),maxT(((MT&&MT.thermostats)||[]).flatMap(c=>c.rows),tt),maxT(((ZP&&ZP.chargers)||[]).flatMap(c=>c.rows),tt)].filter(Boolean)}
 function secSystemer(){
- const tt=x=>new Date(x.t).getTime(),src=(n,ok,arr,f,alt,lim)=>{if(!ok)return[n,'wait',alt||'venter'];const m=maxT(arr,f);return[n,m&&Date.now()-m>(lim||SRC_OLD)?'old':'ok',m?'sist '+ago(m):'']};
+ const tt=x=>new Date(x.t).getTime(),src=(n,ok,arr,f,alt,lim)=>{if(!ok)return[n,'wait',alt||'venter'];const m=maxT(arr,f);if(!m)return[n,'wait','ingen data'];return[n,Date.now()-m>(lim||SRC_OLD)?'old':'ok','sist '+ago(m)]};
  const rows=[src('Tuya / Smart Life (termostat, varmepumpe)',1,ALL,r=>new Date(r.ts).getTime()),
  src('Shelly (stikk i innerdrivhus)',1,shList().flatMap(c=>c.rows),tt),
  src('Tibber (strøm Oslo og Arendal)',1,((PW&&PW.homes)||[]).flatMap(h=>h.hourly||[]),x=>new Date(x.from).getTime()+3600000,'',6*3600000),
@@ -542,6 +542,32 @@ function secSystemer(){
  ['Inkbird ITC-308','todo','ikke koblet'],['Mill','todo','ikke koblet']];
  const ic={old:'<span class="warn">● gammel</span>',ok:'<span class="ok">● koblet</span>',wait:'<span class="warn">● venter</span>',todo:'<span class="s">○ mangler</span>'};
  return sec('sys','Datakilder',rows.filter(r=>r[1]==='ok'||r[1]==='old').length+' av '+rows.length+' koblet'+(rows.some(r=>r[1]==='old')?' · '+rows.filter(r=>r[1]==='old').length+' gammel':''),el('<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td style="white-space:nowrap">${ic[r[1]]}</td><td class="s">${r[2]}</td></tr>`).join('')+'</table>'),{open:false})}
+/* ---------- effekttrinn: snitt av de 3 høyeste timene (ulike døgn) denne måneden ---------- */
+const TRINN=[2,5,10,15,20,25];/* vanlig inndeling i kW; sjekk nettselskapet */
+function effekt(hm){const osl=d=>d.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'}),mon=osl(new Date()).slice(0,7),day={};
+ hm.hourly.forEach(r=>{const t=new Date(r.from),k=osl(t);if(k.slice(0,7)!==mon||r.kwh==null)return;if(!day[k]||r.kwh>day[k].kwh)day[k]={kwh:r.kwh,t}});
+ const top=Object.values(day).sort((a,b)=>b.kwh-a.kwh).slice(0,3);if(!top.length)return null;
+ const avg=top.reduce((a,x)=>a+x.kwh,0)/top.length,i=TRINN.findIndex(x=>avg<x),nxt=i<0?null:TRINN[i];
+ let lim=null;if(nxt!=null&&top.length===3){lim=Math.max(top[2].kwh,3*nxt-top[0].kwh-top[1].kwh)}
+ const today=day[osl(new Date())];return{avg,top,step:i<0?TRINN.length+1:i+1,lo:i<=0?0:TRINN[i-1],nxt,lim,today:today?today.kwh:null}}
+const effTxt=e=>`Effekttrinn ${e.step} (${nf(e.lo,0)}–${e.nxt==null?'':nf(e.nxt,0)} kW), snitt av ${e.top.length} toppe${e.top.length===1?'n':'r'} ${nf(e.avg,1)} kW`+(e.lim!=null?` · hold timene i dag under ${nf(e.lim,1)} kWh for å bli på trinnet`:'');
+/* ---------- siden sist: hendelser siden forrige besøk (lagres i denne nettleseren) ---------- */
+const SEEN_PREV=ls.get('sh-seen',0);{const mark=()=>ls.set('sh-seen',Date.now());addEventListener('pagehide',mark);document.addEventListener('visibilitychange',()=>{if(document.hidden)mark()})}
+function sinceLast(){const t0=Math.max(SEEN_PREV||Date.now()-864e5,Date.now()-7*864e5),E=[],add=(t,pl,txt,lvl)=>{if(t>t0)E.push({t,pl,txt,lvl})},T=x=>new Date(x.t).getTime();
+ ((HM&&HM.devices)||[]).forEach(c=>{const pl=placeOf(c.site,c.name);for(let i=1;i<c.rows.length;i++){const a=c.rows[i-1].d||{},b=c.rows[i].d||{},t=T(c.rows[i]);
+  if(c.kind==='lock'&&a.locked!==b.locked&&b.locked!=null)add(t,pl,`${esc(c.name)} ble ${b.locked?'låst':'<b>låst opp</b>'}`,b.locked?'':'warn');
+  if(c.kind==='mower'&&a.mower_status!=='mowing'&&b.mower_status==='mowing')add(t,pl,`${esc(c.name)} startet klipping`);
+  if(c.kind==='mower'&&b.mower_status==='error'&&a.mower_status!=='error')add(t,pl,`${esc(c.name)} meldte feil`,'warn')}});
+ ((GD&&GD.devices)||[]).filter(c=>c.kind==='valve').forEach(c=>{for(let i=1;i<c.rows.length;i++){const a=c.rows[i-1],b=c.rows[i];if((!a.act||a.act==='CLOSED')&&b.act&&b.act!=='CLOSED')add(T(b),placeOf(c.site,c.name),`Vanning startet: ${esc(c.name)}`)}});
+ ((ZP&&ZP.chargers)||[]).forEach(c=>{for(let i=1;i<c.rows.length;i++){const a=c.rows[i-1],b=c.rows[i];if(a.m!==3&&b.m===3)add(T(b),placeOf(c.site,c.name),`${esc(c.name)} begynte å lade`)}});
+ SERIES().filter(x=>x.pl==='drivhus').forEach(x=>{const R=x.rows.filter(r=>r.temp!=null&&r.t.getTime()>t0);if(!R.length)return;const m=R.reduce((a,r)=>r.temp<a.temp?r:a);
+  if(m.temp<=WARN_NEAR)add(m.t.getTime(),'drivhus',`${esc(x.name)} var nede i ${nf(m.temp)} °C`,m.temp<=FROST?'bad':'warn')});
+ return{t0,E:E.sort((a,b)=>b.t-a.t)}}
+function secSince(){const {t0,E}=sinceLast(),first=!SEEN_PREV;const ic={bad:'<span class="bad">⚠</span>',warn:'<span class="warn">▲</span>','':'<span class="s">•</span>'};
+ const head=first?'siste døgn':'siden '+new Date(t0).toLocaleString('nb-NO',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+ const b=el((E.length?E.slice(0,12).map(e=>`<div class="al">${ic[e.lvl||'']}<span style="flex:1">${e.txt}<span class="s"> · ${PLACES[e.pl]} · ${new Date(e.t).toLocaleString('nb-NO',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</span></span></div>`).join('')+(E.length>12?`<div class="s">… og ${E.length-12} til</div>`:''):'<div class="s">Ingenting å melde.</div>')
+  +'<div class="s" style="margin-top:8px">Huskes i denne nettleseren. Dører, klippere, vanning, lading og kulde i drivhus.</div>');
+ return sec('since','Siden sist',(E.length?E.length+(E.length===1?' hendelse':' hendelser'):'ingenting nytt')+' · '+head,b,{open:E.some(e=>e.lvl)})}
 function overview(){const w=document.createElement('div'),A=alerts();
  const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Hjemme nå</h1><span class="chip ${A.some(a=>a.lvl==='bad')?'bad':A.some(a=>a.lvl!=='info')?'warn':'ok'}">${A.filter(a=>a.lvl!=='info').length?A.filter(a=>a.lvl!=='info').length+(A.filter(a=>a.lvl!=='info').length===1?' varsel':' varsler'):'Alt OK'}</span></div>${lede().replace('class="lede"','class="lede" style="margin:10px 0 0"')}</div>`);w.appendChild(hero);
  const AA=alerts(true),real=A.filter(a=>a.lvl!=='info'),hidn=AA.filter(a=>a.hid);
@@ -558,8 +584,8 @@ function overview(){const w=document.createElement('div'),A=alerts();
  if(hs.length)w.appendChild(sec('kwh','Strømforbruk',hs.map(h=>nf(pwStats(h).k24,0)+' kWh '+PLACES[placeOf(h.site,h.name)]).join(' · '),el(`<div class="pw">${hs.map(h=>{const s=pwStats(h),pl=placeOf(h.site,h.name),kr=v=>v?nf(v,0)+' kr':'–';
   const lag=s.lag>3*3600000?` <span class="s">· data til ${new Date(s.tmax).toLocaleString('nb-NO',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</span>`:'';
   const ch=s.ch==null?'':`<span class="${s.ch>0?'up':'dn'}">${s.ch>0?'↑':'↓'} ${Math.abs(s.ch)} %</span> <span class="s">mot uka før</span>`;
-  return `<div class="h" style="color:var(--${pl})">${PLACES[pl]}${lag}</div><span class="s">Siste døgn</span><b>${nf(s.k24,1)} kWh</b><span>${kr(s.c24)}</span><span class="s">7 dager</span><b>${nf(s.k7,0)} kWh</b><span>${kr(s.c7)}</span><span class="s" style="grid-column:1/-1">${ch}${s.kr?` · snitt ${nf(s.kr,2)} kr/kWh`:''}</span>`}).join('')}</div>`)));
- w.appendChild(secSystemer());return w}
+  return `<div class="h" style="color:var(--${pl})">${PLACES[pl]}${lag}</div><span class="s">Siste døgn</span><b>${nf(s.k24,1)} kWh</b><span>${kr(s.c24)}</span><span class="s">7 dager</span><b>${nf(s.k7,0)} kWh</b><span>${kr(s.c7)}</span><span class="s" style="grid-column:1/-1">${ch}${s.kr?` · snitt ${nf(s.kr,2)} kr/kWh`:''}</span>${(()=>{const e=effekt(h);return e?`<span class="s" style="grid-column:1/-1">${effTxt(e)}</span>`:''})()}`}).join('')}</div><div class="s" style="margin-top:8px">Effekttrinn er et anslag med vanlig trinninndeling (${TRINN.join(', ')} kW); grensene kan variere mellom nettselskap.</div>`)));
+ w.insertBefore(safe(secSince,'Siden sist'),cards.nextSibling);w.appendChild(secSystemer());return w}
 /* ---------- styring: kompakte kort for alle styrbare enheter ---------- */
 const GRP=['Dører','Hage og vanning','Varme','Lys og stikk','Elbil'],PLORD={oslo:0,arendal:1,drivhus:2};
 const mowLab=I=>{const d=I.d,k=I.last.k;return k==='docked'?(String(d.charging_status||'').includes('complete')?'På lader (full)':String(d.charging_status||'')==='charging'?'Lader':'På lader'):MLAB[k]};
