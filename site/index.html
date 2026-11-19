@@ -451,22 +451,21 @@ function secDrivStrom(){
  const tiles=data.map(o=>{const have=o.tot.filter(x=>x!=null),w=o.tot.slice(-8,-1).filter(x=>x!=null),sum=w.reduce((p,q)=>p+q,0);
   return `<div class="tile"><div class="s">${esc(o.st.name)}</div><div class="n">${nf(o.tot[o.tot.length-1]||0,2)} kWh</div><div class="s">i dag så langt · ${w.length?nf(sum/w.length,2)+' kWh/døgn siste '+w.length+' hele døgn':'ingen hele døgn ennå'}</div></div>`}).join('');
  const b=el(grid(tiles)+data.map(o=>`<h3 style="margin:16px 0 4px;font-size:14px">${esc(o.st.name)}</h3><div class="legend" id="leg-ds${o.si}"></div><div class="chart" id="ch-ds${o.si}"></div>`).join('')
-  +`<div class="s" style="margin-top:8px">Temperatur (døgnsnitt) og strøm deler samme døgnakse, men er to paneler oppå hverandre i stedet for to y-akser, så ingen av dem fordreies. Unntak: det uoppvarmede drivhuset i Arendal har ingen strømmåler.</div>`);
+  +`<div class="s" style="margin-top:8px">Søyler (kWh per døgn, venstre akse) og temperaturlinje (døgnsnitt, høyre akse) ligger i samme graf på samme døgnakse. Det uoppvarmede drivhuset i Arendal har ingen strømmåler.</div>`);
  const draw=()=>data.forEach(o=>{const host=document.getElementById('ch-ds'+o.si);if(!host)return;
   document.getElementById('leg-ds'+o.si).innerHTML=o.tem.map(s=>`<span><i style="background:${s.color};height:3px;border-radius:2px"></i>${esc(s.name)} (°C)</span>`).join('')+o.dev.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)} (kWh)</span>`).join('');
-  const W=host.clientWidth||600,m={l:40,r:10},h1=120,h2=130,gap=26,H=h1+gap+h2+24,n=days.length,bw=(W-m.l-m.r)/n,X=i=>m.l+bw*(i+.5);
+  const W=host.clientWidth||600,m={l:40,r:42},P=240,H=P+24,n=days.length,bw=(W-m.l-m.r)/n,X=i=>m.l+bw*(i+.5);
   const tv=o.tem.flatMap(s=>s.v).filter(x=>x!=null);let lo=Math.min(...tv,FROST)-1,hi=Math.max(...tv,FROST)+1;if(!tv.length){lo=-1;hi=10}
-  const Yt=v=>h1-(v-lo)/(hi-lo)*(h1-6)-0,mx=Math.max(...o.tot.filter(x=>x!=null),0.01)*1.15,Yb=v=>h1+gap+h2-v/mx*(h2-6);
-  let g=`<text x="${m.l}" y="-0" font-size="11" fill="#9aa39d"></text>`;
-  for(let i=0;i<=2;i++){const v=lo+(hi-lo)*i/2,y=Yt(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,0)}</text>`}
-  g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Yt(FROST)}" y2="${Yt(FROST)}" stroke="#e08363" stroke-dasharray="4 4"/>`;
-  for(let i=0;i<=2;i++){const v=mx*i/2,y=Yb(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,mx<2?2:1)}</text>`}
-  g+=`<text x="${m.l}" y="${h1+gap-8}" font-size="11" fill="#9aa39d">kWh per døgn</text>`;
-  o.tem.forEach(s=>{const pts=s.v.map((v,i)=>v==null?null:[X(i),Yt(v)]);let d='',pen=false;pts.forEach(p=>{if(!p){pen=false;return}d+=(pen?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);pen=true});
-   g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`+pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.5" fill="${s.color}"/>`).join('')});
+  const mx=Math.max(...o.tot.filter(x=>x!=null),0.01)*1.15,Yt=v=>P-(v-lo)/(hi-lo)*(P-8),Yb=v=>P-v/mx*(P-8),tc=o.tem.length?o.tem[0].color:'#9aa39d';
+  let g='';
+  for(let i=0;i<=4;i++){const y=P-i/4*(P-8);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(mx*i/4,mx<2?2:1)}</text><text x="${W-m.r+6}" y="${y+4}" fill="${tc}" font-size="11">${nf(lo+(hi-lo)*i/4,0)}</text>`}
+  g+=`<text x="${m.l-6}" y="-0" font-size="0"></text><text x="${m.l}" y="${P+16}" font-size="0"></text>`;
   days.forEach((_,i)=>{let acc=0;o.dev.forEach(d=>{const v=d.v[i];if(!v)return;const y0=Yb(acc),y1=Yb(acc+v);acc+=v;g+=`<rect x="${X(i)-Math.max(1,bw*.36)}" width="${Math.max(2,bw*.72)}" y="${y1}" height="${Math.max(0,y0-y1)}" rx="2" fill="${d.color}" stroke="#141917" stroke-width="1.5"/>`})});
+  g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Yt(FROST)}" y2="${Yt(FROST)}" stroke="#e08363" stroke-dasharray="4 4"/>`;
+  o.tem.forEach(s=>{const pts=s.v.map((v,i)=>v==null?null:[X(i),Yt(v)]);let d='',pen=false;pts.forEach(p=>{if(!p){pen=false;return}d+=(pen?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);pen=true});
+   g+=`<path d="${d}" fill="none" stroke="#141917" stroke-width="5" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`+pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${s.color}" stroke="#141917" stroke-width="1.5"/>`).join('')});
   const step=Math.ceil(n/Math.max(2,Math.floor(W/60)));days.forEach((d,i)=>{if(i%step===0||i===n-1)g+=`<text x="${X(i)}" y="${H-6}" text-anchor="middle" fill="#9aa39d" font-size="11">${d.slice(8)}.${d.slice(5,7)}.</text>`});
-  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Temperatur og strømforbruk per døgn">${g}<rect id="ds-band-${o.si}" y="0" height="${H-24}" fill="#ffffff" opacity=".06" style="display:none"/></svg><div class="tip" id="ds-tip-${o.si}"></div>`;
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Temperatur og strømforbruk per døgn">${g}<rect id="ds-band-${o.si}" y="0" height="${P}" fill="#ffffff" opacity=".06" style="display:none"/></svg><div class="tip" id="ds-tip-${o.si}"></div>`;
   const svg=host.querySelector('svg'),band=document.getElementById('ds-band-'+o.si),tip=document.getElementById('ds-tip-'+o.si);
   svg.addEventListener('pointermove',e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*W,i=Math.min(n-1,Math.max(0,Math.floor((px-m.l)/bw)));
    band.setAttribute('x',m.l+bw*i);band.setAttribute('width',bw);band.style.display='';
