@@ -79,11 +79,12 @@ details.mini{margin-top:8px;color:var(--mut);font-size:13px}table{border-collaps
 .dg{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
 .dc{--pl:var(--acc);position:relative;display:flex;flex-direction:column;gap:6px;background:linear-gradient(160deg,#1f2825,#161c1a);border:1px solid #ffffff0d;border-radius:18px;padding:13px;transition:border-color .2s,box-shadow .2s}
 .dc.on{border-color:color-mix(in srgb,var(--pl) 55%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--pl) 25%,transparent),0 8px 26px color-mix(in srgb,var(--pl) 14%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--pl) 16%,#1f2825),#161c1a)}
-.dc-top{display:flex;align-items:center;gap:9px}
+.dc-top{display:flex;align-items:center;gap:9px}.dc.off{opacity:.55}.dc.off .dc-st{font-size:18px}
+.pw{display:grid;grid-template-columns:1fr auto auto;gap:4px 14px;align-items:baseline;font-variant-numeric:tabular-nums}.pw b{font-size:20px}.pw .h{grid-column:1/-1;margin-top:8px;font-weight:650}.pw .h:first-child{margin-top:0}.up{color:var(--bad)}.dn{color:var(--ok)}
 .dc-ic{width:32px;height:32px;border-radius:10px;background:#ffffff10;display:grid;place-items:center;flex:none;color:var(--mut)}
 .dc.on .dc-ic{background:color-mix(in srgb,var(--pl) 30%,transparent);color:var(--pl)}
 .dc-ic svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;height:19px}
-.dc-nm{min-width:0;line-height:1.2}.dc-nm b{display:block;font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dc-nm span{font-size:11px;color:var(--mut)}
+.dc-nm{min-width:0;line-height:1.2}.dc-nm b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:14px;font-weight:650;overflow:hidden;overflow-wrap:anywhere}.dc-nm span{font-size:11px;color:var(--mut)}
 .dc-dot{width:9px;height:9px;border-radius:50%;background:#59615d;margin-left:auto;flex:none}
 .dc.ok .dc-dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}.dc.warn .dc-dot{background:var(--warn);box-shadow:0 0 8px var(--warn)}.dc.bad .dc-dot{background:var(--bad);box-shadow:0 0 8px var(--bad)}
 .dc-st{font-size:26px;font-weight:650;letter-spacing:-.02em;line-height:1.1;margin-top:2px;font-variant-numeric:tabular-nums}
@@ -111,7 +112,7 @@ details.mini{margin-top:8px;color:var(--mut);font-size:13px}table{border-collaps
 <nav class="nav" id="nav"></nav>
 <div class="toast" id="toast"></div>
 <main id="main">Laster…</main>
-<details class="mini" style="margin-top:20px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Døgn regnes som de siste 24 timene. Kostnad per kWh er et anslag på 1,1 kr med Norgespris, nett og avgifter. Siden oppdateres omtrent hvert 15. minutt.</p></details>
+<details class="mini" style="margin-top:20px"><summary>Om tallene</summary><p>Frostgrensen på 0 °C er et forslag, ikke noe du har valgt. Døgn regnes som de siste 24 timene. Kroner i Strømforbruk på Oversikt er Tibbers egne beløp. Andre steder brukes et anslag på 1,1 kr per kWh med Norgespris, nett og avgifter. Tibber leverer timeforbruk med noen timers forsinkelse; da står det «data til …». Siden oppdateres omtrent hvert 15. minutt.</p></details>
 <script>
 const FROST=0,WARN_NEAR=3,LOW_BATT=30,STALE_MIN=60,RATE=1.1;
 const PAL=['#7eaddb','#e08363','#93a877','#d8a747','#a97a9b','#b98e5a','#c9c2b3','#8d9aa3'];
@@ -119,7 +120,7 @@ const nf=(v,d=1)=>v==null||isNaN(v)?'–':v.toLocaleString('nb-NO',{minimumFract
 const fmt=d=>d.toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå':m<90?m+' min siden':m<2880?Math.round(m/60)+' t siden':Math.round(m/1440)+' d siden'};
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus'};
+const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus',alle:'Alle steder'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
 let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
@@ -186,6 +187,14 @@ const SERIES=()=>{const by={};ALL.filter(r=>r.kind!=='heatpump').forEach(r=>{(by
  ((AQ&&AQ.devices)||[]).forEach(d=>{const rows=d.rows.filter(r=>r.temp!=null).map(r=>({t:new Date(r.t),temp:r.temp,hum:r.hum,batt:null,site:d.site}));if(rows.length)by[d.name]=rows});
  return Object.entries(by).map(([name,rows],i)=>({name,color:PAL[i%PAL.length],rows,pl:placeOf(rows[rows.length-1].site,name)}))};
 const sensors=pl=>SERIES().filter(s=>s.pl===pl);
+/* frost-anslag: lineær trend siste 3 t; krever ≥6 målinger, fall ≥0,5 °C og -0,15 °C/t eller brattere; bare anslag ≤6 t */
+const ETA_H=6;
+function frostEta(s){const l=lastOf(s.rows);if(!l||l.temp==null||l.temp<=FROST)return null;const t0=new Date(l.t).getTime()-3*3600000;
+ const P=s.rows.filter(r=>r.temp!=null&&new Date(r.t).getTime()>=t0).map(r=>[(new Date(r.t).getTime()-t0)/3600000,r.temp]);if(P.length<6)return null;
+ const n=P.length,mx=P.reduce((a,p)=>a+p[0],0)/n,my=P.reduce((a,p)=>a+p[1],0)/n,sxx=P.reduce((a,p)=>a+(p[0]-mx)**2,0);if(!sxx)return null;
+ const k=P.reduce((a,p)=>a+(p[0]-mx)*(p[1]-my),0)/sxx;if(k>-0.15||P[0][1]-P[n-1][1]<0.5)return null;
+ const h=(l.temp-FROST)/-k;return h<=ETA_H?{h,rate:-k}:null}
+const etaTxt=e=>e.h<1?'under 1 t':'ca. '+nf(e.h,e.h<3?1:0)+' t';
 const hmList=(pl,kind)=>((HM&&HM.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl&&(!kind||c.kind===kind));
 const gdList=pl=>((GD&&GD.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl);
 const axAvg=pl=>axList(pl).filter(c=>!(pl==='oslo'&&/vaskerom/i.test(c.name)));
@@ -195,7 +204,8 @@ const pwList=pl=>((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length&&place
 const hpRows=()=>ALL.filter(r=>r.kind==='heatpump').map(r=>({t:new Date(r.ts).getTime(),p:r.props||{},name:r.name}));
 function pwStats(hm){const H=hm.hourly.map(r=>({t:new Date(r.from),kwh:r.kwh,cost:r.cost}));
  const tmax=Math.max(...H.map(r=>r.t.getTime()))+3600000,sum=(a,b)=>H.filter(r=>r.t.getTime()>tmax-b*3600000&&r.t.getTime()<=tmax-a*3600000).reduce((x,r)=>x+(r.kwh||0),0);
- const k24=sum(0,24),k7=sum(0,168),p7=sum(168,336);return{H,k24,k7,p7,ch:p7?Math.round((k7-p7)/p7*100):null}}
+ const k24=sum(0,24),k7=sum(0,168),p7=sum(168,336),cs=(a,b)=>H.filter(r=>r.t.getTime()>tmax-b*3600000&&r.t.getTime()<=tmax-a*3600000).reduce((x,r)=>x+(r.cost||0),0),c24=cs(0,24),c7=cs(0,168);
+ return{H,k24,k7,p7,c24,c7,kr:k7?c7/k7:null,tmax,lag:Date.now()-tmax,ch:p7?Math.round((k7-p7)/p7*100):null}}
 function shStats(c){const r=c.rows,last=r[r.length-1],cut=Date.now()-86400000,r24=r.filter(x=>new Date(x.t).getTime()>=cut),first=r24[0]||last;
  const kwh=(last.wh!=null&&first.wh!=null)?Math.max(0,(last.wh-first.wh)/1000):null,on=r24.filter(x=>x.on).length;
  return{last,kwh,share:r24.length?Math.round(on/r24.length*100):null}}
@@ -216,7 +226,8 @@ function drawLine(id,legId,tbId,sets,key,unit,refLine,pad){
  lo-=pad;hi+=pad;if(hi===lo)hi=lo+1;
  const X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-(v-lo)/(hi-lo)*(H-m.t-m.b),d0=(key==='hum'||key==='pw')?0:1;
  let g='';for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,d0)}</text>`}
- for(let i=0;i<=3;i++){const t=t0+(t1-t0)*i/3;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==3?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</text>`}
+ {const nT=W<520?2:3,span=t1-t0,fo=span>96*3600000?(W<520?{day:'numeric',month:'short'}:{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):{weekday:'short',hour:'2-digit',minute:'2-digit'};
+ for(let i=0;i<=nT;i++){const t=t0+span*i/nT;g+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i==0?'start':i==nT?'end':'middle'}" fill="#9aa39d" font-size="11">${new Date(t).toLocaleString('nb-NO',fo)}</text>`}}
  if(refLine!=null)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(refLine)}" y2="${Y(refLine)}" stroke="#e08363" stroke-dasharray="4 4"/><text x="${W-m.r}" y="${Y(refLine)-4}" text-anchor="end" fill="#e08363" font-size="11">Frost ${refLine} °C</text>`;
  const lines=sets.map(s=>`<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" points="${s.pts.map(p=>X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}"/>`+(s.pts.length===1?`<circle cx="${X(s.pts[0].t)}" cy="${Y(s.pts[0].v)}" r="4" fill="${s.color}"/>`:'')).join('');
  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf over tid">${g}${lines}<line id="${id}-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="${id}-tip"></div>`;
@@ -351,13 +362,15 @@ function daikinHist(c,id){const S=daikinSeries(c),since=Date.now()-hours*3600000
 const ZMODE={1:'Ingen bil tilkoblet',2:'Bil tilkoblet, venter',3:'Lader',5:'Ferdig ladet'};
 function zapInc(c){const R=c.rows,inc=[];for(let i=1;i<R.length;i++){const a=R[i-1].kwh,b=R[i].kwh;if(a==null||b==null)continue;
  const t=new Date(R[i].t).getTime();if(t-new Date(R[i-1].t)>3*3600000)continue;inc.push({t,v:b>=a?b-a:b})}return inc}
-function zaptecBlock(pl,id){const c=((ZP&&ZP.chargers)||[]).find(x=>placeOf(x.site,x.name)===pl);if(!c||!c.rows.length)return null;
- const l=c.rows[c.rows.length-1],inc=zapInc(c),k24=inc.filter(x=>x.t>Date.now()-86400000).reduce((a,x)=>a+x.v,0),day={};
- inc.forEach(x=>{const k=new Date(x.t).toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[k]=(day[k]||0)+x.v});
- const lab=l.on===0?'Frakoblet':ZMODE[l.m]||'Ukjent';
- return{k24,inc,sub:'bil: '+lab.toLowerCase()+(l.m===3&&l.w!=null?' '+nf(l.w/1000,1)+' kW':''),
-  html:grid(tile('Status',lab,'')+tile('Effekt nå',l.w==null?null:nf(l.w/1000,1),'kW')+tile('Denne økten',l.kwh==null?null:nf(l.kwh,1),'kWh')+tile('Siste 24 t',nf(k24,1),'kWh'))+(c.id?`<div class="tile"><div class="s">Lading (Zaptec)</div>${ctlBtns('z'+c.id,[['Pause lading',{act:'zaptec',id:c.id,cmd:'pause',q:'Pause ladingen?'}],['Fortsett lading',{act:'zaptec',id:c.id,cmd:'resume',q:'Fortsette ladingen?'}]])}</div>`:'')+`<h3>Bilforbruk per døgn (kWh)</h3><div class="chart" id="zb${id}"></div>`,
-  draw:()=>bars('zb'+id,Object.entries(day).slice(-14).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#a97a9b')}}
+function zaptecBlock(pl,id){const C=((ZP&&ZP.chargers)||[]).filter(x=>placeOf(x.site,x.name)===pl&&x.rows.length);if(!C.length)return null;
+ const day={},many=C.length>1;let k24=0;const subs=[];let html='';
+ C.forEach(c=>{const l=c.rows[c.rows.length-1],inc=zapInc(c),k=inc.filter(x=>x.t>Date.now()-86400000).reduce((a,x)=>a+x.v,0);k24+=k;
+  inc.forEach(x=>{const d=new Date(x.t).toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'});day[d]=(day[d]||0)+x.v});
+  const lab=l.on===0?'Frakoblet':ZMODE[l.m]||'Ukjent',chg=l.m===3,can=l.on!==0&&l.m!==1;subs.push((many?esc(c.name)+': ':'bil: ')+lab.toLowerCase()+(chg&&l.w!=null?' '+nf(l.w/1000,1)+' kW':''));
+  html+=(many?`<h3>${esc(c.name)}</h3>`:'')+grid(tile('Status',lab,'')+tile('Effekt nå',l.w==null?null:nf(l.w/1000,1),'kW')+tile('Denne økten',l.kwh==null?null:nf(l.kwh,1),'kWh')+tile('Siste 24 t',nf(k,1),'kWh'))
+   +(c.id&&can?`<div class="tile"><div class="s">Lading (Zaptec)</div>${ctlBtns('z'+c.id,[chg?['Pause lading',{act:'zaptec',id:c.id,cmd:'pause',q:'Pause ladingen ('+c.name+')?'}]:['Fortsett lading',{act:'zaptec',id:c.id,cmd:'resume',q:'Fortsette ladingen ('+c.name+')?'}]])}</div>`:'')});
+ return{k24,sub:many?subs.join(', '):subs[0],html:html+`<h3>Bilforbruk per døgn (kWh${many?', alle ladere':''})</h3><div class="chart" id="zb${id}"></div>`,
+  draw:()=>bars('zb'+id,Object.entries(day).sort().slice(-14).map(([k,v])=>({v,lab:new Date(k+'T12:00:00').toLocaleDateString('nb-NO',{day:'numeric',month:'short'}),tip:k})),'kWh',1,'#a97a9b')}}
 function pulseBlock(pl,id){const h=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl);if(!h)return null;
  if(!h.enabled)return{html:waiting('Tibber Pulse er ikke aktiv for dette hjemmet. Sjekk i Tibber-appen at Pulse er koblet til riktig hjem.'),draw:()=>{},sub:null};
  const R=h.rows||[];if(!R.length)return{html:waiting('Pulse er aktiv, men ingen målinger er hentet ennå'+(h.error?' ('+h.error+')':'')+'. Første måling kommer ved neste innsamling.'),draw:()=>{},sub:null};
@@ -420,7 +433,7 @@ function secDrivTemp(){
  const sel=ls.get('sh-tsel',{}),last=all.map(s=>s.pts[s.pts.length-1]).filter(Boolean);
  const b=el(`<div class="sel" id="sel-dt"></div>${chartBlock('dt')}`);
  const draw=()=>{const S=mk(),s0=since();const box=document.getElementById('sel-dt');if(!box)return;
-  box.innerHTML=S.map(s=>{const l=s.pts[s.pts.length-1];return `<label class="chk"><input type="checkbox" data-n="${esc(s.name)}" ${sel[s.name]===false?'':'checked'}><i style="background:${s.color}"></i>${esc(s.name)}${l?` <b>${nf(l.v,1)} °C</b>`:''}</label>`}).join('');
+  box.innerHTML=S.map(s=>{const l=s.pts[s.pts.length-1];return `<label class="chk"><input type="checkbox" data-n="${esc(s.name)}" ${sel[s.name]===false?'':'checked'}><i style="background:${s.color}"></i>${esc(s.name)}${l?` <b>${nf(l.v,1)} °C</b>`:''}${(()=>{const sr=sensors('drivhus').find(x=>x.name===s.name),e=sr&&frostEta(sr);return e?` <span class="warn">↘ 0 °C om ${etaTxt(e)}</span>`:''})()}</label>`}).join('');
   box.querySelectorAll('input').forEach(i=>i.onchange=()=>{sel[i.dataset.n]=i.checked;ls.set('sh-tsel',sel);draw()});
   drawLine('ch-dt','leg-dt','tb-dt',S.filter(s=>sel[s.name]!==false).map(s=>({...s,pts:s.pts.filter(p=>p.t>s0)})).filter(s=>s.pts.length),'t','°C',FROST,1)};
  return sec('dtemp','Temperaturer i alle drivhus',all.length+' målere',b,{open:true,draw})}
@@ -434,18 +447,48 @@ function secDrivhusIn(pl){const T=[];
  if(!T.length)return null;
  const b=el(grid(T.join(''))+`<div style="margin-top:10px"><button class="btn" data-go="drivhus">Åpne hele drivhusfanen</button></div>`);b.querySelector('[data-go]').onclick=()=>go('drivhus');
  return sec('drivhus-i','Drivhus '+PLACES[pl],T.length+' enheter',b,{open:true})}
+/* ---------- før du drar: samlet sjekk per sted (bare lesing) ---------- */
+function leaveChecks(pl){const C=[],add=(lvl,txt,t)=>C.push({lvl,txt,t});
+ hmList(pl,'lock').forEach(c=>{const l=lastOf(c.rows),d=l.d||{},nm=esc(c.name);
+  if(d.locked===false)add('warn',`${nm} er <b>ulåst</b>`,l.t);else add('ok',`${nm} er låst`,l.t);
+  if(d.alarm_contact===true)add('warn',`${nm}: dørsensoren melder <b>åpen</b>`,l.t)});
+ gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.act&&l.act!=='CLOSED'&&l.link!=='OFFLINE')add('warn',`Vanning går: <b>${esc(c.name)}</b>`,l.t)});
+ {const v=gdList(pl).filter(c=>c.kind==='valve'&&c.rows.length);if(v.length&&!C.some(x=>/Vanning går/.test(x.txt)))add('ok','Ingen vanning går',maxT(v.map(c=>lastOf(c.rows)),x=>new Date(x.t).getTime()))}
+ hmList(pl,'mower').forEach(c=>{const I=mowerInfo(c);if(!I)return;const k=I.last.k,l=lastOf(c.rows);
+  if(k==='error'||I.stuck)add('warn',`${esc(c.name)}: <b>${esc(I.stuck||'feil')}</b>`,l.t);else if(k==='mowing'||k==='returning')add('info',`${esc(c.name)} er ute og klipper`,l.t);else add('ok',`${esc(c.name)}: ${esc(mowLab(I).toLowerCase())}`,l.t)});
+ ((LG&&LG.devices)||[]).filter(d=>placeOf(d.site,d.name)===pl&&d.rows&&d.rows.length).forEach(d=>{const l=lastOf(d.rows),s=l.s||{},k=Object.keys(s).find(x=>/runState\.currentState$/.test(x));if(!k)return;const st=String(s[k]);
+  const nm=/oven/i.test(d.type||d.name)?'Ovnen':/wash/i.test(d.type||'')?'Vaskemaskinen':esc(d.name);
+  if(/POWER_OFF|^END$|INITIAL|SLEEP/i.test(st))add('ok',`${nm} er av`,l.t);else add('warn',`${nm} går (${esc(st.toLowerCase().replace(/_/g,' '))})`,l.t)});
+ ((ZP&&ZP.chargers)||[]).filter(c=>placeOf(c.site,c.name)===pl&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.m===3)add('info',`${esc(c.name)} lader bilen (${nf((l.w||0)/1000,1)} kW)`,l.t)});
+ hmList(pl,'daikin').forEach(c=>{const l=lastOf(c.rows),d=l.d||{};if(d.onoff===true)add('info',`Daikin står på, innstilt ${nf(d.target_temperature,1)} °C`,l.t)});
+ {const ax=axList(pl).map(c=>lastOf(c.rows)).filter(l=>l&&l.on&&l.target!=null);if(ax.length){const m=ax.reduce((a,l)=>a+l.target,0)/ax.length;add('info',`${ax.length} panelovner står på, innstilt snitt ${nf(m,1)} °C`,maxT(ax,x=>new Date(x.t).getTime()))}}
+ SERIES().filter(x=>x.pl==='drivhus'&&ghHome(x.rows[x.rows.length-1].site,x.name)===pl).forEach(x=>{const l=lastOf(x.rows);if(l.temp==null)return;
+  const heat=pl==='oslo'?((AQ&&AQ.devices)||[]).find(d=>PLUGS[d.did]&&/varme/i.test(d.name)):null,hon=heat&&lastOf(heat.rows)?lastOf(heat.rows).on:null;
+  const e=frostEta(x);if(e)add('warn',`${esc(x.name)} faller og kan nå 0 °C om <b>${etaTxt(e)}</b>${hon===false?' – varmen er av':''}`,l.t);
+  else if(l.temp<=WARN_NEAR&&hon===false)add('warn',`${esc(x.name)} er ${nf(l.temp)} °C og varmen er <b>av</b>`,l.t);
+  else if(l.temp<=FROST)add('warn',`${esc(x.name)} har frost: ${nf(l.temp)} °C`,l.t);
+  else add('ok',`${esc(x.name)}: ${nf(l.temp)} °C${hon===true?', varmen er på':''}`,l.t)});
+ return C}
+function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if(!C.length)return null;
+ const w=C.filter(c=>c.lvl==='warn').length,ok=C.filter(c=>c.lvl==='ok').length,ord={warn:0,info:1,ok:2},ic={ok:'<span class="ok">✓</span>',warn:'<span class="warn">▲</span>',info:'<span class="s">ⓘ</span>'};
+ const b=el(C.sort((a,b)=>ord[a.lvl]-ord[b.lvl]).map(c=>`<div class="al">${ic[c.lvl]}<span style="flex:1">${c.txt}${c.t?`<span class="s"> · ${ago(c.t)}</span>`:''}</span></div>`).join('')
+  +`<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn" data-sty>Åpne Styring for ${PLACES[pl]}</button><span class="s">Sjekken leser bare data, og noen målinger kan være opptil 15 min gamle.</span></div>`);
+ b.querySelector('[data-sty]').onclick=()=>{ls.set('sh-spl',pl);go('styring')};
+ return sec('avreise','Før du drar',w?w+(w===1?' ting å sjekke':' ting å sjekke'):'alt klart · '+ok+' sjekket',b,{open:w>0})}
+const safe=(f,nm)=>{try{return f()}catch(e){console.error(nm,e);return el(waiting('Kunne ikke vise '+nm+' ('+esc(e.message)+')')).firstChild}};
 function placeView(pl){const w=document.createElement('div');
- w.appendChild(placeHero(pl));
- const list=[pl==='drivhus'?secDrivTemp():null,secKlima(pl),secVarme(pl),secStrom(pl),secHage(pl),pl==='drivhus'?secShelly():null,secAqara(pl),secLaas(pl),secKjokken(pl)].filter(Boolean);if(pl!=='drivhus'){const g=secDrivhusIn(pl);if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
+ w.appendChild(placeHero(pl));{const a=safe(()=>secAvreise(pl),'Før du drar');if(a)w.appendChild(a)}
+ const list=[pl==='drivhus'?()=>secDrivTemp():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
  
- if(pl==='arendal')w.appendChild(secPlan('gulv','Gulvvarme (Salus) og Mill-ovner','Ikke koblet ennå. Trenger modell på Salus-gatewayen og hvilken generasjon Mill-ovnene er.'));
+ if(pl==='arendal')w.appendChild(secPlan('mill','Mill-ovner','Ikke koblet ennå. Trenger å vite hvilken generasjon Mill-ovnene er.'));
  return w}
 /* ---------- oversikt ---------- */
 function alerts(all){const A=[];
  SERIES().forEach(s=>{const l=s.rows[s.rows.length-1],pl=s.pl;
   if(l.temp!=null&&l.temp<=FROST)A.push({k:'frost:'+s.name,pl,lvl:'bad',txt:`Frost i ${esc(s.name)}: ${nf(l.temp)} °C`});
-  else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({k:'nearfrost:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} er nær frost: ${nf(l.temp)} °C`});
+  else{const e=frostEta(s);if(e)A.push({k:'frosteta:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} er ${nf(l.temp)} °C, faller ${nf(e.rate,1)} °C/t og kan nå 0 °C om ${etaTxt(e)} (anslag)`});
+   else if(l.temp!=null&&l.temp<=WARN_NEAR)A.push({k:'nearfrost:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} er nær frost: ${nf(l.temp)} °C`})}
   if((Date.now()-l.t)/60000>STALE_MIN)A.push({k:'stale:'+s.name,pl,lvl:'warn',txt:`${esc(s.name)} har ikke sendt måling siden ${fmt(l.t)}`});
   if(l.batt!=null&&l.batt<LOW_BATT)A.push({k:'batt:'+s.name,pl,lvl:'warn',txt:`Lavt batteri i ${esc(s.name)} (${nf(l.batt,0)} %)`})});
  ['oslo','arendal','drivhus'].forEach(pl=>{
@@ -453,9 +496,10 @@ function alerts(all){const A=[];
    if(c.kind==='lock'&&d.locked===false)A.push({k:'unlocked:'+c.name,pl,lvl:'warn',txt:`${esc(c.name)} er ulåst`});
    if(c.kind==='mower'){const I=mowerInfo(c);if(I&&I.stuck)A.push({k:'mow:'+c.name,pl,lvl:'bad',txt:`${esc(c.name)}: ${I.stuck}`})}
    if(Date.now()-new Date(l.t)>3*3600000||l.av===false)A.push({k:'hmoff:'+c.name,pl,lvl:'warn',txt:`${esc(c.name)} er frakoblet i Homey`})});
-  const g=gdList(pl),off=g.filter(c=>c.rows[c.rows.length-1].link==='OFFLINE').length;
-  if(off)A.push({k:'gdoff:'+pl,pl,lvl:'info',txt:`${off} av ${g.length} Gardena-enheter er frakoblet (trolig vinterlagret)`});
+  const g=gdList(pl);
   g.forEach(c=>{const b=c.rows[c.rows.length-1].batt;if(b!=null&&b<LOW_BATT)A.push({k:'gdbatt:'+c.name,pl,lvl:'warn',txt:`Lavt batteri i ${esc(c.name)} (Gardena): ${b} %`})})});
+ {const g=((GD&&GD.devices)||[]).filter(c=>c.rows.length),off=g.filter(c=>c.rows[c.rows.length-1].link==='OFFLINE');
+  if(off.length){const pls=[...new Set(off.map(c=>placeOf(c.site,c.name)))];A.push({k:'gdoff',pl:pls.length===1?pls[0]:'alle',lvl:'info',txt:`${off.length} av ${g.length} Gardena-enheter er frakoblet (trolig vinterlagret)`})}}
  const hid=ls.get('sh-hid',{});A.forEach(a=>a.hid=!!hid[a.k]);return all?A:A.filter(a=>!a.hid)}
 const worst=(A,pl)=>{const a=A.filter(x=>x.pl===pl&&x.lvl!=='info');return a.some(x=>x.lvl==='bad')?'bad':a.length?'warn':'ok'};
 function placeCard(pl,A){const L=[],G={ar:[],os:[],in:[]},T=(g,x)=>pl==='drivhus'?G[g].push(x):L.push(x);
@@ -477,23 +521,53 @@ function lede(){const S=SERIES();if(!S.length)return '';
  const info=S.map(s=>{const last=s.rows[s.rows.length-1],since=last.t.getTime()-86400000,w=s.rows.filter(r=>r.t.getTime()>since&&r.temp!=null).map(r=>r.temp);return{name:s.name,temp:last.temp,min:w.length?Math.min(...w):null}}).filter(i=>i.temp!=null);
  if(!info.length)return '';const c=info.reduce((a,b)=>b.temp<a.temp?b:a),frost=info.some(i=>i.min!=null&&i.min<=FROST);
  return `<p class="lede">Det kaldeste stedet, <b>${esc(c.name)}</b>, er nå <b>${nf(c.temp)}</b> °C og var nede i <b>${nf(c.min)}</b> °C siste døgn. ${frost?'Minst ett sted hadde frost.':'Ingen steder hadde frost.'}</p>`}
-function lastT(arr,f){let m=0;arr.forEach(x=>{const t=f(x);if(t>m)m=t});return m?'sist '+ago(m):''}
+function maxT(arr,f){let m=0;arr.forEach(x=>{const t=f(x);if(t>m)m=t});return m}
+function lastT(arr,f){const m=maxT(arr,f);return m?'sist '+ago(m):''}
+const SRC_OLD=3*3600000;
+function srcTimes(){const tt=x=>new Date(x.t).getTime();return[maxT(ALL,r=>new Date(r.ts).getTime()),maxT(shList().flatMap(c=>c.rows),tt),maxT(((AX&&AX.rooms)||[]).flatMap(c=>c.rows),tt),maxT(((GD&&GD.devices)||[]).flatMap(c=>c.rows),tt),maxT(((HM&&HM.devices)||[]).flatMap(c=>c.rows),tt),maxT(((AQ&&AQ.devices)||[]).flatMap(c=>c.rows),tt),maxT(((MT&&MT.thermostats)||[]).flatMap(c=>c.rows),tt),maxT(((ZP&&ZP.chargers)||[]).flatMap(c=>c.rows),tt)].filter(Boolean)}
 function secSystemer(){
- const rows=[['Tuya / Smart Life (termostat, varmepumpe)','ok',lastT(ALL,r=>new Date(r.ts).getTime())],
- ['Shelly (stikk i innerdrivhus)','ok',lastT(shList().flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
- ['Tibber (strøm Oslo og Arendal)','ok',lastT(((PW&&PW.homes)||[]).flatMap(h=>h.hourly||[]),x=>new Date(x.from).getTime())],
- ['Adax (panelovner)','ok',lastT(((AX&&AX.rooms)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
- ['Gardena (to kontoer)','ok',lastT(((GD&&GD.devices)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
- ['Homey (Daikin, Dreame, Yale)','ok',lastT(((HM&&HM.devices)||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime())],
- ['Aqara (drivhus Oslo)',AQ&&!AQ.error&&(AQ.devices||[]).length?'ok':'wait',AQ&&!AQ.error?lastT((AQ.devices||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime()):'venter'],
- ['Microtemp (gulvvarme Oslo)',MT&&!MT.error&&(MT.thermostats||[]).length?'ok':'wait',MT&&!MT.error?lastT((MT.thermostats||[]).flatMap(c=>c.rows),x=>new Date(x.t).getTime()):'feil'],
- ['Zaptec (lader)',ZP&&(ZP.chargers||[]).length?'ok':'wait',ZP&&(ZP.chargers||[]).length?lastT(ZP.chargers.flatMap(c=>c.rows),x=>new Date(x.t).getTime()):'venter'],
- ['LG ThinQ (vaskemaskin, ovn)',LG&&(LG.devices||[]).length?'ok':'wait',LG&&(LG.devices||[]).length?lastT(LG.devices.flatMap(c=>c.rows||[]),x=>new Date(x.t).getTime()):'venter'],
+ const tt=x=>new Date(x.t).getTime(),src=(n,ok,arr,f,alt,lim)=>{if(!ok)return[n,'wait',alt||'venter'];const m=maxT(arr,f);if(!m)return[n,'wait','ingen data'];return[n,Date.now()-m>(lim||SRC_OLD)?'old':'ok','sist '+ago(m)]};
+ const rows=[src('Tuya / Smart Life (termostat, varmepumpe)',1,ALL,r=>new Date(r.ts).getTime()),
+ src('Shelly (stikk i innerdrivhus)',1,shList().flatMap(c=>c.rows),tt),
+ src('Tibber (strøm Oslo og Arendal)',1,((PW&&PW.homes)||[]).flatMap(h=>h.hourly||[]),x=>new Date(x.from).getTime()+3600000,'',6*3600000),
+ src('Adax (panelovner)',1,((AX&&AX.rooms)||[]).flatMap(c=>c.rows),tt),
+ src('Gardena (to kontoer)',1,((GD&&GD.devices)||[]).flatMap(c=>c.rows),tt),
+ src('Homey (Daikin, Dreame, Yale)',1,((HM&&HM.devices)||[]).flatMap(c=>c.rows),tt),
+ src('Aqara (drivhus Oslo)',AQ&&!AQ.error&&(AQ.devices||[]).length,((AQ&&AQ.devices)||[]).flatMap(c=>c.rows),tt),
+ src('Microtemp (gulvvarme Oslo)',MT&&!MT.error&&(MT.thermostats||[]).length,((MT&&MT.thermostats)||[]).flatMap(c=>c.rows),tt,'feil'),
+ src('Zaptec (lader)',ZP&&(ZP.chargers||[]).length,((ZP&&ZP.chargers)||[]).flatMap(c=>c.rows),tt),
+ src('LG ThinQ (vaskemaskin, ovn)',LG&&(LG.devices||[]).length,((LG&&LG.devices)||[]).flatMap(c=>c.rows||[]),tt),
  ['Miele (kjøleskap)','wait','venter på aktivering hos Miele'],
- ['Salus (gulvvarme Arendal)',saDevs().length?'ok':'wait',saDevs().length?lastT(saDevs(),d=>new Date(d.at).getTime()):SA&&SA.error?'feil':'venter'],
+ src('Salus (gulvvarme Arendal)',saDevs().length,saDevs(),d=>new Date(d.at).getTime(),SA&&SA.error?'feil':'venter',6*3600000),
  ['Inkbird ITC-308','todo','ikke koblet'],['Mill','todo','ikke koblet']];
- const ic={ok:'<span class="ok">● koblet</span>',wait:'<span class="warn">● venter</span>',todo:'<span class="s">○ mangler</span>'};
- return sec('sys','Datakilder',rows.filter(r=>r[1]==='ok').length+' av '+rows.length+' koblet',el('<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td>${ic[r[1]]}</td><td class="s">${r[2]}</td></tr>`).join('')+'</table>'),{open:false})}
+ const ic={old:'<span class="warn">● gammel</span>',ok:'<span class="ok">● koblet</span>',wait:'<span class="warn">● venter</span>',todo:'<span class="s">○ mangler</span>'};
+ return sec('sys','Datakilder',rows.filter(r=>r[1]==='ok'||r[1]==='old').length+' av '+rows.length+' koblet'+(rows.some(r=>r[1]==='old')?' · '+rows.filter(r=>r[1]==='old').length+' gammel':''),el('<table>'+rows.map(r=>`<tr><td>${r[0]}</td><td style="white-space:nowrap">${ic[r[1]]}</td><td class="s">${r[2]}</td></tr>`).join('')+'</table>'),{open:false})}
+/* ---------- effekttrinn: snitt av de 3 høyeste timene (ulike døgn) denne måneden ---------- */
+const TRINN=[2,5,10,15,20,25];/* vanlig inndeling i kW; sjekk nettselskapet */
+function effekt(hm){const osl=d=>d.toLocaleDateString('sv-SE',{timeZone:'Europe/Oslo'}),mon=osl(new Date()).slice(0,7),day={};
+ hm.hourly.forEach(r=>{const t=new Date(r.from),k=osl(t);if(k.slice(0,7)!==mon||r.kwh==null)return;if(!day[k]||r.kwh>day[k].kwh)day[k]={kwh:r.kwh,t}});
+ const top=Object.values(day).sort((a,b)=>b.kwh-a.kwh).slice(0,3);if(!top.length)return null;
+ const avg=top.reduce((a,x)=>a+x.kwh,0)/top.length,i=TRINN.findIndex(x=>avg<x),nxt=i<0?null:TRINN[i];
+ let lim=null;if(nxt!=null&&top.length===3){lim=Math.max(top[2].kwh,3*nxt-top[0].kwh-top[1].kwh)}
+ const today=day[osl(new Date())];return{avg,top,step:i<0?TRINN.length+1:i+1,lo:i<=0?0:TRINN[i-1],nxt,lim,today:today?today.kwh:null}}
+const effTxt=e=>`Effekttrinn ${e.step} (${nf(e.lo,0)}–${e.nxt==null?'':nf(e.nxt,0)} kW), snitt av ${e.top.length} toppe${e.top.length===1?'n':'r'} ${nf(e.avg,1)} kW`+(e.lim!=null?` · hold timene i dag under ${nf(e.lim,1)} kWh for å bli på trinnet`:'');
+/* ---------- siden sist: hendelser siden forrige besøk (lagres i denne nettleseren) ---------- */
+const SEEN_PREV=ls.get('sh-seen',0);{const mark=()=>ls.set('sh-seen',Date.now());addEventListener('pagehide',mark);document.addEventListener('visibilitychange',()=>{if(document.hidden)mark()})}
+function sinceLast(){const t0=Math.max(SEEN_PREV||Date.now()-864e5,Date.now()-7*864e5),E=[],add=(t,pl,txt,lvl)=>{if(t>t0)E.push({t,pl,txt,lvl})},T=x=>new Date(x.t).getTime();
+ ((HM&&HM.devices)||[]).forEach(c=>{const pl=placeOf(c.site,c.name);for(let i=1;i<c.rows.length;i++){const a=c.rows[i-1].d||{},b=c.rows[i].d||{},t=T(c.rows[i]);
+  if(c.kind==='lock'&&a.locked!==b.locked&&b.locked!=null)add(t,pl,`${esc(c.name)} ble ${b.locked?'låst':'<b>låst opp</b>'}`,b.locked?'':'warn');
+  if(c.kind==='mower'&&a.mower_status!=='mowing'&&b.mower_status==='mowing')add(t,pl,`${esc(c.name)} startet klipping`);
+  if(c.kind==='mower'&&b.mower_status==='error'&&a.mower_status!=='error')add(t,pl,`${esc(c.name)} meldte feil`,'warn')}});
+ ((GD&&GD.devices)||[]).filter(c=>c.kind==='valve').forEach(c=>{for(let i=1;i<c.rows.length;i++){const a=c.rows[i-1],b=c.rows[i];if((!a.act||a.act==='CLOSED')&&b.act&&b.act!=='CLOSED')add(T(b),placeOf(c.site,c.name),`Vanning startet: ${esc(c.name)}`)}});
+ ((ZP&&ZP.chargers)||[]).forEach(c=>{for(let i=1;i<c.rows.length;i++){const a=c.rows[i-1],b=c.rows[i];if(a.m!==3&&b.m===3)add(T(b),placeOf(c.site,c.name),`${esc(c.name)} begynte å lade`)}});
+ SERIES().filter(x=>x.pl==='drivhus').forEach(x=>{const R=x.rows.filter(r=>r.temp!=null&&r.t.getTime()>t0);if(!R.length)return;const m=R.reduce((a,r)=>r.temp<a.temp?r:a);
+  if(m.temp<=WARN_NEAR)add(m.t.getTime(),'drivhus',`${esc(x.name)} var nede i ${nf(m.temp)} °C`,m.temp<=FROST?'bad':'warn')});
+ return{t0,E:E.sort((a,b)=>b.t-a.t)}}
+function secSince(){const {t0,E}=sinceLast(),first=!SEEN_PREV;const ic={bad:'<span class="bad">⚠</span>',warn:'<span class="warn">▲</span>','':'<span class="s">•</span>'};
+ const head=first?'siste døgn':'siden '+new Date(t0).toLocaleString('nb-NO',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+ const b=el((E.length?E.slice(0,12).map(e=>`<div class="al">${ic[e.lvl||'']}<span style="flex:1">${e.txt}<span class="s"> · ${PLACES[e.pl]} · ${new Date(e.t).toLocaleString('nb-NO',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</span></span></div>`).join('')+(E.length>12?`<div class="s">… og ${E.length-12} til</div>`:''):'<div class="s">Ingenting å melde.</div>')
+  +'<div class="s" style="margin-top:8px">Huskes i denne nettleseren. Dører, klippere, vanning, lading og kulde i drivhus.</div>');
+ return sec('since','Siden sist',(E.length?E.length+(E.length===1?' hendelse':' hendelser'):'ingenting nytt')+' · '+head,b,{open:E.some(e=>e.lvl)})}
 function overview(){const w=document.createElement('div'),A=alerts();
  const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Hjemme nå</h1><span class="chip ${A.some(a=>a.lvl==='bad')?'bad':A.some(a=>a.lvl!=='info')?'warn':'ok'}">${A.filter(a=>a.lvl!=='info').length?A.filter(a=>a.lvl!=='info').length+(A.filter(a=>a.lvl!=='info').length===1?' varsel':' varsler'):'Alt OK'}</span></div>${lede().replace('class="lede"','class="lede" style="margin:10px 0 0"')}</div>`);w.appendChild(hero);
  const AA=alerts(true),real=A.filter(a=>a.lvl!=='info'),hidn=AA.filter(a=>a.hid);
@@ -507,8 +581,11 @@ function overview(){const w=document.createElement('div'),A=alerts();
  cards.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));w.appendChild(cards);
  if(!real.length)w.appendChild(alertSec);
  const hs=((PW&&PW.homes)||[]).filter(h=>h.hourly&&h.hourly.length);
- if(hs.length)w.appendChild(sec('kwh','Strømforbruk',hs.map(h=>nf(pwStats(h).k24,0)+' kWh '+PLACES[placeOf(h.site,h.name)]).join(' · '),el(grid(hs.map(h=>{const s=pwStats(h);return tile(h.name+' siste 24 t',nf(s.k24,1),'kWh')+tile(h.name+' 7 dager',nf(s.k7,1),'kWh')}).join('')))));
- w.appendChild(secSystemer());return w}
+ if(hs.length)w.appendChild(sec('kwh','Strømforbruk',hs.map(h=>nf(pwStats(h).k24,0)+' kWh '+PLACES[placeOf(h.site,h.name)]).join(' · '),el(`<div class="pw">${hs.map(h=>{const s=pwStats(h),pl=placeOf(h.site,h.name),kr=v=>v?nf(v,0)+' kr':'–';
+  const lag=s.lag>3*3600000?` <span class="s">· data til ${new Date(s.tmax).toLocaleString('nb-NO',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</span>`:'';
+  const ch=s.ch==null?'':`<span class="${s.ch>0?'up':'dn'}">${s.ch>0?'↑':'↓'} ${Math.abs(s.ch)} %</span> <span class="s">mot uka før</span>`;
+  return `<div class="h" style="color:var(--${pl})">${PLACES[pl]}${lag}</div><span class="s">Siste døgn</span><b>${nf(s.k24,1)} kWh</b><span>${kr(s.c24)}</span><span class="s">7 dager</span><b>${nf(s.k7,0)} kWh</b><span>${kr(s.c7)}</span><span class="s" style="grid-column:1/-1">${ch}${s.kr?` · snitt ${nf(s.kr,2)} kr/kWh`:''}</span>${(()=>{const e=effekt(h);return e?`<span class="s" style="grid-column:1/-1">${effTxt(e)}</span>`:''})()}`}).join('')}</div><div class="s" style="margin-top:8px">Effekttrinn er et anslag med vanlig trinninndeling (${TRINN.join(', ')} kW); grensene kan variere mellom nettselskap.</div>`)));
+ w.insertBefore(safe(secSince,'Siden sist'),cards.nextSibling);w.appendChild(secSystemer());return w}
 /* ---------- styring: kompakte kort for alle styrbare enheter ---------- */
 const GRP=['Dører','Hage og vanning','Varme','Lys og stikk','Elbil'],PLORD={oslo:0,arendal:1,drivhus:2};
 const mowLab=I=>{const d=I.d,k=I.last.k;return k==='docked'?(String(d.charging_status||'').includes('complete')?'På lader (full)':String(d.charging_status||'')==='charging'?'Lader':'På lader'):MLAB[k]};
@@ -524,7 +601,7 @@ function devs(){const D=[],HMd=(HM&&HM.devices)||[],sub=(...a)=>a.filter(Boolean
   const btns=k==='mowing'||k==='returning'?[home]:k==='paused'?[resume,home]:k==='error'?[home]:k==='unknown'?[start,home]:[start];
   D.push({key:'mw:'+dv,grp:'Hage og vanning',pl:placeOf(c.site,c.name),name:c.name,ic:'mower',on:k==='mowing'||k==='returning',tone:k==='error'?'bad':k==='mowing'?'ok':k==='paused'?'warn':'',st:mowLab(I),sub:sub(bat!=null?'Batteri '+nf(bat,0)+' %':'',I.stuck?'⚠ '+I.stuck:'oppdatert '+ago(l.t)),btns})});
  ((GD&&GD.devices)||[]).filter(c=>c.kind==='valve'&&c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows),off=l.link==='OFFLINE',open=!!l.act&&l.act!=='CLOSED';
-  D.push({key:'gd:'+c.id,grp:'Hage og vanning',pl:placeOf(c.site,c.name),gh:ghHome(c.site,c.name),name:c.name,ic:'drop',on:!off&&open,tone:off?'warn':open?'ok':'',st:off?'Frakoblet':open?'Vanner':'Lukket',sub:sub(l.batt!=null?'Batteri '+l.batt+' %':'','oppdatert '+ago(l.t)),
+  D.push({key:'gd:'+c.id,off,grp:'Hage og vanning',pl:placeOf(c.site,c.name),gh:ghHome(c.site,c.name),name:c.name,ic:'drop',on:!off&&open,tone:off?'':open?'ok':'',st:off?'Frakoblet':open?'Vanner':'Lukket',sub:sub(l.batt!=null?'Batteri '+l.batt+' %':'','oppdatert '+ago(l.t)),
    btns:off?[]:[open?{t:'Stopp',cls:'danger',run:()=>act(null,{act:'gardena',id:c.id,cmd:'stop',q:'Stoppe vanning: '+c.name+'?'})}:{t:'Vann 10 min',cls:'pri',run:()=>act(null,{act:'gardena',id:c.id,cmd:'start',minutes:10,q:'Starte vanning i 10 minutter: '+c.name+'?'})}]})});
  ((AX&&AX.rooms)||[]).filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.target==null)return;
   D.push({key:'ax:'+c.id,grp:'Varme',pl:placeOf(c.home,c.name),name:c.name,ic:'flame',on:!!l.on,st:l.temp==null?'–':nf(l.temp,1)+' °C',sub:sub('Panelovn · innstilt '+nf(l.target,1)+' °C',l.on?'':'av','oppdatert '+ago(l.t)),
@@ -555,7 +632,7 @@ function devs(){const D=[],HMd=(HM&&HM.devices)||[],sub=(...a)=>a.filter(Boolean
 function stCard(d){const k=d.key,bz=!!BUSY[k],dis=bz?' disabled':'';
  const stp=d.step?`<div class="stp"><button class="btn sq" data-sd="-1"${dis} aria-label="Ned">−</button><span class="sv"></span><button class="btn sq" data-sd="1"${dis} aria-label="Opp">+</button><button class="btn pri" data-sset${dis}>Sett</button></div>`:'';
  const bt=(d.btns||[]).map((b,i)=>`<button class="btn ${b.cls||''}" data-i="${i}"${dis}>${esc(b.t)}</button>`).join('');
- const e=el(`<div class="dc ${d.on?'on':''} ${d.tone||''} ${bz?'busy':''}" style="--pl:var(--${d.pl})"><div class="dc-top"><span class="dc-ic">${icon(d.ic)}</span><div class="dc-nm"><b>${esc(d.name)}</b><span>${PLACES[d.pl]}</span></div><i class="dc-dot"></i></div><div class="dc-st">${esc(d.st)}</div><div class="dc-sub">${esc(d.sub||'')}</div>${bt||stp?`<div class="dc-ctl">${stp}${bt?`<div class="dc-btns">${bt}</div>`:''}</div>`:''}</div>`).firstChild;
+ const e=el(`<div class="dc ${d.on?'on':''} ${d.tone||''} ${bz?'busy':''} ${d.off?'off':''}" ${d.off?'title="Frakoblet – trolig vinterlagret"':''} style="--pl:var(--${d.pl})"><div class="dc-top"><span class="dc-ic">${icon(d.ic)}</span><div class="dc-nm"><b>${esc(d.name)}</b><span>${PLACES[d.pl]}</span></div><i class="dc-dot"></i></div><div class="dc-st">${esc(d.st)}</div><div class="dc-sub">${esc(d.sub||'')}</div>${bt||stp?`<div class="dc-ctl">${stp}${bt?`<div class="dc-btns">${bt}</div>`:''}</div>`:''}</div>`).firstChild;
  e.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>d.btns[+b.dataset.i].run(b));
  if(d.step){const S=d.step,sv=e.querySelector('.sv'),setB=e.querySelector('[data-sset]'),cur=()=>PEND[k]!=null?PEND[k]:S.v;
   const paint=()=>{sv.textContent=nf(cur(),S.s%1?1:0)+' '+S.u;setB.disabled=bz||Math.abs(cur()-S.v)<1e-9};paint();
@@ -564,18 +641,18 @@ function stCard(d){const k=d.key,bz=!!BUSY[k],dis=bz?' disabled':'';
  return e}
 async function refreshLive(){toast('Henter status …');await Promise.all([livePlugs().catch(()=>{}),mowerLive().catch(()=>{})]);softRender();toast('Status oppdatert '+new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}))}
 function styringView(){const w=document.createElement('div'),D=devs(),pf=ls.get('sh-spl','alle');
- const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Styring</h1><span class="chip">${D.length} enheter</span></div><div class="hi">Status nå og knapper. Oppdateres av seg selv.</div><div class="fl">${['alle','oslo','arendal','drivhus'].map(p=>`<button class="fb ${pf===p?'on':''}" data-p="${p}">${p==='alle'?'Alle':PLACES[p]}</button>`).join('')}<button class="fb rf" id="rf">Oppdater</button></div></div>`);
+ const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Styring</h1><span class="chip">${D.length} enheter</span></div><div class="hi" style="text-transform:none">Status nå og knapper. Oppdateres av seg selv.</div><div class="fl">${['alle','oslo','arendal','drivhus'].map(p=>`<button class="fb ${pf===p?'on':''}" data-p="${p}">${p==='alle'?'Alle':PLACES[p]}</button>`).join('')}<button class="fb rf" id="rf">Oppdater</button></div></div>`);
  hero.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ls.set('sh-spl',b.dataset.p);render()});hero.querySelector('#rf').onclick=refreshLive;w.appendChild(hero);
  const G={};D.filter(d=>pf==='alle'||d.pl===pf||d.gh===pf).forEach(d=>(G[d.grp]=G[d.grp]||[]).push(d));
  if(!Object.keys(G).length)w.appendChild(el(waiting('Ingen styrbare enheter funnet ennå.')));
  GRP.forEach(g=>{if(!G[g])return;w.appendChild(el(`<h3 class="gh">${g}</h3>`));const gr=document.createElement('div');gr.className='dg';
-  G[g].sort((a,b)=>(PLORD[a.pl]-PLORD[b.pl])||a.name.localeCompare(b.name,'nb')).forEach(d=>gr.appendChild(stCard(d)));w.appendChild(gr)});
+  G[g].sort((a,b)=>(!!a.off-!!b.off)||(PLORD[a.pl]-PLORD[b.pl])||a.name.localeCompare(b.name,'nb')).forEach(d=>gr.appendChild(stCard(d)));w.appendChild(gr)});
  return w}
-function placeHero(pl){const A=alerts().filter(a=>a.pl===pl&&a.lvl!=='info'),S=sensors(pl),chips=[];
+function placeHero(pl){const A=alerts().filter(a=>a.pl===pl&&a.lvl!=='info'),S=sensors(pl),chips=[],LW=pl==='drivhus'?0:(()=>{try{return leaveChecks(pl).filter(c=>c.lvl==='warn').length}catch(e){return 0}})();
  const t=S.map(s=>lastOf(s.rows).temp).filter(x=>x!=null);if(t.length)chips.push(['Snitt temperatur',nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C']);
  const pu=((PU&&PU.homes)||[]).find(x=>placeOf(x.site,x.name)===pl),pr=pu&&pu.enabled?lastOf(pu.rows):null;if(pr&&pr.w!=null)chips.push(['Effekt nå',nf(pr.w,0)+' W']);
  const cls=A.length?(A.some(a=>a.lvl==='bad')?'bad':'warn'):'ok';
- return el(`<div class="hero"><div class="hl"><span class="hd"></span><h1>${PLACES[pl]}</h1><span class="chip ${cls}">${A.length?A.length+(A.length===1?' varsel':' varsler'):'Alt OK'}</span></div>${chips.length?`<div class="hc">${chips.map(([l,v])=>`<div class="hk"><span>${l}</span><b>${v}</b></div>`).join('')}</div>`:''}</div>`)}
+ return el(`<div class="hero"><div class="hl"><span class="hd"></span><h1>${PLACES[pl]}</h1><span class="chip ${A.length?cls:LW?'warn':'ok'}">${A.length?A.length+(A.length===1?' varsel':' varsler'):LW?LW+' å sjekke':'Alt OK'}</span></div>${chips.length?`<div class="hc">${chips.map(([l,v])=>`<div class="hk"><span>${l}</span><b>${v}</b></div>`).join('')}</div>`:''}</div>`)}
 /* ---------- app ---------- */
 const TABS=[['oversikt','Oversikt','grid'],['styring','Styring','sliders'],['oslo','Oslo','city'],['arendal','Arendal','house'],['drivhus','Drivhus','leaf']];
 function go(t){TAB=t;history.replaceState(null,'','#'+t);render();scrollTo(0,0)}
@@ -584,7 +661,7 @@ function nav(){const n=alerts().filter(a=>a.lvl!=='info').length;
  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.t))}
 function render(){if(!TABS.some(t=>t[0]===TAB))TAB='oversikt';nav();document.body.dataset.tab=TAB;const m=document.getElementById('main');m.innerHTML='';
  m.appendChild(TAB==='oversikt'?overview():TAB==='styring'?styringView():placeView(TAB));
- {const u=document.getElementById('upd'),mx=ALL.reduce((a,r)=>{const t=new Date(r.ts).getTime();return t>a?t:a},0);if(u)u.textContent=mx?'Data '+ago(mx):''}
+ {const u=document.getElementById('upd'),T=srcTimes(),mx=T.length?Math.max(...T):0,mn=T.length?Math.min(...T):0,old=mx&&Date.now()-mn>SRC_OLD;if(u){u.textContent=mx?'Data '+ago(mx)+(old?' · én kilde er gammel':''):'';u.className='s'+(old?' warn':'')}}
  m.querySelectorAll('details.sec').forEach(d=>{if(d.open&&d._draw)d._draw()})}
 document.getElementById('range').addEventListener('change',e=>{hours=+e.target.value;render()});
 addEventListener('resize',()=>{clearTimeout(window._r);window._r=setTimeout(render,150)});
