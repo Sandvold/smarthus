@@ -1,0 +1,936 @@
+# Adapted from mikrohard/CarConnectivity-connector-vw-eu-data-act (MIT, see LICENSE in this folder):
+# only the carconnectivity imports were replaced by local stand-ins.
+"""Synchronous client for the VW EU Data Act portal (OIDC login + data delivery).
+
+Ported from the homeassistant-vw-eu-data-act integration's ``api.py``, swapping
+``aiohttp`` for a :class:`requests.Session`. The login flow and the workarounds
+it relies on (building the OIDC authorize URL directly to bypass the broken AEM
+servlet, the ``type: partial`` and ``traceid`` headers, stripping the duplicate
+``relayState`` query) are kept verbatim in behaviour.
+"""
+from __future__ import annotations
+
+import io
+import json
+import logging
+import re
+import uuid
+import zipfile
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+from vw_euda.brands import resolve_brand
+
+__version__ = "smarthus"
+
+
+class TooManyRequestsError(Exception):
+    """HTTP 429 from the portal (local stand-in for carconnectivity's error)."""
+
+    def __init__(self, msg: str, retry_after=None) -> None:
+        super().__init__(msg)
+        self.retry_after = retry_after
+
+LOG: logging.Logger = logging.getLogger("carconnectivity.connectors.vw_eu_data_act-api-debug")
+
+# --- Portal / OIDC endpoints ----------------------------------------------
+# The portal moved to this host on 2026-11-16 (issue #67). The client starts
+# here and follows any later move on its own (see _portal_move_target).
+BASE_URL = "https://eu-data-act.vwgroup-datahub.com"
+IDENTITY_BASE = "https://identity.vwgroup.io"
+PORTAL_HOST = urlparse(BASE_URL).netloc
+IDENTITY_HOST = urlparse(IDENTITY_BASE).netloc
+# Hosts the portal used before. VW still runs them, and they only answer with
+# a permanent redirect to the current host, so a login chain may cross them.
+LEGACY_PORTAL_HOSTS = frozenset({"eu-data-act.drivesomethinggreater.com"})
+# Domains VW runs the portal under. A permanent redirect (301/308) from the
+# portal to another https host under one of them is a portal move: the client
+# switches to that host for the rest of the session and logs a warning. Any
+# other host is still refused.
+PORTAL_DOMAINS = ("vwgroup-datahub.com", "drivesomethinggreater.com")
+PORTAL_MOVE_STATUSES = frozenset({301, 308})
+
+# The portal hop that exchanges the OIDC code and sets the ``access_token``
+# session cookie. The login stops there: the localized CMS page it redirects
+# to is never fetched (VW request, October 2026).
+CALLBACK_LOGIN_PATH = "/services/callbacklogin"
+# Callbacks accepted when skipping the optional marketing consent page.
+MARKETING_CALLBACK_PATHS = ("/oidc/v1/oauth/client/callback", "/oidc/v1/oauth/client/callback/success")
+LOGIN_REDIRECT_STATUSES = frozenset({301, 302, 303, 308})
+MAX_LOGIN_REDIRECTS = 10
+# Sign-in pages (identifier, password, ...) a login may go through.
+MAX_LOGIN_FORMS = 3
+
+OIDC_AUTHORIZE_URL = IDENTITY_BASE + "/oidc/v1/authorize"
+OIDC_CLIENT_ID = "9b58543e-1c15-4193-91d5-8a14145bebb0@apps_vw-dilab_com"
+OIDC_SCOPE = "openid cars profile"
+# The OIDC redirect_uri is built from the portal host in use (_build_authorize_url).
+OIDC_REDIRECT_URI = BASE_URL + "/login"
+
+# Defaults for the OIDC ``state`` (country__language__brand), echoed back to
+# the portal callback. Overridable via connector config.
+DEFAULT_COUNTRY = "si"
+DEFAULT_LANGUAGE = "sl"
+DEFAULT_BRAND = "VOLKSWAGEN_PASSENGER_CARS"
+
+# proxy_api paths (relative to BASE_URL)
+VEHICLES_PATH = "/proxy_api/consent/me/vehicles"
+RELATION_PATH = "/proxy_api/vum/v2/users/me/relations/{vin}"
+METADATA_PATH = "/proxy_api/euda-apim/datarequest/vehicles/{vin}/metadata/{request_type}"
+LIST_PATH = "/proxy_api/euda-apim/datadelivery/vehicles/{vin}/{identifier}/list"
+DOWNLOAD_PATH = "/proxy_api/euda-apim/datadelivery/vehicles/{vin}/{identifier}/download"
+
+
+
+def _http_token(value: str) -> str:
+    """Return ``value`` reduced to an RFC 9110 token (User-Agent product syntax)."""
+    return re.sub(r"[^!#$%&'*+\-.^_`|~0-9A-Za-z]", "-", value).strip("-") or "unknown"
+
+
+# VW asked community clients to identify themselves with a product token
+# instead of a browser User-Agent (October 2026 login changes).
+USER_AGENT = f"smarthus-dashboard-vw-eu-data-act/{_http_token(__version__)}"
+
+# Files with this suffix carry no payload and are skipped.
+NO_CONTENT_SUFFIX = "_no_content_found.zip"
+
+
+def _accept_language(country: str, language: str) -> str:
+    """Browser-like ``Accept-Language`` derived from the configured locale.
+
+    The identity provider resolves per-locale variants of pending legal
+    documents from this header; a header-less client can be routed to a
+    terms-and-conditions interstitial for a document variant the user was
+    never offered by any official VW surface (issue #15). Every official
+    client sends this header.
+    """
+    lang = language.lower()
+    parts = [f"{lang}-{country.upper()}", f"{lang};q=0.9"]
+    if lang != "en":
+        parts.append("en;q=0.8")
+    return ",".join(parts)
+
+
+class ApiError(Exception):
+    """Generic API failure."""
+
+
+class PortalMovedError(ApiError):
+    """The portal answered with a permanent redirect to another VW host.
+
+    Raised inside the client and handled there by switching to ``base_url``
+    and retrying once. It only escapes when the portal moves again right
+    after the switch.
+    """
+
+    def __init__(self, base_url: str) -> None:
+        super().__init__(f"The EU Data Act portal moved to {base_url}")
+        self.base_url = base_url
+
+
+class AuthError(ApiError):
+    """Authentication failed or session expired."""
+
+
+def _retry_after_seconds(response: requests.Response) -> Optional[int]:
+    """Seconds requested by a ``Retry-After`` header (delta or HTTP date), if any."""
+    raw = (response.headers.get("Retry-After") or "").strip()
+    if raw.isdigit():
+        return int(raw)
+    if raw:
+        try:
+            delta = parsedate_to_datetime(raw) - datetime.now(tz=timezone.utc)
+        except (TypeError, ValueError):
+            return None
+        return max(int(delta.total_seconds()), 0)
+    return None
+
+
+def _raise_for_status(response: requests.Response, context: str) -> None:
+    """Translate an HTTP error status into the connector's exceptions.
+
+    HTTP 429 becomes ``TooManyRequestsError`` so the background loop backs off
+    instead of retrying within a minute; real 429s were seen on both the listing
+    and the download endpoint (PR #43).
+    """
+    if response.status_code == 429:
+        LOG.debug("%s -> HTTP 429, Retry-After=%r", context, response.headers.get("Retry-After"))
+        raise TooManyRequestsError(f"{context} -> HTTP 429", retry_after=_retry_after_seconds(response))
+    if response.status_code >= 400:
+        raise ApiError(f"{context} -> HTTP {response.status_code}")
+
+
+def _raise_for_unavailable_login(response: requests.Response, step: str) -> None:
+    """Report a login step the identity service failed, not the credentials.
+
+    5xx and 404 (sign-in service redeploying) are VW outages and 429 is
+    throttling (same classification as HA vw_eu_data_act e4d8055). Without this
+    they surfaced as "could not parse the sign-in form" or "check email and
+    password". 429 becomes ``TooManyRequestsError`` so the loop honours
+    Retry-After; outages stay an ``AuthError`` so the exponential login back-off
+    still applies (#49) instead of a full login every minute during an outage.
+    """
+    status = response.status_code
+    if status == 429:
+        raise TooManyRequestsError(f"Login {step} -> HTTP 429", retry_after=_retry_after_seconds(response))
+    if status >= 500 or status == 404:
+        raise AuthError(f"VW identity service unavailable during login {step} (HTTP {status}); "
+                        "not a credentials problem, will retry")
+
+
+class _FormParser(HTMLParser):
+    """Extract the first <form> action and all hidden/input fields."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.action: Optional[str] = None
+        self.fields: Dict[str, str] = {}
+        self._in_form = False
+        self._done = False  # only capture the first form
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if self._done:
+            return
+        a = dict(attrs)
+        if tag == "form" and self.action is None:
+            self.action = a.get("action")
+            self._in_form = True
+        elif tag == "input" and self._in_form:
+            name = a.get("name")
+            if name:
+                self.fields[name] = a.get("value") or ""
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "form" and self._in_form:
+            self._in_form = False
+            self._done = True
+
+
+def _parse_form(html: str) -> _FormParser:
+    p = _FormParser()
+    p.feed(html)
+    return p
+
+
+def _extract_template_model(html: str) -> dict:
+    """Extract the VW identity ``templateModel`` JSON embedded in the page.
+
+    The signin/authenticate pages carry their form state (hmac, relayState,
+    prefilled email, postAction, error) in a JS object rather than HTML inputs:
+
+        window._IDK = { templateModel: { ... }, csrf_token: '...' }
+    """
+    idx = html.find("templateModel")
+    if idx == -1:
+        return {}
+    brace = html.find("{", idx)
+    if brace == -1:
+        return {}
+    depth = 0
+    for i in range(brace, len(html)):
+        c = html[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(html[brace : i + 1])
+                except ValueError:
+                    return {}
+    return {}
+
+
+def _extract_csrf(html: str) -> Optional[str]:
+    """Pull the csrf_token out of the identity page's JS."""
+    m = re.search(r"csrf_token\s*[:=]\s*['\"]([^'\"]+)['\"]", html)
+    return m.group(1) if m else None
+
+
+def _login_fields(html: str) -> Tuple[Dict[str, str], Optional[str]]:
+    """Collect the fields needed to POST a VW identity login step.
+
+    Merges HTML hidden inputs with the JS templateModel/csrf so it works
+    whether the page renders inputs server-side (email step) or via JS
+    (password step). Returns (fields, form_action).
+    """
+    form = _parse_form(html)
+    fields: Dict[str, str] = dict(form.fields)
+    model = _extract_template_model(html)
+    if model:
+        for key in ("hmac", "relayState"):
+            if model.get(key):
+                fields[key] = model[key]
+        email = (model.get("emailPasswordForm") or {}).get("email")
+        if email:
+            fields.setdefault("email", email)
+    csrf = _extract_csrf(html)
+    if csrf:
+        fields.setdefault("_csrf", csrf)
+    return fields, form.action
+
+
+class _LoginForm:  # pylint: disable=too-few-public-methods
+    """A sign-in form found on an identity page, ready to be filled and POSTed."""
+
+    def __init__(self, kind: str, fields: Dict[str, str], post_url: str,
+                 identifier_fields: Tuple[str, ...], asks_password: bool) -> None:
+        self.kind = kind
+        self.fields = fields
+        self.post_url = post_url
+        self.identifier_fields = identifier_fields
+        self.asks_password = asks_password
+
+    @property
+    def step(self) -> str:
+        """Name of the login step for messages and logs."""
+        return "password step" if self.asks_password else "identifier step"
+
+    def filled(self, email: str, password: str) -> Dict[str, str]:
+        """The form fields with the credentials it asks for."""
+        data = dict(self.fields)
+        for name in self.identifier_fields:
+            data[name] = email
+        if self.asks_password:
+            data["password"] = password
+        return data
+
+
+def _detect_login_form(url: str, html: str) -> Optional[_LoginForm]:
+    """Recognise the sign-in form on an identity page from its content alone.
+
+    Nothing depends on the brand: each brand is moved from one flow to the
+    other by VW on its own schedule (on 2026-11-01 SEAT and CUPRA were on
+    Auth0, the other brands still on signin-service), so the page decides.
+
+    - VW signin-service (``hmac`` and ``_csrf`` from HTML inputs and/or the JS
+      templateModel): the identifier page asks for ``email``, the authenticate
+      page (``/authenticate`` in its action, URL or templateModel postAction)
+      for ``email`` + ``password``. The authenticate POST goes to the clean
+      URL: its ``?relayState=`` duplicates the body field (HTTP 400).
+    - Any other HTML form with an identifier (``username``/``email``) and/or
+      a ``password`` input, e.g. Auth0 Universal Login (``/u/login``, issue
+      #60), either combined or split into ``/u/login/identifier`` and
+      ``/u/login/password``. It is POSTed back to its action, or to the page
+      URL itself (``?state=`` included, as Auth0 and evcc do).
+
+    Account creation pages are never sign-in forms, although they ask for an
+    email and a password too: signin-service sends an unknown email to
+    ``.../register`` (template ``registerCredentials``), Auth0 has
+    ``/u/signup``. Credentials must never be POSTed there.
+
+    Returns None when the page holds no sign-in form.
+    """
+    fields, action = _login_fields(html)
+    model = _extract_template_model(html)
+    hints = tuple(hint.lower() for hint in (action or "", urlparse(url).path, str(model.get("postAction") or ""),
+                                            str(model.get("template") or "")))
+    if any(word in hint for hint in hints for word in ("register", "signup")):
+        return None
+    if "hmac" in fields and "_csrf" in fields:
+        asks_password = any("authenticate" in hint for hint in hints)
+        if action:
+            post_url = urljoin(url, action)
+        else:
+            post_url = url.split("?", 1)[0] if asks_password else url
+        return _LoginForm("signin-service", fields, post_url, ("email",), asks_password)
+    identifier_fields = tuple(name for name in ("username", "email") if name in fields)
+    asks_password = "password" in fields
+    if not identifier_fields and not asks_password:
+        return None
+    return _LoginForm("form", fields, urljoin(url, action) if action else url, identifier_fields, asks_password)
+
+
+def _is_sign_in_page_again(url: str, html: str) -> bool:
+    """True if a page reached after the password POST holds a sign-in form.
+
+    Bad credentials re-render the sign-in form: signin-service with HTTP 200,
+    Auth0 (``/u/login``) with HTTP 400. Judged from the content, so it holds
+    for either flow and any brand.
+    """
+    return urlparse(url).netloc.lower() == IDENTITY_HOST and _detect_login_form(url, html) is not None
+
+
+def _login_error(html: str) -> Optional[str]:
+    """Return a human-readable login error from the page, if present."""
+    model = _extract_template_model(html)
+    err = model.get("error") or model.get("errorCode")
+    if isinstance(err, dict):
+        return err.get("text") or err.get("errorCode") or str(err)
+    return str(err) if err else None
+
+
+def _is_portal_callback(url: str, portal_host: str = PORTAL_HOST) -> bool:
+    """Return True if ``url`` is the portal's OIDC callback (``/services/callbacklogin``)."""
+    parsed = urlparse(url)
+    return parsed.netloc == portal_host and parsed.path.startswith(CALLBACK_LOGIN_PATH)
+
+
+def _is_portal_domain(host: str) -> bool:
+    """Whether ``host`` (no port) sits under one of VW's portal domains."""
+    host = host.lower()
+    return any(host == domain or host.endswith("." + domain) for domain in PORTAL_DOMAINS)
+
+
+def _portal_move_target(resp, portal_host: str) -> Optional[str]:
+    """Return the new portal base URL if ``resp`` announces a portal move, else None.
+
+    A move is a permanent redirect (301/308) sent by the current portal host or
+    a legacy one, to another https host under PORTAL_DOMAINS, with no explicit
+    port. Only the host is taken over, never the path: the old host also
+    rewrites some API paths (e.g. /proxy_api/euda-apim/... to /euda-b2u/...)
+    to URLs that answer 404 (issue #67).
+    """
+    if getattr(resp, "status_code", None) not in PORTAL_MOVE_STATUSES:
+        return None
+    source = urlparse(getattr(resp, "url", "") or "").netloc.lower()
+    if source != portal_host and source not in LEGACY_PORTAL_HOSTS:
+        return None
+    location = (getattr(resp, "headers", None) or {}).get("Location")
+    if not location:
+        return None
+    target = urlparse(urljoin(resp.url, location))
+    host = target.netloc.lower()
+    if (target.scheme != "https" or target.port is not None or host in (portal_host, source)
+            or host in LEGACY_PORTAL_HOSTS or not _is_portal_domain(host)):
+        return None
+    return f"https://{host}"
+
+
+def _marketing_consent_callback(url: str) -> Optional[str]:
+    """Return the OIDC callback that skips an optional marketing consent page.
+
+    The IdP can put a marketing consent question (``.../consent/marketing/...``,
+    issue #49) in front of an otherwise successful login. Its ``callback``
+    query parameter resumes the flow without answering it, which is how VW's
+    own evcc login update (evcc fb83818) skips it: no consent is given on the
+    account holder's behalf. Only an https callback on the identity host with
+    one of the known paths is accepted; anything else returns None and the
+    page is reported as before. The callback query is re-encoded because it
+    can carry raw spaces (``scopes=openid cars``).
+    """
+    parsed = urlparse(url)
+    if parsed.netloc.lower() != IDENTITY_HOST or "/consent/marketing/" not in parsed.path:
+        return None
+    callback = (parse_qs(parsed.query).get("callback") or [""])[0]
+    target = urlparse(callback)
+    if (target.scheme != "https" or target.netloc.lower() != IDENTITY_HOST
+            or target.path not in MARKETING_CALLBACK_PATHS):
+        LOG.debug("login: marketing consent page without a usable callback")
+        return None
+    return target._replace(query=urlencode(parse_qsl(target.query, keep_blank_values=True))).geturl()
+
+
+def _marketing_consent_v2_skip(url: str) -> Optional[Tuple[str, Dict[str, str]]]:
+    """Return ``(skip_url, form)`` for the v2 marketing consent page, else None.
+
+    Since late October 2026 SEAT and CUPRA accounts land, after the Auth0
+    sign-in, on the single-page ``/v2/login/ui/marketing-consent?relayState=..
+    &state=..``. That page has no ``callback`` parameter: the browser's Skip
+    button POSTs ``relayState`` and ``state`` to ``.../marketing-consent/skip``
+    (TommiG1/HA_VAG-EU-Data-Act#76, confirmed on SEAT and CUPRA). Skipping
+    gives no consent on the account holder's behalf. Only an https page on the
+    identity host carrying both parameters qualifies; anything else returns
+    None and the page is reported by _finish_login.
+    """
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/")
+    if (parsed.scheme != "https" or parsed.netloc.lower() != IDENTITY_HOST
+            or not path.endswith("/login/ui/marketing-consent")):
+        return None
+    query = parse_qs(parsed.query)
+    relay = (query.get("relayState") or [""])[0]
+    state = (query.get("state") or [""])[0]
+    if not relay or not state:
+        LOG.debug("login: v2 marketing consent page without relayState/state")
+        return None
+    skip_url = parsed._replace(path=path + "/skip", query="", fragment="").geturl()
+    return skip_url, {"relayState": relay, "state": state}
+
+
+def _extract_vins(payload) -> List[dict]:
+    """Best-effort extraction of vehicles from the (undocumented) vehicles body.
+
+    Returns a list of {vin, nickname?} dicts. Walks the JSON for any 17-char
+    VIN-like identifier so it is robust to wrapper shape ({vehicles:[]}, list…).
+    """
+    vins: Dict[str, dict] = {}
+
+    def walk(node):
+        if isinstance(node, dict):
+            vin = node.get("vin") or node.get("vehicleIdentificationNumber")
+            if isinstance(vin, str) and len(vin) == 17:
+                vins.setdefault(vin, {"vin": vin})
+                nick = node.get("vehicleNickname") or node.get("nickname") or node.get("modelName")
+                if nick:
+                    vins[vin]["nickname"] = nick
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(payload)
+    return list(vins.values())
+
+
+class EudaApiClient:
+    """Authenticated synchronous client for the EU Data Act portal."""
+
+    def __init__(self, email: str, password: str, *, country: str = DEFAULT_COUNTRY,
+                 language: str = DEFAULT_LANGUAGE, brand: str = DEFAULT_BRAND,
+                 timeout: int = 60, accept_terms_on_login: bool = False) -> None:
+        self._session = requests.Session()
+        # Browser-like Accept headers: the IdP routes header-less clients to
+        # legal interstitials a browser never sees (issue #15), Accept-Language
+        # being the prime suspect. Accept keeps */* so the proxy_api JSON
+        # responses are unaffected. The User-Agent is a product token, as VW
+        # asked.
+        self._session.headers.update({
+            "User-Agent": USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": _accept_language(country, language),
+            "Upgrade-Insecure-Requests": "1",
+        })
+        # Retry transient connection/5xx errors at the transport layer so a single
+        # dropped connection (the portal/Azure blob occasionally closes idle
+        # sockets) does not bubble up as a hard failure.
+        retry = Retry(total=3, connect=3, read=3, backoff_factor=1.0,
+                      status_forcelist=(500, 502, 503, 504),
+                      allowed_methods=frozenset(["GET", "POST"]),
+                      raise_on_status=False)
+        adapter = HTTPAdapter(max_retries=retry)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
+        self._email = email
+        self._password = password
+        # Resolve the brand once: the OIDC state needs the canonical brand key
+        # (e.g. "CUPRA"), and each brand authenticates with its own client_id
+        # (the state alone is not enough). Accepts aliases / any case.
+        resolved = resolve_brand(brand)
+        self._state = f"{country}__{language}__{resolved.key}"
+        self._client_id = resolved.client_id
+        self._timeout = timeout
+        self._accept_terms_on_login = accept_terms_on_login
+        self._logged_in = False
+        # Where the portal lives for this session: BASE_URL until VW moves it
+        # (see _follow_portal_move).
+        self._base_url = BASE_URL
+
+    @property
+    def base_url(self) -> str:
+        """The portal base URL in use (BASE_URL unless VW moved the portal)."""
+        return self._base_url
+
+    @property
+    def _portal_host(self) -> str:
+        return urlparse(self._base_url).netloc
+
+    def close(self) -> None:
+        """Close the underlying HTTP session."""
+        self._session.close()
+
+    def _follow_portal_move(self, base_url: str) -> None:
+        """Switch to the host VW moved the portal to; the session must log in again."""
+        LOG.warning("The VW EU Data Act portal moved from %s to %s. Following it for this session; "
+                    "please report it so the connector can be updated "
+                    "(https://github.com/mikrohard/CarConnectivity-connector-vw-eu-data-act/issues).",
+                    self._base_url, base_url)
+        self._base_url = base_url
+        self._logged_in = False
+
+    # -- authentication ----------------------------------------------------
+
+    def login(self) -> None:
+        """Run the full OIDC login, populating the session cookie jar.
+
+        If the portal announces a move during the login (permanent redirect to
+        another VW host), the login starts over once on the new host, with a
+        redirect_uri there.
+        """
+        try:
+            try:
+                self._do_login()
+            except PortalMovedError as moved:
+                self._follow_portal_move(moved.base_url)
+                self._do_login()
+        except requests.RequestException as err:
+            raise ApiError(f"Network error during login: {err}") from err
+        self._logged_in = True
+
+    def _do_login(self) -> None:
+        # No priming GET of the portal home page: VW asked community clients
+        # to drop it (millions of such requests, October 2026).
+
+        # 1. Start the OIDC flow directly at the identity provider. We build the
+        #    authorize URL ourselves because the portal's
+        #    /services/redirect/authentication servlet returns HTTP 500 for
+        #    non-browser clients (it depends on AEM browser session state).
+        authorize_url = self._build_authorize_url()
+        LOG.debug("login step1: authorize url = %s", authorize_url)
+        resp = self._session.get(authorize_url, timeout=self._timeout)
+        _raise_for_unavailable_login(resp, "sign-in page")
+        signin_url = resp.url
+        signin_html = resp.text
+        LOG.debug("login step2: signin page = %s (%d bytes)", signin_url, len(signin_html))
+
+        # 2. Fill in and POST the sign-in forms the identity provider serves,
+        #    recognised from each page's content (_detect_login_form), never
+        #    from the brand: signin-service asks for the email, then the
+        #    password; Auth0 Universal Login (issue #60) for both at once, or
+        #    split over two pages. Redirects are followed by hand on the
+        #    identity/portal hosts only, and the password is sent once at most:
+        #    a re-rendered form afterwards means bad credentials, never a retry.
+        url, html = signin_url, signin_html
+        email_sent = False
+        for _ in range(MAX_LOGIN_FORMS):
+            form = _detect_login_form(url, html)
+            if form is None or (email_sent and not form.asks_password):
+                # The email was not taken: no form, or the identifier form again.
+                if not email_sent:
+                    fields, _action = _login_fields(html)
+                    raise AuthError(f"Could not parse the sign-in form (fields found: {sorted(fields)})")
+                err = _login_error(html)
+                raise AuthError(err or "Identity portal did not return the password form - check the "
+                                "email address (or the login flow changed)")
+            target = urlparse(form.post_url)
+            if target.scheme != "https" or target.netloc.lower() != IDENTITY_HOST:
+                raise AuthError(f"Sign-in form posts to an unexpected location ({target.scheme}://{target.netloc})")
+            LOG.debug("login: %s form, %s, POST to %s fields=%s", form.kind, form.step,
+                      target.path, sorted(form.fields))
+            resp = self._session.post(
+                form.post_url,
+                data=form.filled(self._email, self._password),
+                headers={"Referer": url},
+                allow_redirects=False,
+                timeout=self._timeout,
+            )
+            _raise_for_unavailable_login(resp, form.step)
+            resp = self._follow_login_redirects(resp)
+            if form.asks_password or _is_portal_callback(resp.url, self._portal_host):
+                # The redirect chain ends on the portal callback, which sets
+                # the session cookie via /services/callbacklogin.
+                self._finish_login(resp)
+                return
+            _raise_for_unavailable_login(resp, form.step)
+            email_sent = True
+            url, html = resp.url, resp.text
+            LOG.debug("login: after %s status=%s url=%s", form.step, resp.status_code, urlparse(url).path)
+        raise AuthError(f"Login did not reach the password form within {MAX_LOGIN_FORMS} sign-in pages")
+
+    def _follow_login_redirects(self, resp: requests.Response) -> requests.Response:
+        """Follow the post-credentials redirects up to the portal callback.
+
+        Login flow as VW wrote it for evcc and HA_VAG-EU-Data-Act (October
+        2026): at most MAX_LOGIN_REDIRECTS hops, https on the identity or
+        portal host only, stop at the /services/callbacklogin response (it
+        sets the session cookie) without fetching the localized CMS page it
+        redirects to, and skip the optional marketing consent page: the classic
+        one through its callback, the v2 one (SEAT/CUPRA after Auth0) by POSTing
+        to its skip endpoint like the browser's Skip button, once per chain.
+        Returns the response the chain stopped on.
+        """
+        skipped_v2 = False
+        portal_host = self._portal_host
+        for _ in range(MAX_LOGIN_REDIRECTS):
+            if _is_portal_callback(resp.url, portal_host):
+                return resp
+            skip = None if skipped_v2 or resp.status_code >= 400 else _marketing_consent_v2_skip(resp.url)
+            if skip:
+                skip_url, form = skip
+                LOG.info("Login: skipping the optional marketing consent page without consenting")
+                resp = self._session.post(skip_url, data=form,
+                                          headers={"Referer": resp.url, "Origin": IDENTITY_BASE},
+                                          allow_redirects=False, timeout=self._timeout)
+                skipped_v2 = True
+                continue
+            if resp.status_code not in LOGIN_REDIRECT_STATUSES:
+                return resp
+            location = resp.headers.get("Location")
+            if not location:
+                return resp
+            target = urljoin(resp.url, location)
+            parsed = urlparse(target)
+            host = parsed.netloc.lower()
+            if parsed.scheme != "https" or (host not in (IDENTITY_HOST, portal_host)
+                                            and host not in LEGACY_PORTAL_HOSTS):
+                moved_to = _portal_move_target(resp, portal_host)
+                if moved_to:
+                    raise PortalMovedError(moved_to)
+                hint = (" The EU Data Act portal may have moved: please report it so the connector "
+                        "can be updated." if _is_portal_domain(parsed.hostname or "") else "")
+                raise AuthError(f"Login redirected to an unexpected location ({parsed.scheme}://{parsed.netloc}).{hint}")
+            callback = _marketing_consent_callback(target)
+            if callback:
+                LOG.info("Login: skipping the optional marketing consent page without consenting")
+                target = callback
+            LOG.debug("login: redirect HTTP %s -> %s", resp.status_code, parsed.path)
+            resp = self._session.get(target, headers={"Referer": resp.url},
+                                     allow_redirects=False, timeout=self._timeout)
+        raise AuthError(f"Login redirect chain exceeded {MAX_LOGIN_REDIRECTS} hops")
+
+    def _finish_login(self, resp: requests.Response, _terms_retried: bool = False) -> None:
+        """Judge where the credentials redirect chain stopped.
+
+        Success is the portal callback response setting the ``access_token``
+        cookie. Its redirect to a localized CMS page is not followed, so that
+        page's availability (missing for e.g. country "ch", issue #29) no
+        longer matters and no session probe is needed afterwards.
+        """
+        landing = resp.url
+        is_callback = _is_portal_callback(landing, self._portal_host)
+        _raise_for_unavailable_login(resp, "callback" if is_callback else "credentials step")
+        if is_callback:
+            if resp.status_code >= 400:
+                raise AuthError(f"Login callback rejected (HTTP {resp.status_code})")
+            if "access_token" not in resp.cookies:
+                raise AuthError("Login callback did not establish a session (access_token cookie missing)")
+            LOG.debug("login step4: access_token cookie received")
+            return
+
+        landing_html = resp.text
+        if resp.status_code >= 400:
+            if _is_sign_in_page_again(landing, landing_html):
+                # Auth0 Universal Login (issue #60) re-renders its form with
+                # HTTP 400 when the email or password is wrong.
+                raise AuthError("Login failed - check email and password")
+            LOG.debug("login step4: HTTP %s body[:500]=%s", resp.status_code, landing_html[:500])
+            err = _login_error(landing_html)
+            raise AuthError(err or f"Login rejected (HTTP {resp.status_code})")
+        LOG.debug("login step4: stopped on %s", landing)
+
+        # The IdP can interrupt the flow with a terms-and-conditions interstitial
+        # (e.g. ?updated=dataprivacy). Authentication has genuinely not completed,
+        # but "check email and password" would be misleading there (issue #15).
+        # With accept_terms_on_login enabled, POST the acceptance embedded in the
+        # page and resume the flow (once: a second interstitial means the
+        # acceptance was not recorded and retrying would loop).
+        if "terms-and-conditions" in landing:
+            if self._accept_terms_on_login and not _terms_retried:
+                LOG.info("Login interrupted by a terms-and-conditions update; "
+                         "accepting it (accept_terms_on_login is enabled)")
+                self._finish_login(self._follow_login_redirects(self._accept_terms(landing, landing_html)),
+                                   _terms_retried=True)
+                return
+            raise AuthError(
+                "Login interrupted: the identity provider requires accepting updated "
+                "terms and conditions for this account (try completing a login in a "
+                "browser first, or set accept_terms_on_login). See connector issue #15."
+            )
+
+        # The IdP can also stop the flow on a consent question, e.g.
+        # /signin-service/v1/consent/marketing/<user-id>/<client-id>/0 (issue
+        # #49). Credentials were accepted, so "check email and password" would
+        # send the user after a password that is fine. A marketing page with a
+        # valid callback is skipped in _follow_login_redirects and never gets
+        # here. Any other consent is the account holder's own choice, so it is
+        # never answered here; the message names its kind but not the URL,
+        # which carries the user id.
+        path_segments = urlparse(landing).path.split("/")
+        if "marketing-consent" in path_segments:
+            # v2 page that could not be skipped (no relayState/state, or shown
+            # again after the skip).
+            raise AuthError(
+                "Login interrupted: the identity provider asks this account a consent question "
+                f"(marketing). Complete one login in a browser at {self._base_url} and answer it. "
+                "See connector issue #49."
+            )
+        if "signin-service" in path_segments and "consent" in path_segments:
+            kind_index = path_segments.index("consent") + 1
+            kind = path_segments[kind_index] if kind_index < len(path_segments) else ""
+            raise AuthError(
+                f"Login interrupted: the identity provider asks this account a consent question"
+                f"{f' ({kind})' if kind else ''}. Complete one login in a browser at "
+                f"{self._base_url} and answer it. See connector issue #49."
+            )
+
+        # The chain stopped before the portal callback. Bad credentials
+        # re-render a sign-in form (whatever the flow), or leave the URL on
+        # identity.vwgroup.io/signin-service.
+        if (_is_sign_in_page_again(landing, landing_html)
+                or "signin-service" in landing or "/error" in landing):
+            raise AuthError("Login failed - check email and password")
+        ended = urlparse(landing)
+        raise AuthError(f"Login did not complete (ended at {ended.scheme}://{ended.netloc}{ended.path})")
+
+    def _accept_terms(self, url: str, html: str) -> requests.Response:
+        """POST the acceptance form of a terms-and-conditions interstitial.
+
+        The page embeds a genuine acceptance form in its JS ``templateModel``
+        (issue #15): ``relayState``/``hmac``, ``countryOfResidence`` (sent
+        upper-cased) and the pending document flattened into
+        ``legalDocuments[0].<key>`` fields with booleans as ``yes``/``no``
+        (link/version/summary keys are not part of the form). Same scheme as
+        the seatcupra connector and WeConnect-python's acceptTermsOnLogin.
+        The IdP records the acceptance account-side and resumes the OIDC flow.
+        """
+        model = _extract_template_model(html)
+        fields: Dict[str, str] = {}
+        for key in ("relayState", "hmac"):
+            if model.get(key):
+                fields[key] = model[key]
+        country = model.get("countryOfResidence")
+        if country:
+            fields["countryOfResidence"] = str(country).upper()
+        documents = model.get("legalDocuments") or []
+        document = documents[0] if documents else {}
+        for key, value in document.items():
+            if key in ("skipLink", "declineLink", "majorVersion", "minorVersion", "changeSummary"):
+                continue
+            fields[f"legalDocuments[0].{key}"] = ("yes" if value else "no") if isinstance(value, bool) else value
+        csrf = _extract_csrf(html)
+        if csrf:
+            fields["_csrf"] = csrf
+        # The form target is the templateModel's loginUrl when present; fall
+        # back to the page URL stripped of its query (both observed working).
+        action = urljoin(url, model["loginUrl"]) if model.get("loginUrl") else url.split("?", 1)[0]
+        LOG.info("login terms: accepting document %s v%s.%s",
+                 document.get("name") or document.get("textId") or "?",
+                 document.get("majorVersion", "?"), document.get("minorVersion", "?"))
+        LOG.debug("login terms: POST acceptance to %s fields=%s", action, sorted(fields))
+        return self._session.post(action, data=fields, headers={"Referer": url},
+                                  allow_redirects=False, timeout=self._timeout)
+
+    def _build_authorize_url(self) -> str:
+        """Construct the OIDC authorize URL (bypasses the broken AEM servlet)."""
+        params = {
+            "client_id": self._client_id,
+            "response_type": "code",
+            "scope": OIDC_SCOPE,
+            "state": self._state,
+            "redirect_uri": f"{self._base_url}/login",
+            "prompt": "login",
+        }
+        return f"{OIDC_AUTHORIZE_URL}?{urlencode(params)}"
+
+    def ensure_login(self) -> None:
+        """Log in if not already authenticated."""
+        if not self._logged_in:
+            self.login()
+
+    # -- authenticated requests -------------------------------------------
+
+    def _session_get(self, url: str, *, headers: Optional[dict] = None):
+        """GET wrapper that translates transport errors into ApiError.
+
+        Transient network failures (dropped connections, timeouts, DNS) must be
+        surfaced as ApiError so the connector's background loop retries on its
+        interval instead of crashing the worker thread.
+        """
+        try:
+            return self._session.get(url, headers=headers, timeout=self._timeout)
+        except requests.RequestException as err:
+            raise ApiError(f"Network error for GET {url}: {err}") from err
+
+    def _portal_get(self, path: str, *, headers: Optional[dict] = None):
+        """GET a portal path on the current host, following a portal move once.
+
+        ``path`` is relative to the portal base URL (an absolute URL is used
+        as is). requests follows redirects, so a move shows up as the first
+        hop of the history. Without this check, the old host's rewritten API
+        paths answered 404 behind a 301, which looked like "no data" (issue
+        #67). On a move the client switches host, logs in there and repeats
+        the request once.
+        """
+        resp = self._session_get(self._portal_url(path), headers=headers)
+        first_hop = (getattr(resp, "history", None) or [resp])[0]
+        moved_to = _portal_move_target(first_hop, self._portal_host)
+        if moved_to is None:
+            return resp
+        self._follow_portal_move(moved_to)
+        self.login()
+        return self._session_get(self._portal_url(path), headers=headers)
+
+    def _portal_url(self, path: str) -> str:
+        return path if "://" in path else f"{self._base_url}{path}"
+
+    def _get_json(self, path: str, *, headers: Optional[dict] = None, _retry: bool = True):
+        resp = self._portal_get(path, headers=headers)
+        if resp.status_code in (401, 403) and _retry:
+            LOG.debug("Session expired (%s) for %s; re-authenticating", resp.status_code, path)
+            self._logged_in = False
+            self.login()
+            return self._get_json(path, headers=headers, _retry=False)
+        _raise_for_status(resp, f"GET {path}")
+        try:
+            return resp.json()
+        except ValueError as err:
+            raise ApiError(f"Invalid JSON from {path}: {err}") from err
+
+    def list_vehicles(self) -> List[dict]:
+        """Return [{vin, nickname?}] for vehicles consented on the portal."""
+        self.ensure_login()
+        payload = self._get_json(f"{VEHICLES_PATH}?viewPosition=FRONT_LEFT")
+        vehicles = _extract_vins(payload)
+        # Enrich with the friendly vehicleNickname from the relation endpoint
+        # (the authoritative source, e.g. "ID.3").
+        for veh in vehicles:
+            try:
+                rel = self.get_relation(veh["vin"])
+                nickname = (rel.get("relation") or {}).get("vehicleNickname")
+                LOG.debug("relation for %s: nickname=%r", veh["vin"], nickname)
+                if nickname:
+                    veh["nickname"] = nickname
+            except ApiError as err:
+                LOG.debug("Could not fetch nickname for %s: %s", veh["vin"], err)
+        return vehicles
+
+    def get_relation(self, vin: str) -> dict:
+        """Return the user<->vehicle relation (carries vehicleNickname)."""
+        self.ensure_login()
+        # The relation endpoint requires a traceid header; HTTP 400 without one.
+        headers = {"traceid": f"vehicle-relation-fetch-{uuid.uuid4()}"}
+        return self._get_json(RELATION_PATH.format(vin=vin), headers=headers)
+
+    def get_metadata(self, vin: str, request_type: str = "partial") -> dict:
+        """Return the data-request metadata; ``Identifier`` is needed downstream.
+
+        ``request_type`` selects the EU Data Act feed: ``"partial"`` (continuous,
+        the default) or ``"all"`` (on-demand historical export). Both live on the
+        same endpoint; only the ``metadata/{type}`` path segment changes.
+        """
+        self.ensure_login()
+        return self._get_json(METADATA_PATH.format(vin=vin, request_type=request_type))
+
+    def list_datasets(self, vin: str, identifier: str, request_type: str = "partial") -> List[dict]:
+        """Return the rolling list of available zips: [{name, createdOn, size}]."""
+        self.ensure_login()
+        path = LIST_PATH.format(vin=vin, identifier=identifier)
+        # The list endpoint requires the data-request type header (matching the
+        # metadata request type); without it the backend returns HTTP 500.
+        data = self._get_json(path, headers={"type": request_type})
+        return data if isinstance(data, list) else data.get("files", [])
+
+    def download_dataset(self, vin: str, identifier: str, name: str, request_type: str = "partial") -> dict:
+        """Download a specific zip by name and return the parsed JSON inside it."""
+        self.ensure_login()
+        if name.endswith(NO_CONTENT_SUFFIX):
+            raise ApiError(f"{name} contains no content")
+        path = DOWNLOAD_PATH.format(vin=vin, identifier=identifier)
+        headers = {"filename": name, "type": request_type}
+        resp = self._portal_get(path, headers=headers)
+        if resp.status_code in (401, 403):
+            self._logged_in = False
+            self.login()
+            resp = self._portal_get(path, headers=headers)
+        _raise_for_status(resp, f"Download {name}")
+        return self._unzip_json(resp.content, name)
+
+    @staticmethod
+    def _unzip_json(raw: bytes, name: str) -> dict:
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                members = [n for n in zf.namelist() if n.lower().endswith(".json")]
+                if not members:
+                    raise ApiError(f"No JSON inside {name}")
+                with zf.open(members[0]) as fh:
+                    return json.loads(fh.read().decode("utf-8"))
+        except (zipfile.BadZipFile, ValueError) as err:
+            raise ApiError(f"Could not read {name}: {err}") from err
