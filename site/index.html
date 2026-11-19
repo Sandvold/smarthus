@@ -120,7 +120,7 @@ const nf=(v,d=1)=>v==null||isNaN(v)?'–':v.toLocaleString('nb-NO',{minimumFract
 const fmt=d=>d.toLocaleString('nb-NO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå':m<90?m+' min siden':m<2880?Math.round(m/60)+' t siden':Math.round(m/1440)+' d siden'};
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus',alle:'Alle steder'};
+const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus',bil:'Bil',alle:'Alle steder'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
 let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
@@ -577,6 +577,7 @@ function alerts(all){const A=[];
    if(Date.now()-new Date(l.t)>3*3600000||l.av===false)A.push({k:'hmoff:'+c.name,pl,lvl:'warn',txt:`${esc(c.name)} er frakoblet i Homey`})});
   const g=gdList(pl);
   g.forEach(c=>{const b=c.rows[c.rows.length-1].batt;if(b!=null&&b<LOW_BATT)A.push({k:'gdbatt:'+c.name,pl,lvl:'warn',txt:`Lavt batteri i ${esc(c.name)} (Gardena): ${b} %`})})});
+ {const vr=(VWD&&VWD.rows)||[];if(vr.length){const t=new Date(vr[vr.length-1].t);if(Date.now()-t>48*3600000)A.push({k:'vw48',pl:'bil',lvl:'warn',txt:`Bilen (ID.4) har ikke sendt data på over 48 timer (sist ${fmt(t)})`})}}
  {const g=((GD&&GD.devices)||[]).filter(c=>c.rows.length),off=g.filter(c=>c.rows[c.rows.length-1].link==='OFFLINE');
   if(off.length){const pls=[...new Set(off.map(c=>placeOf(c.site,c.name)))];A.push({k:'gdoff',pl:pls.length===1?pls[0]:'alle',lvl:'info',txt:`${off.length} av ${g.length} Gardena-enheter er frakoblet (trolig vinterlagret)`})}}
  const hid=ls.get('sh-hid',{});A.forEach(a=>a.hid=!!hid[a.k]);return all?A:A.filter(a=>!a.hid)}
