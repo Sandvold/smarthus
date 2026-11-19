@@ -122,7 +122,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus',bil:'Bil',alle:'Alle steder'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null;
+let GDALL=null,ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -196,6 +196,8 @@ function frostEta(s){const l=lastOf(s.rows);if(!l||l.temp==null||l.temp<=FROST)r
  const h=(l.temp-FROST)/-k;return h<=ETA_H?{h,rate:-k}:null}
 const etaTxt=e=>e.h<1?'under 1 t':'ca. '+nf(e.h,e.h<3?1:0)+' t';
 const hmList=(pl,kind)=>((HM&&HM.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl&&(!kind||c.kind===kind));
+const gdHidden=()=>!!ls.get('sh-hide-gd',false);
+window.toggleGd=()=>{const h=!gdHidden();ls.set('sh-hide-gd',h);GD=h?{devices:[],error:null}:GDALL;render()};
 const gdList=pl=>((GD&&GD.devices)||[]).filter(c=>placeOf(c.site,c.name)===pl);
 const axAvg=pl=>axList(pl).filter(c=>!(pl==='oslo'&&/vaskerom/i.test(c.name)));
 const axList=pl=>((AX&&AX.rooms)||[]).filter(c=>placeOf(c.home,c.name)===pl);
@@ -550,7 +552,7 @@ window.closeUp=closeUp;
 function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if(!C.length)return null;
  const w=C.filter(c=>c.lvl==='warn').length,ok=C.filter(c=>c.lvl==='ok').length,ord={warn:0,info:1,ok:2},ic={ok:'<span class="ok">✓</span>',warn:'<span class="warn">▲</span>',info:'<span class="s">ⓘ</span>'};
  const b=el(C.sort((a,b)=>ord[a.lvl]-ord[b.lvl]).map(c=>`<div class="al">${ic[c.lvl]}<span style="flex:1">${c.txt}${c.t?`<span class="s"> · ${ago(c.t)}</span>`:''}</span></div>`).join('')
-  +`<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn" data-sty>Åpne Styring for ${PLACES[pl]}</button>${closeSteps(pl).length?`<button class="btn pri" data-close>Steng ${PLACES[pl].toLowerCase()}</button>`:''}<span class="s">Sjekken leser bare data, og noen målinger kan være opptil 15 min gamle.</span></div>`);
+  +`<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn" data-sty>Åpne Styring for ${PLACES[pl]}</button><button class="btn" onclick="toggleGd()" title="Skjuler Gardena (vanning og sensorer) overalt på siden, lagres i denne nettleseren">${gdHidden()?'Vis Gardena':'Skjul Gardena'}</button>${closeSteps(pl).length?`<button class="btn pri" data-close>Steng ${PLACES[pl].toLowerCase()}</button>`:''}<span class="s">Sjekken leser bare data, og noen målinger kan være opptil 15 min gamle.</span></div>`);
  const cb=b.querySelector('[data-close]');if(cb)cb.onclick=()=>closeUp(cb,pl);
  b.querySelector('[data-sty]').onclick=()=>{ls.set('sh-spl',pl);go('styring')};
  return sec('avreise','Før du drar',w?w+(w===1?' ting å sjekke':' ting å sjekke'):'alt klart · '+ok+' sjekket',b,{open:w>0})}
@@ -819,7 +821,7 @@ const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
 function loginScreen(msg,out){const m=document.getElementById('main');
  m.innerHTML=`<div style="max-width:340px;margin:70px auto;text-align:center"><h2 style="margin:0 0 6px">Smarthus</h2><p class="s" style="margin:0 0 20px">${msg||'Logg inn for å se dataene.'}</p><button id="lg" style="font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${out?'Logg ut':'Logg inn med Google'}</button></div>`;
  document.getElementById('lg').onclick=async()=>{try{if(out){await AUTHC.signOut();location.reload()}else await AUTHC.signIn.social({provider:'google',callbackURL:location.origin+location.pathname})}catch(e){loginScreen('Feil: '+(e&&e.message||e))}}}
-function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json'),J('drivhusstrom.json'),J('vw.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa,ds,vw])=>{VWD=vw;STR=ds;SA=sa;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GD=g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json'),J('drivhusstrom.json'),J('vw.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa,ds,vw])=>{VWD=vw;STR=ds;SA=sa;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GDALL=g;GD=gdHidden()?{devices:[],error:null}:g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
  const lo=document.createElement('p');lo.className='s';lo.style.textAlign='center';lo.innerHTML='<a href="#" id="lo">Logg ut</a>';document.body.appendChild(lo);document.getElementById('lo').onclick=async e=>{e.preventDefault();try{await AUTHC.signOut()}catch(x){}location.reload()}}
 (async()=>{const m=document.getElementById('main');m.textContent='Laster …';
  try{AUTHC=(await import('https://esm.sh/@neon/auth@0.8.2')).createAuthClient(AUTH_URL)}catch(e){loginScreen('Kunne ikke laste innloggingen. Prøv igjen senere.');return}
