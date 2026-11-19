@@ -515,12 +515,12 @@ function leaveChecks(pl){const C=[],add=(lvl,txt,t)=>C.push({lvl,txt,t});
   else if(l.temp<=FROST)add('warn',`${esc(x.name)} har frost: ${nf(l.temp)} °C`,l.t);
   else add('ok',`${esc(x.name)}: ${nf(l.temp)} °C${hon===true?', varmen er på':''}`,l.t)});
  return C}
-const CLOSE={oslo:{mt:12,ax:12,dk:14}};
+const CLOSE={oslo:{mt:12,ax:12,dk:14},arendal:{ax:12}},DOOR={oslo:['terrasse','Terrasedør','terrassedøren'],arendal:['inngang','Inngangsdør','inngangsdøren']};
 function closeSteps(pl){const c=CLOSE[pl],S=[];if(!c)return S;
- ((MT&&MT.thermostats)||[]).filter(t=>placeOf(t.site,t.name)===pl&&t.serial).forEach(t=>S.push({txt:`${t.name} til ${c.mt} °C`,o:{act:'microtemp',serial:t.serial,cmd:'temp',value:c.mt}}));
+ (c.mt==null?[]:(MT&&MT.thermostats)||[]).filter(t=>placeOf(t.site,t.name)===pl&&t.serial).forEach(t=>S.push({txt:`${t.name} til ${c.mt} °C`,o:{act:'microtemp',serial:t.serial,cmd:'temp',value:c.mt}}));
  axList(pl).forEach(r=>S.push({txt:`${r.name} (Adax) til ${c.ax} °C`,o:{act:'adax',room:r.id,target:c.ax}}));
- hmList(pl,'daikin').slice(0,1).forEach(()=>S.push({txt:`Daikin til ${c.dk} °C`,o:{act:'homey',dev:'daikin',cmd:'temp',value:c.dk}}));
- if(pl==='oslo'){const d=lastOf(((HM&&HM.devices)||[]).find(x=>x.name==='Terrasedør'&&x.kind==='lock')?.rows);if(d&&d.d&&d.d.locked===false)S.push({txt:'Låse terrassedøren',lock:'terrasse',open:!!d.d.alarm_contact})}
+ (c.dk==null?[]:hmList(pl,'daikin').slice(0,1)).forEach(()=>S.push({txt:`Daikin til ${c.dk} °C`,o:{act:'homey',dev:'daikin',cmd:'temp',value:c.dk}}));
+ {const dr=DOOR[pl],d=dr&&lastOf(((HM&&HM.devices)||[]).find(x=>x.name===dr[1]&&x.kind==='lock')?.rows);if(d&&d.d&&d.d.locked===false)S.push({txt:'Låse '+dr[2],lock:dr[0],open:!!d.d.alarm_contact})}
  return S}
 async function closeUp(b,pl){const S=closeSteps(pl);if(!S.length)return;
  if(!await ask('Stenge '+PLACES[pl]+'?\n\n'+S.map(x=>'• '+x.txt+(x.open?' (dørsensoren melder åpen, hoppes over)':'')).join('\n'),'Steng'))return;
