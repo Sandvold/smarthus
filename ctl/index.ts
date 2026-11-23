@@ -344,6 +344,38 @@ async function actDispatch(email: string, b: any): Promise<Out> {
   return res;
 }
 
+// ---------- Scener fra Homey (Steng/Åpne), faste verdier, samme som knappene på siden ----------
+// Åpne Arendal finnes ikke: der kan bare Adax styres, og det er avgjort at det ikke trengs.
+const SCENES: Record<string, any> = {
+  close: { oslo: { mt: 12, ax: 12, dk: 14, door: ['terrasse', 'Terrasedør'] }, arendal: { ax: 12, door: ['inngang', 'Inngangsdør'] } },
+  open: { oslo: { dk: 21, ax: { '141398': 19, '142515': 21, '161717': 18, '1487820': 10, '1676790': 16 } } },
+};
+const placeOf = (site: string, name: string) => /drivhus|oppvarmet/i.test((site || '') + ' ' + (name || '')) ? 'drivhus' : /oslo/i.test(site || '') ? 'oslo' : 'arendal';
+async function siteJson(name: string): Promise<any> { const r = (await sql('select body from site_files where name = $1', [name]))[0]; return r ? JSON.parse(r.body) : {}; }
+async function runScene(scene: string, place: string): Promise<Out> {
+  const c = SCENES[scene]?.[place];
+  if (!c) return [{ error: 'ukjent scene eller sted' }, 400];
+  const who = 'homey-scene', res: string[] = [];
+  const step = async (txt: string, b: any) => { const [body, st] = await actDispatch(who, b); res.push((st === 200 ? '✓ ' : '✗ ') + txt + (st === 200 ? '' : ': ' + (body as any).error)); };
+  const rooms = ((await siteJson('adax.json')).rooms || []).filter((r: any) => placeOf(r.home, r.name) === place);
+  const mts = ((await siteJson('microtemp.json')).thermostats || []).filter((t: any) => t.serial && placeOf(t.site, t.name) === place);
+  const lanes: Promise<void>[] = [];
+  if (scene === 'close' ? c.mt != null : true) lanes.push((async () => { for (const t of mts) await step(t.name + (scene === 'close' ? ' til ' + c.mt + ' °C' : ' tilbake til timeplan'), scene === 'close' ? { act: 'microtemp', serial: t.serial, cmd: 'temp', value: c.mt } : { act: 'microtemp', serial: t.serial, cmd: 'schedule' }); })());
+  lanes.push((async () => { for (const r of rooms) { const v = scene === 'close' ? c.ax : c.ax[r.id]; if (v != null) await step(r.name + ' (Adax) til ' + v + ' °C', { act: 'adax', room: r.id, target: v }); } })());
+  lanes.push((async () => {
+    if (c.dk != null) await step('Daikin til ' + c.dk + ' °C', { act: 'homey', dev: 'daikin', cmd: 'temp', value: c.dk });
+    if (scene === 'close' && c.door) {
+      const row = (await sql("select data from homey_readings where kind = 'lock' and name = $1 order by ts desc limit 1", [c.door[1]]))[0]?.data;
+      if (!row) res.push('✗ ' + c.door[1] + ': ingen status');
+      else if (row.locked !== false) res.push('✓ ' + c.door[1] + ' er allerede låst');
+      else if (row.alarm_contact) res.push('✗ ' + c.door[1] + ': hoppet over, døren er åpen');
+      else { const [body, st] = await lockTerrasse(who, false, c.door[0]); res.push((st === 200 ? '✓ lås ' : '✗ lås ') + c.door[1] + (st === 200 ? ' (sendt)' : ': ' + (body as any).error)); }
+    }
+  })());
+  await Promise.all(lanes);
+  return [{ ok: res.every(x => x.startsWith('✓')), scene, place, results: res }, 200];
+}
+
 function cors(req: Request): Record<string, string> {
   const o = req.headers.get('origin') || '';
   const h: Record<string, string> = { 'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Vary': 'Origin' };
@@ -369,6 +401,7 @@ export default {
       const tok = (await sql("select value from ctl_secrets where name = 'HOMEY_PUSH_TOKEN'"))[0]?.value;
       if (!tok || !safeEq(req.headers.get('x-push-token') ?? '', tok)) return json(req, { error: 'unauthorized' }, 401);
       let b: any; try { b = await req.json(); } catch { return json(req, { error: 'ugyldig' }, 400); }
+      if (typeof b.scene === 'string' && typeof b.place === 'string') { const [body, st] = await runScene(b.scene, b.place).catch((e: any) => [{ error: 'feil: ' + String(e?.message || e).slice(0, 80) }, 500] as Out); return json(req, body, st); }
       if (typeof b.dev === 'string' && ['a1', 'a3', 'daikin'].includes(b.dev)) {
         await sql('create table if not exists plug_state (did text primary key, name text, on_state boolean, power double precision, ts timestamptz not null default now())');
         const tp = typeof b.temp === 'number' ? b.temp : null, on = typeof b.on === 'boolean' ? b.on : null;
