@@ -122,7 +122,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus',bil:'Bil',alle:'Alle steder'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let GDALL=null,ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null;
+let GDALL=null,ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null,ST=null;
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -729,9 +729,19 @@ function stCard(d){const k=d.key,bz=!!BUSY[k],dis=bz?' disabled':'';
   setB.onclick=()=>{const v=cur();delete PEND[k];S.set(v)}}
  return e}
 async function refreshLive(){toast('Henter status …');await Promise.all([livePlugs().catch(()=>{}),mowerLive().catch(()=>{})]);softRender();toast('Status oppdatert '+new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}))}
+function salusTest(){if(!ST)return null;const ic=x=>x==='ok'?'<span style="color:#8bc48a">✓</span>':x==='feil'?'<span style="color:#e08363">✗</span>':'<span class="s">…</span>';
+ const steps=(ST.steps||[]).map(x=>`<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--grid)"><b style="width:18px">${ic(x.status)}</b><div><div>${x.n}. ${esc(x.name)}</div><div class="s">${esc(x.detail||'')}</div></div></div>`).join('');
+ const dv=(ST.devices||[]).map(d=>`<tr><td>${esc(d.name||'')}</td><td class="s">${esc(d.model||'')}</td><td>${d.temp!=null?nf(d.temp,1)+' °C':'–'}</td><td>${d.setpoint!=null?nf(d.setpoint,1)+' °C':'–'}</td><td class="s">${d.connected?'tilkoblet':'frakoblet'}</td></tr>`).join('');
+ const api=ST.api||{},pa=Object.keys(api.paths||{}).length;
+ const done=(ST.steps||[]).filter(x=>x.status==='ok').length,tot=(ST.steps||[]).length;
+ const html=`<div class="s" style="margin-bottom:8px">${done} av ${tot} trinn fullført · kjørt ${ago(new Date(ST.updated).getTime())}</div>${steps}
+ <h3 style="margin-top:12px">Termostater</h3><div style="overflow-x:auto"><table style="width:100%;font-size:14px;border-collapse:collapse"><tr class="s"><td>Rom</td><td>Modell</td><td>Temp</td><td>Innstilt</td><td></td></tr>${dv}</table></div>
+ <div class="s" style="margin-top:8px">Salus Open API (${pa} endepunkt) har bare lesing. For å sette temperatur trengs skyplattformens egen innlogging og meldingskø. «Innstilt» vises først når noen har endret den siste døgnene.</div>
+ <div class="s" style="margin-top:6px">Skriving: ${esc((ST.write||{}).detail||'')}</div>`;
+ return sec('salustest','Salus Test',done+' av '+tot+' trinn',html,{open:true})}
 function styringView(){const w=document.createElement('div'),D=devs(),pf=ls.get('sh-spl','alle');
  const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Styring</h1><span class="chip">${D.length} enheter</span></div><div class="hi" style="text-transform:none">Status nå og knapper. Oppdateres av seg selv.</div><div class="fl">${['alle','oslo','arendal','drivhus'].map(p=>`<button class="fb ${pf===p?'on':''}" data-p="${p}">${p==='alle'?'Alle':PLACES[p]}</button>`).join('')}<button class="fb rf" id="rf">Oppdater</button></div></div>`);
- hero.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ls.set('sh-spl',b.dataset.p);render()});hero.querySelector('#rf').onclick=refreshLive;w.appendChild(hero);
+ hero.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ls.set('sh-spl',b.dataset.p);render()});hero.querySelector('#rf').onclick=refreshLive;w.appendChild(hero);{const sx=salusTest();if(sx)w.appendChild(sx)}
  const G={};D.filter(d=>pf==='alle'||d.pl===pf||d.gh===pf).forEach(d=>(G[d.grp]=G[d.grp]||[]).push(d));
  if(!Object.keys(G).length)w.appendChild(el(waiting('Ingen styrbare enheter funnet ennå.')));
  GRP.forEach(g=>{if(!G[g])return;w.appendChild(el(`<h3 class="gh">${g}</h3>`));const gr=document.createElement('div');gr.className='dg';
@@ -827,7 +837,7 @@ const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
 function loginScreen(msg,out){const m=document.getElementById('main');
  m.innerHTML=`<div style="max-width:340px;margin:70px auto;text-align:center"><h2 style="margin:0 0 6px">Smarthus</h2><p class="s" style="margin:0 0 20px">${msg||'Logg inn for å se dataene.'}</p><button id="lg" style="font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${out?'Logg ut':'Logg inn med Google'}</button></div>`;
  document.getElementById('lg').onclick=async()=>{try{if(out){await AUTHC.signOut();location.reload()}else await AUTHC.signIn.social({provider:'google',callbackURL:location.origin+location.pathname})}catch(e){loginScreen('Feil: '+(e&&e.message||e))}}}
-function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json'),J('drivhusstrom.json'),J('vw.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa,ds,vw])=>{VWD=vw;STR=ds;SA=sa;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GDALL=g;GD=gdHidden()?{devices:[],error:null}:g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json'),J('salustest.json'),J('drivhusstrom.json'),J('vw.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa,st,ds,vw])=>{VWD=vw;STR=ds;SA=sa;ST=st;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GDALL=g;GD=gdHidden()?{devices:[],error:null}:g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
  const lo=document.createElement('p');lo.className='s';lo.style.textAlign='center';lo.innerHTML='<a href="#" id="lo">Logg ut</a>';document.body.appendChild(lo);document.getElementById('lo').onclick=async e=>{e.preventDefault();try{await AUTHC.signOut()}catch(x){}location.reload()}}
 (async()=>{const m=document.getElementById('main');m.textContent='Laster …';
  try{AUTHC=(await import('https://esm.sh/@neon/auth@0.8.2')).createAuthClient(AUTH_URL)}catch(e){loginScreen('Kunne ikke laste innloggingen. Prøv igjen senere.');return}
