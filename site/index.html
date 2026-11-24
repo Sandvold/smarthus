@@ -538,14 +538,16 @@ function leaveChecks(pl){const C=[],add=(lvl,txt,t)=>C.push({lvl,txt,t});
   else if(l.temp<=FROST)add('warn',`${esc(x.name)} har frost: ${nf(l.temp)} °C`,l.t);
   else add('ok',`${esc(x.name)}: ${nf(l.temp)} °C${hon===true?', varmen er på':''}`,l.t)});
  return C}
-const CLOSE={oslo:{mt:12,ax:12,dk:14},arendal:{ax:10}},DOOR={oslo:['terrasse','Terrasedør','terrassedøren'],arendal:['inngang','Inngangsdør','inngangsdøren']};
-const OPENV={arendal:{ax:20},oslo:{sched:1,dk:21,ax:{'141398':19,'142515':21,'161717':18,'1487820':10,'1676790':16}}};
+const CLOSE={oslo:{mt:12,ax:12,dk:14},arendal:{ax:10,sa:14}},DOOR={oslo:['terrasse','Terrasedør','terrassedøren'],arendal:['inngang','Inngangsdør','inngangsdøren']};
+const OPENV={arendal:{ax:20,sa:24},oslo:{sched:1,dk:21,ax:{'141398':19,'142515':21,'161717':18,'1487820':10,'1676790':16}}};
 function openSteps(pl){const c=OPENV[pl],S=[];if(!c)return S;
+ (c.sa==null?[]:[1]).forEach(()=>S.push({txt:`Salus (alle termostater) til ${c.sa} °C, utføres innen noen minutter`,o:{act:'salus',value:c.sa}}));
  (c.sched?((MT&&MT.thermostats)||[]):[]).filter(t=>placeOf(t.site,t.name)===pl&&t.serial).forEach(t=>S.push({txt:`${t.name}: tilbake til timeplan`,o:{act:'microtemp',serial:t.serial,cmd:'schedule'}}));
  axList(pl).forEach(r=>{const v=typeof c.ax==='number'?c.ax:c.ax[r.id];if(v!=null)S.push({txt:`${r.name} (Adax) til ${v} °C`,o:{act:'adax',room:r.id,target:v}})});
  (c.dk==null?[]:hmList(pl,'daikin').slice(0,1)).forEach(()=>S.push({txt:`Daikin til ${c.dk} °C`,o:{act:'homey',dev:'daikin',cmd:'temp',value:c.dk}}));
  return S}
 function closeSteps(pl){const c=CLOSE[pl],S=[];if(!c)return S;
+ (c.sa==null?[]:[1]).forEach(()=>S.push({txt:`Salus (alle termostater) til ${c.sa} °C, utføres innen noen minutter`,o:{act:'salus',value:c.sa}}));
  (c.mt==null?[]:(MT&&MT.thermostats)||[]).filter(t=>placeOf(t.site,t.name)===pl&&t.serial).forEach(t=>S.push({txt:`${t.name} til ${c.mt} °C`,o:{act:'microtemp',serial:t.serial,cmd:'temp',value:c.mt}}));
  axList(pl).forEach(r=>S.push({txt:`${r.name} (Adax) til ${c.ax} °C`,o:{act:'adax',room:r.id,target:c.ax}}));
  (c.dk==null?[]:hmList(pl,'daikin').slice(0,1)).forEach(()=>S.push({txt:`Daikin til ${c.dk} °C`,o:{act:'homey',dev:'daikin',cmd:'temp',value:c.dk}}));

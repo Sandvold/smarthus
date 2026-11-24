@@ -331,6 +331,7 @@ async function actMicrotemp(b: any): Promise<Out> {
 }
 
 async function actDispatch(email: string, b: any): Promise<Out> {
+  if (b.act === 'salus') { try { const m = await salusQueue(email, Number(b.value)); return [m.startsWith('✓') ? { ok: true, message: m } : { error: m }, m.startsWith('✓') ? 200 : 400]; } catch (e: any) { return [{ error: 'salus: ' + String(e?.message || e).slice(0, 80) }, 502]; } }
   const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : b.act === 'tuya' ? 'tuya:hp' : b.act === 'microtemp' ? 'microtemp:' + String(b.serial).slice(0, 20) : '';
   if (!key) return [{ error: 'ukjent handling' }, 400];
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
@@ -347,11 +348,21 @@ async function actDispatch(email: string, b: any): Promise<Out> {
 // ---------- Scener fra Homey (Steng/Åpne), faste verdier, samme som knappene på siden ----------
 // Åpne Arendal finnes ikke: der kan bare Adax styres, og det er avgjort at det ikke trengs.
 const SCENES: Record<string, any> = {
-  close: { oslo: { mt: 12, ax: 12, dk: 14, door: ['terrasse', 'Terrasedør'] }, arendal: { ax: 10, door: ['inngang', 'Inngangsdør'] } },
-  open: { arendal: { ax: 20 }, oslo: { sched: true, dk: 21, ax: { '141398': 19, '142515': 21, '161717': 18, '1487820': 10, '1676790': 16 } } },
+  close: { oslo: { mt: 12, ax: 12, dk: 14, door: ['terrasse', 'Terrasedør'] }, arendal: { ax: 10, sa: 14, door: ['inngang', 'Inngangsdør'] } },
+  open: { arendal: { ax: 20, sa: 24 }, oslo: { sched: true, dk: 21, ax: { '141398': 19, '142515': 21, '161717': 18, '1487820': 10, '1676790': 16 } } },
 };
 const placeOf = (site: string, name: string) => /drivhus|oppvarmet/i.test((site || '') + ' ' + (name || '')) ? 'drivhus' : /oslo/i.test(site || '') ? 'oslo' : 'arendal';
 async function siteJson(name: string): Promise<any> { const r = (await sql('select body from site_files where name = $1', [name]))[0]; return r ? JSON.parse(r.body) : {}; }
+// Salus (skyen) kan ikke styres fra Neon-funksjonen: kommandoen legges i salus_queue og utføres av GitHub Actions («Salus sky», mode queue).
+async function salusQueue(who: string, value: number): Promise<string> {
+  await sql("create table if not exists salus_queue (id bigserial primary key, created_at timestamptz not null default now(), device text not null, setpoint real not null, status text not null default 'ny', result text, done_at timestamptz)");
+  if (!(value >= 5 && value <= 28)) return '✗ Salus: ' + value + ' °C er utenfor grensen 5-28';
+  await sql("update salus_queue set status = 'erstattet', done_at = now() where status = 'ny' and device = 'alle'");
+  await sql("insert into salus_queue (device, setpoint) values ('alle', $1)", [value]);
+  await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
+  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [who, 'salus:alle', 'kø ' + value, 0, null]);
+  return '✓ Salus alle til ' + value + ' °C lagt i kø (utføres av Actions, normalt innen 15 minutter)';
+}
 async function runScene(scene: string, place: string): Promise<Out> {
   const c = SCENES[scene]?.[place];
   if (!c) return [{ error: 'ukjent scene eller sted' }, 400];
@@ -360,6 +371,7 @@ async function runScene(scene: string, place: string): Promise<Out> {
   const rooms = ((await siteJson('adax.json')).rooms || []).filter((r: any) => placeOf(r.home, r.name) === place);
   const mts = ((await siteJson('microtemp.json')).thermostats || []).filter((t: any) => t.serial && placeOf(t.site, t.name) === place);
   const lanes: Promise<void>[] = [];
+  if (c.sa != null) lanes.push((async () => { try { res.push(await salusQueue(who, c.sa)); } catch (e: any) { res.push('✗ Salus: ' + String(e?.message || e).slice(0, 60)); } })());
   if (scene === 'close' ? c.mt != null : c.sched) lanes.push((async () => { for (const t of mts) await step(t.name + (scene === 'close' ? ' til ' + c.mt + ' °C' : ' tilbake til timeplan'), scene === 'close' ? { act: 'microtemp', serial: t.serial, cmd: 'temp', value: c.mt } : { act: 'microtemp', serial: t.serial, cmd: 'schedule' }); })());
   lanes.push((async () => { for (const r of rooms) { const v = typeof c.ax === 'number' ? c.ax : c.ax[r.id]; if (v != null) await step(r.name + ' (Adax) til ' + v + ' °C', { act: 'adax', room: r.id, target: v }); } })());
   lanes.push((async () => {

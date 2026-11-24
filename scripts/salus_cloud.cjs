@@ -2,7 +2,8 @@
 /* Salus Premium Lite via skyplattformen (Cognito SRP + REST + AWS IoT MQTT).
    Protokollen er reverse-engineeret av Peterka35/salus-it600-cloud og brukt i mrcobra/Hubitat-Salus-UGE600-Cloud-integration.
    MODE=read  (standard): leser alle termostater, skriver site/salus2.json og site/salustest.json. Kun lesing.
-   MODE=write: setter ÉN termostat (WRITE_DEVICE = navn eller kode, WRITE_SETPOINT i °C, 5-28) og bekrefter via skyggen.
+   MODE=write: setter én termostat (WRITE_DEVICE = navn, kode eller «alle», WRITE_SETPOINT i °C, 5-28) og bekrefter via skyggen.
+   MODE=queue: utfører ventende rader i tabellen salus_queue (lagt inn av ctl ved «steng/åpne hytta»), siste verdi per termostat vinner.
    Passord og tokens skrives aldri ut. */
 const fs = require('fs');
 const { randomUUID } = require('crypto');
@@ -19,11 +20,17 @@ const API = 'https://service-api.eu.premium.salusconnect.io/api/v1', COMPANY = '
 const MIN_T = 5, MAX_T = 28;
 const K = 'ep9:sIT600TH:';
 
-const STEPS = ['Logge inn (Cognito)', 'Finne gateway og enheter', 'Lese temperatur og settpunkt', 'Hente AWS-nøkler', 'Koble til meldingskø (MQTT)', 'Skrive til én termostat', 'Bekrefte at termostaten svarte'];
+const STEPS = ['Logge inn (Cognito)', 'Finne gateway og enheter', 'Lese temperatur og settpunkt', 'Hente AWS-nøkler', 'Koble til meldingskø (MQTT)', 'Skrive til termostatene', 'Bekrefte at termostaten svarte'];
 const OUT = { updated: new Date().toISOString(), source: 'sky', steps: STEPS.map((n, i) => ({ n: i + 1, name: n, status: 'venter', detail: '' })), devices: [], api: {}, write: { status: 'venter', detail: 'Ikke kjørt. Venter på godkjenning før noe skrives til termostatene.' } };
 const clean = s => { s = String(s); for (const v of [E, P]) if (v) s = s.split(v).join('<skjult>'); return s.slice(0, 300); };
 const rec = (i, status, detail = '') => { OUT.steps[i].status = status; OUT.steps[i].detail = clean(detail); };
 const save = () => { fs.mkdirSync('site', { recursive: true }); fs.writeFileSync('site/salustest.json', JSON.stringify(OUT)); };
+async function sqlq(query, params = []) {
+  const url = process.env.NEON_DATABASE_URL; if (!url) throw new Error('NEON_DATABASE_URL mangler');
+  const r = await fetch(`https://${new URL(url).host}/sql`, { method: 'POST', headers: { 'Neon-Connection-String': url, 'content-type': 'application/json' }, body: JSON.stringify({ query, params }) });
+  if (!r.ok) throw new Error('Neon SQL ga HTTP ' + r.status);
+  return (await r.json()).rows || [];
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 let tokens = null;
@@ -91,7 +98,7 @@ const publish = (c, topic, payload) => new Promise((res, rej) => c.publish(topic
 
 (async () => {
   if (!(E && P)) { rec(0, 'feil', 'SALUS_EMAIL/SALUS_PASSWORD mangler i GitHub-secrets'); save(); return; }
-  let rows = [], all = null;
+  let rows = [], all = null, qids = [];
   try {
     await login(); rec(0, 'ok', 'Innlogget via Cognito SRP');
     all = await readAll();
@@ -101,42 +108,69 @@ const publish = (c, topic, payload) => new Promise((res, rej) => c.publish(topic
     rec(2, th.length ? 'ok' : 'feil', `Leste ${th.length} termostater: ` + th.map(r => `${r.name} ${r.temp}° (innstilt ${r.setpoint ?? '–'}°)`).join(', '));
     OUT.devices = rows;
     save();
-    if (MODE !== 'write') {
+    if (MODE === 'read') {
       // salus2.json brukes av siden; bare termostater med temperatur
       fs.writeFileSync('site/salus2.json', JSON.stringify({ updated: new Date().toISOString(), source: 'sky', devices: th }));
       rec(3, 'venter', 'Ikke nødvendig ved lesing'); rec(4, 'venter', 'Ikke nødvendig ved lesing'); rec(5, 'venter', 'Venter på godkjenning fra deg'); rec(6, 'venter', '');
       save(); console.log('Lesing ferdig:', th.length, 'termostater'); return;
     }
-    // ---- Skriving: én termostat ----
-    const want = (process.env.WRITE_DEVICE || '').trim(), val = Number(String(process.env.WRITE_SETPOINT || '').replace(',', '.'));
-    const tgt = th.filter(r => r.code === want || r.name.toLowerCase() === want.toLowerCase());
-    if (tgt.length !== 1) throw new Error(`Fant ${tgt.length} termostater som heter «${want}». Navn: ${th.map(r => r.name).join(', ')}`);
-    if (!(val >= MIN_T && val <= MAX_T)) throw new Error(`Settpunktet ${val} er utenfor grensen ${MIN_T}-${MAX_T} °C`);
-    const t = tgt[0], idx = t.index || '11', before = t.setpoint;
-    const cr = await awsCreds(); rec(3, 'ok', 'Midlertidige AWS-nøkler hentet');
-    const gwCode = (all.devs.find(d => d.device_code === t.code) || {})._gw;
-    const cli = await mqttConnect(cr, gwCode); rec(4, 'ok', 'Tilkoblet AWS IoT');
-    const payload = JSON.stringify({ state: { desired: { [idx]: { properties: { [K + 'SetHeatingSetpoint_x100']: Math.round(val * 100), [K + 'SetHoldType']: 2 } } } } });
-    await publish(cli, `$aws/things/${t.code}/shadow/update`, payload);
-    cli.end(true);
-    rec(5, 'ok', `Sendte «${t.name}» fra ${before ?? '?'} til ${val} °C (manuell hold)`);
-    OUT.write = { status: 'sendt', detail: `Sendte ${t.name}: ${before ?? '?'} -> ${val} °C. Venter på bekreftelse.`, device: t.name, value: val, before };
-    save();
-    let ok = false, now = null;
-    for (let i = 0; i < 8 && !ok; i++) {
-      await sleep(5000);
-      const r = await api('POST', '/devices/device_shadows', { request_id: 'smarthus', device_codes: [t.code] });
-      const it = ((r.data || {}).success_list || [])[0];
-      if (it) { const rep = (JSON.parse(it.payload).state || {}).reported || {}; for (const v of Object.values(rep)) if (v && v.properties) { now = x100(v.properties[K + 'HeatingSetpoint_x100']); break; } }
-      ok = now != null && Math.abs(now - val) < 0.01;
+    // ---- Skriving (MODE=write: WRITE_DEVICE navn eller «alle»; MODE=queue: rader i salus_queue) ----
+    const plan = new Map();   // kode -> {r, val}
+    const addPlan = (dev, val) => {
+      if (!(val >= MIN_T && val <= MAX_T)) throw new Error(`Settpunktet ${val} er utenfor grensen ${MIN_T}-${MAX_T} °C`);
+      const hit = /^(alle|\*)$/i.test(dev) ? th : th.filter(r => r.code === dev || r.name.toLowerCase() === dev.toLowerCase());
+      if (!hit.length) throw new Error(`Fant ingen termostat som heter «${dev}». Navn: ${th.map(r => r.name).join(', ')}`);
+      for (const r of hit) plan.set(r.code, { r, val });
+    };
+    if (MODE === 'queue') {
+      await sqlq('create table if not exists salus_queue (id bigserial primary key, created_at timestamptz not null default now(), device text not null, setpoint real not null, status text not null default \'ny\', result text, done_at timestamptz)');
+      await sqlq("update salus_queue set status = 'utløpt', done_at = now() where status = 'ny' and created_at < now() - interval '3 hours'");
+      await sqlq("update salus_queue set status = 'feil', result = 'Kjøringen stoppet uten svar', done_at = now() where status = 'kjører' and created_at < now() - interval '30 minutes'");
+      const q = await sqlq("select id, device, setpoint from salus_queue where status = 'ny' order by id");
+      if (!q.length) { OUT.write = { status: 'tom', detail: 'Ingen ventende Salus-kommandoer i køen' }; rec(5, 'venter', 'Ingen ventende kommandoer'); save(); console.log('Køen er tom'); return; }
+      qids = q.map(x => x.id);
+      await sqlq('update salus_queue set status = \'kjører\' where id = any($1::bigint[])', [qids]);
+      try { for (const x of q) addPlan(String(x.device), Number(x.setpoint)); } catch (e) { await sqlq("update salus_queue set status = 'feil', result = $2, done_at = now() where id = any($1::bigint[])", [qids, clean(e.message)]); throw e; }
+    } else {
+      addPlan((process.env.WRITE_DEVICE || '').trim(), Number(String(process.env.WRITE_SETPOINT || '').replace(',', '.')));
     }
-    rec(6, ok ? 'ok' : 'feil', ok ? `Termostaten melder nå ${now} °C` : `Termostaten meldte fortsatt ${now ?? 'ingenting'} °C etter 40 s (kommandoen kan være i kø)`);
-    OUT.write = { status: ok ? 'ok' : 'ukjent', detail: ok ? `Bekreftet: ${t.name} melder ${now} °C (var ${before ?? '?'})` : `Sendt, men ikke bekreftet innen 40 s. Siste verdi ${now ?? '–'} °C`, device: t.name, value: val, before, after: now };
-    save(); console.log(OUT.write.detail);
+    const targets = [...plan.values()];
+    const cr = await awsCreds(); rec(3, 'ok', 'Midlertidige AWS-nøkler hentet');
+    const gwCode = (all.devs.find(d => d.device_code === targets[0].r.code) || {})._gw;
+    const cli = await mqttConnect(cr, gwCode); rec(4, 'ok', 'Tilkoblet AWS IoT');
+    for (const { r, val } of targets) {
+      const payload = JSON.stringify({ state: { desired: { [r.index || '11']: { properties: { [K + 'SetHeatingSetpoint_x100']: Math.round(val * 100), [K + 'SetHoldType']: 2 } } } } });
+      await publish(cli, `$aws/things/${r.code}/shadow/update`, payload);
+      await sleep(700);
+    }
+    cli.end(true);
+    rec(5, 'ok', 'Sendte: ' + targets.map(t => `${t.r.name} ${t.r.setpoint ?? '?'}→${t.val} °C`).join(', '));
+    OUT.write = { status: 'sendt', detail: 'Sendt til ' + targets.length + ' termostater. Venter på bekreftelse.' };
+    save();
+    const left = new Map(targets.map(t => [t.r.code, t])), now = {};
+    for (let i = 0; i < 8 && left.size; i++) {
+      await sleep(5000);
+      const r = await api('POST', '/devices/device_shadows', { request_id: 'smarthus', device_codes: [...left.keys()] });
+      for (const it of ((r.data || {}).success_list || [])) {
+        let rep = {}; try { rep = (JSON.parse(it.payload).state || {}).reported || {}; } catch (e) {}
+        for (const v of Object.values(rep)) if (v && v.properties) { now[it.device_code] = x100(v.properties[K + 'HeatingSetpoint_x100']); break; }
+        const t = left.get(it.device_code);
+        if (t && now[it.device_code] != null && Math.abs(now[it.device_code] - t.val) < 0.01) left.delete(it.device_code);
+      }
+    }
+    const okN = targets.filter(t => !left.has(t.r.code)).map(t => t.r.name), failN = [...left.values()].map(t => `${t.r.name} (melder ${now[t.r.code] ?? '–'})`);
+    rec(6, failN.length ? 'feil' : 'ok', failN.length ? `Ikke bekreftet: ${failN.join(', ')}` : `Alle ${okN.length} termostater melder ny verdi`);
+    const det = (failN.length ? `Bekreftet ${okN.length} av ${targets.length}. Ikke bekreftet: ${failN.join(', ')}` : `Bekreftet: ${okN.join(', ')} melder ${targets[0].val} °C`);
+    OUT.write = { status: failN.length ? 'ukjent' : 'ok', detail: det, devices: okN, value: targets[0].val };
+    if (MODE === 'queue' && qids.length) await sqlq("update salus_queue set status = $2, result = $3, done_at = now() where id = any($1::bigint[])", [qids, failN.length ? 'feil' : 'ok', det.slice(0, 200)]);
+    // oppdater salus2.json så siden viser nye verdier
+    try { const again = (await readAll()).devs.map(toRow).filter(r => r.temp != null); fs.writeFileSync('site/salus2.json', JSON.stringify({ updated: new Date().toISOString(), source: 'sky', devices: again })); } catch (e) {}
+    save(); console.log(det);
   } catch (e) {
     const i = OUT.steps.findIndex(s => s.status === 'venter');
     rec(i < 0 ? 0 : i, 'feil', 'Stoppet: ' + (e && e.message || e));
-    if (MODE === 'write') OUT.write = { status: 'feil', detail: clean(e && e.message || e) };
+    if (MODE === 'write' || MODE === 'queue') OUT.write = { status: 'feil', detail: clean(e && e.message || e) };
+    if (MODE === 'queue' && qids.length) { try { await sqlq("update salus_queue set status = 'feil', result = $2, done_at = now() where id = any($1::bigint[]) and status = 'kjører'", [qids, clean(e && e.message || e)]); } catch (e2) {} }
     save(); console.log('Feil:', clean(e && e.message || e));
     process.exitCode = 0;
   }

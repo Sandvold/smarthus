@@ -29,6 +29,25 @@ jobs:
       - run: python scripts/upload_site.py
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - name: Start Salus-køen hvis det ligger kommandoer der
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          n=$(python - <<'PY'
+          import os, psycopg
+          try:
+              with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as c:
+                  print(c.execute("select count(*) from salus_queue where status = 'ny' and created_at > now() - interval '3 hours'").fetchone()[0])
+          except Exception:
+              print(0)
+          PY
+          )
+          echo "Ventende Salus-kommandoer: $n"
+          if [ "${n:-0}" -gt 0 ]; then
+            gh api -X POST "repos/${{ github.repository }}/actions/workflows/salus-cloud.yml/dispatches" -f ref=main -f 'inputs[mode]=queue'
+            echo "Startet Salus sky (queue)"
+          fi
       - name: Start Hent målinger hvis siste kjøring er over 10 min gammel
         env:
           GH_TOKEN: ${{ github.token }}
