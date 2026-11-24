@@ -1,0 +1,46 @@
+name: Salus sky
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "read = bare lesing, write = sett én termostat"
+        required: true
+        default: "read"
+        type: choice
+        options: [read, write]
+      write_device:
+        description: "Skriving: termostatnavn (f.eks. Gang)"
+        required: false
+        default: ""
+      write_setpoint:
+        description: "Skriving: temperatur i °C (5-28)"
+        required: false
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: salus-cloud
+  cancel-in-progress: false
+jobs:
+  salus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm install --no-save --no-audit --no-fund amazon-cognito-identity-js aws-iot-device-sdk node-fetch@2
+      - run: node scripts/salus_cloud.cjs
+        env:
+          SALUS_EMAIL: ${{ secrets.SALUS_EMAIL }}
+          SALUS_PASSWORD: ${{ secrets.SALUS_PASSWORD }}
+          MODE: ${{ inputs.mode }}
+          WRITE_DEVICE: ${{ inputs.write_device }}
+          WRITE_SETPOINT: ${{ inputs.write_setpoint }}
+      - run: pip install "psycopg[binary]"
+      - run: python scripts/upload_site.py
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
