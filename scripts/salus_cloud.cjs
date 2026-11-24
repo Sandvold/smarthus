@@ -1,7 +1,7 @@
 'use strict';
 /* Salus Premium Lite via skyplattformen (Cognito SRP + REST + AWS IoT MQTT).
    Protokollen er reverse-engineeret av Peterka35/salus-it600-cloud og brukt i mrcobra/Hubitat-Salus-UGE600-Cloud-integration.
-   MODE=read  (standard): leser alle termostater, skriver site/salus2.json og site/salustest.json. Kun lesing.
+   MODE=read  (standard): leser alle termostater og skriver site/salus2.json. Kun lesing; rører ikke salustest.json.
    MODE=write: setter én termostat (WRITE_DEVICE = navn, kode eller «alle», WRITE_SETPOINT i °C, 5-28) og bekrefter via skyggen.
    MODE=queue: utfører ventende rader i tabellen salus_queue (lagt inn av ctl ved «steng/åpne hytta»), siste verdi per termostat vinner.
    Passord og tokens skrives aldri ut. */
@@ -24,7 +24,8 @@ const STEPS = ['Logge inn (Cognito)', 'Finne gateway og enheter', 'Lese temperat
 const OUT = { updated: new Date().toISOString(), source: 'sky', steps: STEPS.map((n, i) => ({ n: i + 1, name: n, status: 'venter', detail: '' })), devices: [], api: {}, write: { status: 'venter', detail: 'Ikke kjørt. Venter på godkjenning før noe skrives til termostatene.' } };
 const clean = s => { s = String(s); for (const v of [E, P]) if (v) s = s.split(v).join('<skjult>'); return s.slice(0, 300); };
 const rec = (i, status, detail = '') => { OUT.steps[i].status = status; OUT.steps[i].detail = clean(detail); };
-const save = () => { fs.mkdirSync('site', { recursive: true }); fs.writeFileSync('site/salustest.json', JSON.stringify(OUT)); };
+// salustest.json beskriver siste SKRIVING. Lesing (hvert kvarter) og tom kø skal ikke overskrive den; salus2.json har lesingen.
+const save = () => { if (MODE === 'read' || OUT.write?.status === 'tom') return; fs.mkdirSync('site', { recursive: true }); fs.writeFileSync('site/salustest.json', JSON.stringify(OUT)); };
 async function sqlq(query, params = []) {
   const url = process.env.NEON_DATABASE_URL; if (!url) throw new Error('NEON_DATABASE_URL mangler');
   const r = await fetch(`https://${new URL(url).host}/sql`, { method: 'POST', headers: { 'Neon-Connection-String': url, 'content-type': 'application/json' }, body: JSON.stringify({ query, params }) });
