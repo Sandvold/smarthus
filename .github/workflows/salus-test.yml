@@ -1,0 +1,50 @@
+name: Salus Test
+on:
+  workflow_dispatch:
+    inputs:
+      write_device:
+        description: "Skriv-test: termostatnavn eller kode (tomt = bare lesing)"
+        required: false
+        default: ""
+      write_setpoint:
+        description: "Skriv-test: settpunkt i °C"
+        required: false
+        default: ""
+      write_path:
+        description: "Skriv-test: endepunkt, f.eks. /premium-lite/devices/{kode}/..."
+        required: false
+        default: ""
+      write_method:
+        description: "Skriv-test: POST, PUT eller PATCH"
+        required: false
+        default: "POST"
+      write_body:
+        description: "Skriv-test: JSON-body (tomt = heating_setpoint i hundredeler)"
+        required: false
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: salus-test
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests "psycopg[binary]"
+      - run: python scripts/salus_test.py
+        env:
+          SALUS_EMAIL: ${{ secrets.SALUS_EMAIL }}
+          SALUS_PASSWORD: ${{ secrets.SALUS_PASSWORD }}
+          WRITE_DEVICE: ${{ inputs.write_device }}
+          WRITE_SETPOINT: ${{ inputs.write_setpoint }}
+          WRITE_PATH: ${{ inputs.write_path }}
+          WRITE_METHOD: ${{ inputs.write_method }}
+          WRITE_BODY: ${{ inputs.write_body }}
+      - run: python scripts/upload_site.py
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
