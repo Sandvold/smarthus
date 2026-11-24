@@ -8,7 +8,7 @@ import psycopg
 url = os.environ.get("NEON_DATABASE_URL")
 if not url:
     print("NEON_DATABASE_URL mangler"); sys.exit(0)
-STANDBY_W = 30.0      # antakelse: kompressor står
+STANDBY_W = 15.0      # kompressor står: appen viser 0,0 A (under ca. 24 W), resten er antakelse
 MAX_GAP_MIN = 30      # lengre hull i målingene teller ikke som drift
 DEFAULT_PF = 0.95     # antakelse til watt = V*A*pf
 
@@ -50,16 +50,19 @@ with psycopg.connect(url) as con:
 
 pts = [dict(ts=r[0].isoformat(), hz=float(r[1]), amb=float(r[2]), tw=float(r[3]), tout=None if r[4] is None else float(r[4]),
             v=float(r[5]), a=float(r[6]), w=float(r[5]) * float(r[6]) * float(r[7]), note=r[8]) for r in cal if r[1] is not None and r[5] is not None]
-out = {"updated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "n": len(pts), "standby_w": STANDBY_W, "pf": DEFAULT_PF}
+out = {"updated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "n": len([p for p in pts if p["hz"] > 0]), "standby_w": STANDBY_W, "pf": DEFAULT_PF}
 if not pts:
     out["model"] = None
 else:
-    kind, c = fit(pts)
+    run_pts = [p for p in pts if p["hz"] > 0]  # stillstand brukes ikke i tilpasningen, den håndteres av STANDBY_W
+    kind, c = fit(run_pts) if run_pts else ("prop", [25.0])
     res = [predict(kind, c, p["hz"], p["amb"], p["tw"]) - p["w"] for p in pts]
-    rmse = (sum(e * e for e in res) / len(res)) ** 0.5
-    mean_w = sum(p["w"] for p in pts) / len(pts)
+    rr = [e for e, p in zip(res, pts) if p["hz"] > 0] or [0.0]
+    rmse = (sum(e * e for e in rr) / len(rr)) ** 0.5
+    mean_w = sum(p["w"] for p in run_pts) / max(1, len(run_pts))
     out["model"] = {"kind": kind, "coef": [round(x, 4) for x in c], "rmse_w": round(rmse, 1), "rel_pct": round(100 * rmse / mean_w, 1) if mean_w else None}
-    for p, e in zip(pts, res): p["est"] = round(p["w"] + e); p["w"] = round(p["w"])
+    for p, e in zip(pts, res):
+        p["est"] = round(p["w"] + e) if p["hz"] > 0 else round(STANDBY_W); p["w"] = round(p["w"])
 
     def est(p):
         hz = p.get("compressor_strength"); run = p.get("compressor_state") is True and isinstance(hz, (int, float)) and hz > 0
