@@ -394,20 +394,44 @@ function secKlima(pl){const S=sensors(pl);if(!S.length)return null;
  return sec('klima','Klima',`${nf(last.temp)} °C · ${nf(last.hum,0)} % fukt`,b,{draw:()=>{chart('t'+pl,'temp','°C',FROST,1,S);chart('h'+pl,'hum','%',null,3,S)}})}
 function hpEstBlock(){const m=HPW&&HPW.model;if(!HPW)return `<div class="s" style="margin:8px 0">Effekt-anslag ikke tilgjengelig ennå.</div>`;
  if(!m)return `<div class="s" style="margin:8px 0">Pumpen sender ikke effekt til Tuya. Anslaget venter på første kalibreringspunkt.</div>`;
- const days=(HPW.daily||[]).slice(-7),mx=Math.max(1,...days.map(x=>x.kwh)),kind={prop:'effekt ∝ frekvens',lin:'frekvens',lin_amb:'frekvens og utetemperatur',lin_amb_tw:'frekvens, utetemperatur og vanntemperatur'}[m.kind]||m.kind;
- const bars=days.length?`<div style="display:flex;gap:6px;align-items:flex-end;height:70px;margin:6px 0">${days.map(x=>`<div style="flex:1;text-align:center;font-size:11px"><div style="background:#d8a747;height:${Math.max(2,Math.round(x.kwh/mx*50))}px;border-radius:3px 3px 0 0"></div>${nf(x.kwh,1)}<br><span class="s">${x.d.slice(8)}.</span></div>`).join('')}</div>`:'';
+ const kind={prop:'effekt ∝ frekvens',lin:'frekvens',lin_amb:'frekvens og utetemperatur',lin_amb_tw:'frekvens, utetemperatur og vanntemperatur'}[m.kind]||m.kind;
+
  const q=m.rel_pct==null?'':' · avvik mot målingene ca. '+nf(m.rel_pct,0)+' %';
- return `<div class="s" style="margin:8px 0">Pumpen sender ikke strøm til Tuya, så effekten er et anslag fra ${kind}, kalibrert mot ${HPW.n} avlesning${HPW.n===1?'':'er'} fra produsentens app${q}.${HPW.n<8?' Få punkter, så grovt foreløpig.':''}</div><h3>kWh per døgn (anslag)</h3>${bars||'<div class="s">Ingen døgn ennå.</div>'}<details class="mini"><summary>Kalibreringspunkter (${HPW.n})</summary><table><tr><th>Hz</th><th>Ute</th><th>Inn</th><th>Målt W</th><th>Modell W</th></tr>${(HPW.calib||[]).map(c=>`<tr><td>${nf(c.hz,0)}</td><td>${nf(c.amb,0)}</td><td>${nf(c.tw,0)}</td><td>${nf(c.w,0)}</td><td>${nf(c.est,0)}</td></tr>`).join('')}</table><div class="s">Målt W = spenning × strøm × ${HPW.pf} (antatt effektfaktor). Stillstand regnes som ${HPW.standby_w} W (appen viser 0,0 A).</div></details>`}
+ return `<div class="s" style="margin:8px 0">Pumpen sender ikke strøm til Tuya, så effekten er et anslag fra ${kind}, kalibrert mot ${HPW.n} avlesning${HPW.n===1?'':'er'} fra produsentens app${q}.${HPW.n<8?' Få punkter, så grovt foreløpig.':''}</div><h3>Strømforbruk (anslag)</h3>${chartBlock('hpk')}<details class="mini"><summary>Kalibreringspunkter (${HPW.n})</summary><table><tr><th>Hz</th><th>Ute</th><th>Inn</th><th>Målt W</th><th>Modell W</th></tr>${(HPW.calib||[]).map(c=>`<tr><td>${nf(c.hz,0)}</td><td>${nf(c.amb,0)}</td><td>${nf(c.tw,0)}</td><td>${nf(c.w,0)}</td><td>${nf(c.est,0)}</td></tr>`).join('')}</table><div class="s">Målt W = spenning × strøm × ${HPW.pf} (antatt effektfaktor). Stillstand regnes som ${HPW.standby_w} W (appen viser 0,0 A).</div></details>`}
+function hpKwh(since){const host=document.getElementById('ch-hpk');if(!host)return;
+ const leg=document.getElementById('leg-hpk'),H1=3600000,hr=(HPW&&HPW.hourly)||[],hm=new Map(hr);
+ if(!hr.length){host.innerHTML='<div class="s">Ingen data ennå</div>';return}
+ const last=hr[hr.length-1][0]+H1,from=Math.max(since,hr[0][0]+24*H1),pts=[];
+ for(let t=Math.ceil(from/H1)*H1;t<=last;t+=H1){let v=0;for(let k=1;k<=24;k++)v+=hm.get(t-k*H1)||0;pts.push({t,v})}
+ const dl=d=>new Date(d+'T00:00:00').getTime(),days=(HPW.daily||[]).filter(x=>dl(x.d)+86400000>from).map(x=>({d:x.d,t0:dl(x.d),v:x.kwh}));
+ if(!pts.length&&!days.length){host.innerHTML='<div class="s">For lite data i perioden</div>';return}
+ const t0=Math.min(from,...days.map(x=>x.t0)),t1=Math.max(last,...pts.map(p=>p.t)),W=host.clientWidth||600,H=240,m={l:40,r:10,t:10,b:24};
+ const hi=Math.max(1,...pts.map(p=>p.v),...days.map(x=>x.v))*1.1,X=t=>m.l+(t-t0)/(t1-t0)*(W-m.l-m.r),Y=v=>H-m.b-v/hi*(H-m.t-m.b);
+ let g='';for(let i=0;i<=4;i++){const v=hi*i/4,y=Y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="#2a2f2d"/><text x="${m.l-6}" y="${y+4}" text-anchor="end" fill="#9aa39d" font-size="11">${nf(v,0)}</text>`}
+ const step=Math.max(1,Math.ceil(days.length/Math.max(2,Math.floor(W/60))));
+ g+=days.map((x,i)=>{const xa=Math.max(m.l,X(x.t0)),xb=Math.min(W-m.r,X(x.t0+86400000)),h=x.v/hi*(H-m.t-m.b);
+  return `<rect x="${xa+1}" y="${H-m.b-h}" width="${Math.max(1,xb-xa-2)}" height="${h}" rx="3" fill="#d8a747" fill-opacity=".28"><title>${x.d}: ${nf(x.v,1)} kWh</title></rect>`+(i%step===0?`<text x="${(xa+xb)/2}" y="${H-6}" text-anchor="middle" fill="#9aa39d" font-size="11">${x.d.slice(8)}.${x.d.slice(5,7)}.</text>`:'')}).join('');
+ g+=`<polyline fill="none" stroke="#d8a747" stroke-width="2" stroke-linejoin="round" points="${pts.map(p=>X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}"/>`;
+ host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Strømforbruk, glidende 24 timer og kWh per døgn">${g}<line id="hpk-x" y1="${m.t}" y2="${H-m.b}" stroke="#9aa39d" style="display:none"/></svg><div class="tip" id="hpk-tip"></div>`;
+ leg.innerHTML='<span><i style="background:#d8a747"></i>Siste 24 timer (kWh, glidende)</span><span><i style="background:#d8a747;opacity:.35"></i>Hvert kalenderdøgn (kWh)</span>';
+ const svg=host.querySelector('svg'),xl=document.getElementById('hpk-x'),tip=document.getElementById('hpk-tip');
+ svg.addEventListener('pointermove',e=>{const r=svg.getBoundingClientRect(),t=t0+((e.clientX-r.left)/r.width*W-m.l)/(W-m.l-m.r)*(t1-t0);if(!pts.length)return;
+  let b=pts[0];pts.forEach(p=>{if(Math.abs(p.t-t)<Math.abs(b.t-t))b=p});const dd=days.find(x=>b.t-1>=x.t0&&b.t-1<x.t0+86400000);
+  xl.setAttribute('x1',X(b.t));xl.setAttribute('x2',X(b.t));xl.style.display='';
+  tip.innerHTML=`<div class="s">${fmt(new Date(b.t))}</div><div><i class="dot" style="background:#d8a747"></i>Siste 24 t: ${nf(b.v,1)} kWh</div>${dd?`<div class="s">Døgnet ${dd.d.slice(8)}.${dd.d.slice(5,7)}.: ${nf(dd.v,1)} kWh</div>`:''}`;
+  tip.style.display='block';tip.style.left=Math.min(Math.max(X(b.t)/W*r.width+10,0),r.width-tip.offsetWidth)+'px';tip.style.top='8px'});
+ svg.addEventListener('pointerleave',()=>{xl.style.display='none';tip.style.display='none'});
+ document.getElementById('tb-hpk').innerHTML='<table><tr><th>Døgn</th><th>kWh (anslag)</th></tr>'+days.slice().reverse().map(x=>`<tr><td>${x.d}</td><td>${nf(x.v,1)}</td></tr>`).join('')+'</table>'}
 function secVarme(pl){let h='',sub=[],draw=null;
  const rows=pl==='arendal'?hpRows():[];
  if(rows.length){const last=rows[rows.length-1],p=last.p,run=p.compressor_state===true,on=p.switch===true,fault=p.fault&&p.fault!==0,since=()=>Date.now()-hours*3600000;
   sub.push('Varmepumpe '+(on?'på':'av'));
   h+=`<h3>${esc(last.name)}</h3>`+grid(`<div class="tile"><div class="s">Status</div><div style="font-size:20px">${on?'På':'Av'} · ${run?'kompressor går':'kompressor står'}</div><div class="s">${p.mode??'–'} · ${p.work_mode??'–'}</div>${fault?'<div class="warn">⚠ Feilkode '+p.fault+'</div>':''}</div>`
    +tile('Innstilt',p.temp_set==null?null:nf(p.temp_set,0),'°C')+tile('Retur (inn)',p.temp_bottom==null?null:nf(p.temp_bottom,0),'°C')+tile('Ut',p.temp_top==null?null:nf(p.temp_top,0),'°C')+tile('Effekt (anslag)',HPW&&HPW.now_w!=null?nf(HPW.now_w,0):null,'W')+hpCtl(p.temp_set))
-   +hpEstBlock()+`<h3>Temperaturer</h3>${chartBlock('hpt')}<h3>Effekt</h3>${chartBlock('hpp')}<details class="mini"><summary>Alle verdier fra enheten</summary><table>${Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</table></details>`;
+   +hpEstBlock()+`<details class="mini" id="hpt-d"><summary>Temperaturer</summary>${chartBlock('hpt')}</details><details class="mini"><summary>Alle verdier fra enheten</summary><table>${Object.entries(p).map(([k,v])=>`<tr><td>${k}</td><td>${String(v)}</td></tr>`).join('')}</table></details>`;
   draw=()=>{const s=since(),HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877']];
    drawLine('ch-hpt','leg-hpt','tb-hpt',HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>s&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length),'t','°C',null,2);
-   drawLine('ch-hpp','leg-hpp','tb-hpp',[{name:'Effekt (anslag)',color:'#d8a747',pts:((HPW&&HPW.series)||[]).filter(x=>x[0]>s).map(x=>({t:x[0],v:x[1]}))}],'pw','W',null,5)}}
+   hpKwh(s)}}
  const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join('')+daikinCtl(dk[0]))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
  const ax=axList(pl);if(ax.length){const t=axAvg(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
  const sb=saBlock(pl);if(sb){sub.push(sb.sub);h+=`<h3>Gulvvarme (Salus)</h3>`+sb.html;const d2=draw;draw=()=>{d2&&d2();sb.draw()}}

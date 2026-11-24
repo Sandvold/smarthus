@@ -69,7 +69,7 @@ else:
         if not run: return STANDBY_W
         amb = p.get("around_temp"); tw = p.get("temp_bottom")
         return predict(kind, c, float(hz), float(amb if isinstance(amb, (int, float)) else 0), float(tw if isinstance(tw, (int, float)) else 40))
-    series, daily, prev = [], {}, None
+    series, daily, hourly, prev = [], {}, {}, None
     tz = ZoneInfo("Europe/Oslo")
     for ts, props in rd:
         p = props if isinstance(props, dict) else json.loads(props)
@@ -78,12 +78,16 @@ else:
             dt = (ts - prev[0]).total_seconds() / 60
             if 0 < dt <= MAX_GAP_MIN:
                 d = ts.astimezone(tz).date().isoformat()
-                daily[d] = daily.get(d, 0.0) + (prev[1] + w) / 2 * dt / 60 / 1000
+                e = (prev[1] + w) / 2 * dt / 60 / 1000
+                daily[d] = daily.get(d, 0.0) + e
+                hk = int(ts.replace(minute=0, second=0, microsecond=0).timestamp() * 1000)
+                hourly[hk] = hourly.get(hk, 0.0) + e
         prev = (ts, w)
         if ts > datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=8):
             series.append([int(ts.timestamp() * 1000), round(w)])
     out["now_w"] = round(prev[1]) if prev else None
     out["series"] = series
+    out["hourly"] = [[k, round(v, 3)] for k, v in sorted(hourly.items())]
     out["daily"] = [{"d": d, "kwh": round(v, 2)} for d, v in sorted(daily.items())]
 out["calib"] = pts
 os.makedirs("site", exist_ok=True)
