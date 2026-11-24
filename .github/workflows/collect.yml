@@ -143,6 +143,10 @@ jobs:
           OJ_PASSWORD: ${{ secrets.OJ_PASSWORD }}
           OJ_API_KEY: ${{ secrets.OJ_API_KEY }}
           OJ_CUSTOMER_ID: ${{ secrets.OJ_CUSTOMER_ID }}
+      - run: python scripts/hp_power.py
+        continue-on-error: true
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/upload_site.py
         continue-on-error: true
         env:
