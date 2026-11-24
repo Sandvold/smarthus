@@ -331,7 +331,7 @@ async function actMicrotemp(b: any): Promise<Out> {
 }
 
 async function actDispatch(email: string, b: any): Promise<Out> {
-  if (b.act === 'salus') { try { const m = await salusQueue(email, Number(b.value)); return [m.startsWith('✓') ? { ok: true, message: m } : { error: m }, m.startsWith('✓') ? 200 : 400]; } catch (e: any) { return [{ error: 'salus: ' + String(e?.message || e).slice(0, 80) }, 502]; } }
+  if (b.act === 'salus') { try { const m = await salusQueue(email, Number(b.value), String(b.device || 'alle')); return [m.startsWith('✓') ? { ok: true, message: m } : { error: m }, m.startsWith('✓') ? 200 : 400]; } catch (e: any) { return [{ error: 'salus: ' + String(e?.message || e).slice(0, 80) }, 502]; } }
   const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : b.act === 'tuya' ? 'tuya:hp' : b.act === 'microtemp' ? 'microtemp:' + String(b.serial).slice(0, 20) : '';
   if (!key) return [{ error: 'ukjent handling' }, 400];
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
@@ -354,14 +354,21 @@ const SCENES: Record<string, any> = {
 const placeOf = (site: string, name: string) => /drivhus|oppvarmet/i.test((site || '') + ' ' + (name || '')) ? 'drivhus' : /oslo/i.test(site || '') ? 'oslo' : 'arendal';
 async function siteJson(name: string): Promise<any> { const r = (await sql('select body from site_files where name = $1', [name]))[0]; return r ? JSON.parse(r.body) : {}; }
 // Salus (skyen) kan ikke styres fra Neon-funksjonen: kommandoen legges i salus_queue og utføres av GitHub Actions («Salus sky», mode queue).
-async function salusQueue(who: string, value: number): Promise<string> {
+async function salusQueue(who: string, value: number, device = 'alle'): Promise<string> {
   await sql("create table if not exists salus_queue (id bigserial primary key, created_at timestamptz not null default now(), device text not null, setpoint real not null, status text not null default 'ny', result text, done_at timestamptz)");
   if (!(value >= 5 && value <= 28)) return '✗ Salus: ' + value + ' °C er utenfor grensen 5-28';
-  await sql("update salus_queue set status = 'erstattet', done_at = now() where status = 'ny' and device = 'alle'");
-  await sql("insert into salus_queue (device, setpoint) values ('alle', $1)", [value]);
+  let dev = 'alle';
+  if (device && !/^(alle|\*)$/i.test(device)) {
+    const names: string[] = ((await siteJson('salus2.json')).devices || []).map((d: any) => String(d.name || ''));
+    const hit = names.find((n) => n.toLowerCase() === String(device).toLowerCase());
+    if (!hit) return '✗ Salus: ukjent termostat «' + String(device).slice(0, 30) + '»';
+    dev = hit;
+  }
+  await sql("update salus_queue set status = 'erstattet', done_at = now() where status = 'ny' and device = $1", [dev]);
+  await sql('insert into salus_queue (device, setpoint) values ($1, $2)', [dev, value]);
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
-  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [who, 'salus:alle', 'kø ' + value, 0, null]);
-  return '✓ Salus alle til ' + value + ' °C lagt i kø (utføres av Actions, normalt innen 15 minutter)';
+  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [who, 'salus:' + dev, 'kø ' + value, 0, null]);
+  return '✓ Salus ' + (dev === 'alle' ? 'alle' : dev) + ' til ' + value + ' °C lagt i kø (utføres av Actions, normalt innen 15 minutter)';
 }
 async function runScene(scene: string, place: string): Promise<Out> {
   const c = SCENES[scene]?.[place];

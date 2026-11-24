@@ -708,6 +708,11 @@ function devs(){const D=[],HMd=(HM&&HM.devices)||[],sub=(...a)=>a.filter(Boolean
  ((AX&&AX.rooms)||[]).filter(c=>c.id&&c.rows.length).forEach(c=>{const l=lastOf(c.rows);if(l.target==null)return;
   D.push({key:'ax:'+c.id,grp:'Varme',pl:placeOf(c.home,c.name),name:c.name,ic:'flame',on:!!l.on,st:l.temp==null?'–':nf(l.temp,1)+' °C',sub:sub('Panelovn · innstilt '+nf(l.target,1)+' °C',l.on?'':'av','oppdatert '+ago(l.t)),
    step:{v:l.target,min:5,max:30,s:1,u:'°C',set:v=>act(null,{act:'adax',room:c.id,target:v,q:c.name+': sette innstilt temperatur til '+nf(v,v%1?1:0)+' °C?'})}})});
+ if(saFresh()){const sd=saDevs(),wst=sd.filter(d=>d.set!=null),avg=wst.length?Math.round(wst.reduce((a,d)=>a+d.set,0)/wst.length*2)/2:20,wait='utføres innen ca. 15 min',fmt=v=>nf(v,v%1?1:0);
+  if(sd.length)D.push({key:'sa:alle',grp:'Varme',pl:'arendal',name:'Salus alle termostater',ic:'flame',on:false,st:wst.length?'snitt '+nf(avg,1)+' °C':'–',sub:sub('Gulvvarme · '+sd.length+' termostater',wait),
+   step:{v:avg,min:5,max:28,s:.5,u:'°C',set:v=>act(null,{act:'salus',value:v,q:'Salus: sette alle '+sd.length+' termostater til '+fmt(v)+' °C? Utføres innen ca. 15 minutter.'})}});
+  sd.forEach(d=>D.push({key:'sa:'+d.name,grp:'Varme',pl:'arendal',name:'Salus '+d.name,ic:'flame',on:!!d.heat,st:d.t==null?'–':nf(d.t,1)+' °C',sub:sub('Gulvvarme · innstilt '+(d.set!=null?nf(d.set,1)+' °C':'–'),wait,'oppdatert '+ago(new Date(d.at).getTime())),
+   step:{v:d.set!=null?d.set:20,min:5,max:28,s:.5,u:'°C',set:v=>act(null,{act:'salus',value:v,device:d.name,q:'Salus '+d.name+': sette til '+fmt(v)+' °C? Utføres innen ca. 15 minutter.'})}}))}
  ((MT&&MT.thermostats)||[]).filter(t=>t.serial&&t.rows.length).forEach(t=>{const l=lastOf(t.rows),cur=l.set!=null?l.set:(l.room!=null?Math.round(l.room*2)/2:21);
   D.push({key:'mt:'+t.serial,grp:'Varme',pl:placeOf(t.site,t.name),name:t.name,ic:'flame',on:!!l.heat,st:l.room==null?'–':nf(l.room,1)+' °C',sub:sub('Gulvvarme',l.mode===3?'manuell '+nf(l.set,1)+' °C':l.mode===1?'følger timeplan':'modus '+l.mode,'oppdatert '+ago(l.t)),
    btns:[{t:'Timeplan',run:()=>act(null,{act:'microtemp',serial:t.serial,cmd:'schedule',q:t.name+': gå tilbake til timeplan?'})}],
