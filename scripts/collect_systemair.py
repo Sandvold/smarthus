@@ -41,7 +41,9 @@ try:
             print("skjema-innlogging:", "fikk kode" if code else f"ingen kode (HTTP {loc.status_code})")
             if code:
                 t2 = requests.post(TOKEN_URL, data={"grant_type": "authorization_code", "client_id": "iot-application", "code": code, "redirect_uri": RED}, timeout=30)
-                tok = (t2.json() if t2.content else {}).get("access_token")
+                j2 = t2.json() if t2.content else {}
+                tok = j2.get("access_token")
+                if not tok: print("kodebytte feilet: HTTP", t2.status_code, str(j2.get("error"))[:60], str(j2.get("error_description"))[:120]); why = "kodebytte: " + str(j2.get("error_description") or j2.get("error"))[:80]
         else:
             print("fant ikke innloggingsskjema, HTTP", p1.status_code)
     if not tok:
