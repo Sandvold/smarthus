@@ -23,9 +23,29 @@ def gql(tok, query, variables=None):
 try:
     r = requests.post(TOKEN_URL, data={"grant_type": "password", "username": EMAIL, "password": PW, "client_id": "iot-application", "scope": "openid email profile"}, timeout=30)
     j = r.json() if r.content else {}
-    tok = j.get("access_token")
+    tok = j.get("access_token"); why = str(j.get("error_description") or j.get("error") or r.status_code)[:80]
+    if not tok:  # samme innlogging som nettsiden bruker (skjema + kode)
+        import re, html as H
+        from urllib.parse import urlparse, parse_qs, urlencode
+        ses = requests.Session(); RED = "https://homesolutions.systemair.com"
+        au = "https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/auth?" + urlencode({"client_id": "iot-application", "redirect_uri": RED, "response_type": "code", "scope": "openid", "state": "abc123"})
+        p1 = ses.get(au, timeout=30); m = re.search(r'id="kc-form-login"[^>]*action="([^"]+)"', p1.text) or re.search(r'action="([^"]+)"[^>]*id="kc-form-login"', p1.text)
+        if m:
+            loc = ses.post(H.unescape(m.group(1)), data={"username": EMAIL, "password": PW, "rememberMe": "on", "credentialId": ""}, allow_redirects=False, timeout=30)
+            for _ in range(5):
+                u = loc.headers.get("Location", "")
+                if "code=" in u: break
+                if not u: break
+                loc = ses.get(u, allow_redirects=False, timeout=30)
+            code = (parse_qs(urlparse(loc.headers.get("Location", "")).query).get("code") or [None])[0]
+            print("skjema-innlogging:", "fikk kode" if code else f"ingen kode (HTTP {loc.status_code})")
+            if code:
+                t2 = requests.post(TOKEN_URL, data={"grant_type": "authorization_code", "client_id": "iot-application", "code": code, "redirect_uri": RED}, timeout=30)
+                tok = (t2.json() if t2.content else {}).get("access_token")
+        else:
+            print("fant ikke innloggingsskjema, HTTP", p1.status_code)
     if not tok:
-        OUT["error"] = "Innlogging avvist: " + str(j.get("error_description") or j.get("error") or r.status_code)[:120] + " (sett eget passord på kontoen hos Systemair?)"; print("e-post har @:", "@" in EMAIL, "| passord tomt:", not PW)
+        OUT["error"] = "Innlogging avvist: " + why + " (passord, eller kontoen bruker Google/Apple?)"
         done(); print(OUT["error"]); sys.exit(0)
     devs = gql(tok, "{ GetAccountDevices { identifier name } }")["GetAccountDevices"] or []
     rows = []
