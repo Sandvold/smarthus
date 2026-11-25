@@ -69,6 +69,12 @@ jobs:
         env:
           LG_THINQ_PAT: ${{ secrets.LG_THINQ_PAT }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      - run: python scripts/collect_systemair.py
+        continue-on-error: true
+        env:
+          SYSTEMAIR_EMAIL: ${{ secrets.SYSTEMAIR_EMAIL }}
+          SYSTEMAIR_PASSWORD: ${{ secrets.SYSTEMAIR_PASSWORD }}
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: python scripts/miele.py collect
         continue-on-error: true
         env:
