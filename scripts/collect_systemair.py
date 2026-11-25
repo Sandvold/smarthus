@@ -66,7 +66,9 @@ try:
             try:
                 sc = gql(tok, "{ q: __type(name:\"Query\"){fields{name args{name type{name kind ofType{name}}}}} m: __type(name:\"Mutation\"){fields{name args{name type{name kind ofType{name}}}}} }")
                 for k in ("q", "m"):
-                    for f in (sc[k] or {}).get("fields") or []:
+                    fl = (sc[k] or {}).get("fields") or []
+                    print("SKJEMA", k, "felt:", len(fl), ",".join(f["name"] for f in fl)[:1500])
+                    for f in fl:
                         if re.search(r"device|data|status|view|value|read|latest", f["name"], re.I):
                             print("SKJEMA", k, f["name"], [(a["name"], (a["type"].get("name") or (a["type"].get("ofType") or {}).get("name"))) for a in f["args"]])
             except Exception as e2:
