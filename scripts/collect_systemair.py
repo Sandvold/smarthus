@@ -1,5 +1,5 @@
 """Henter Systemair SAVE-ventilasjon via Homesolutions-skyen (uoffisielt GraphQL, OIDC passordinnlogging). Skriver site/systemair.json."""
-import json, os, sys
+import json, os, re, sys
 import requests, psycopg
 
 EMAIL, PW = (os.environ.get("SYSTEMAIR_EMAIL") or "").strip(), (os.environ.get("SYSTEMAIR_PASSWORD") or "").strip()
@@ -63,6 +63,14 @@ try:
             rows.append((did, d.get("name") or did, regs))
         except Exception as e:
             print("Systemair enhet feilet:", str(e)[:200]); OUT["error"] = str(e)[:200]
+            try:
+                sc = gql(tok, "{ q: __type(name:\"Query\"){fields{name args{name type{name kind ofType{name}}}}} m: __type(name:\"Mutation\"){fields{name args{name type{name kind ofType{name}}}}} }")
+                for k in ("q", "m"):
+                    for f in (sc[k] or {}).get("fields") or []:
+                        if re.search(r"device|data|status|view|value|read|latest", f["name"], re.I):
+                            print("SKJEMA", k, f["name"], [(a["name"], (a["type"].get("name") or (a["type"].get("ofType") or {}).get("name"))) for a in f["args"]])
+            except Exception as e2:
+                print("introspeksjon feilet:", str(e2)[:150])
     with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
         con.execute("create table if not exists systemair_readings (ts timestamptz not null default now(), device_id text, name text, regs jsonb)")
         con.execute("create index if not exists systemair_ts on systemair_readings (ts)")
