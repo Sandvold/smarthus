@@ -54,7 +54,7 @@ try:
     for d in devs:
         did = d["identifier"]
         try:
-            v = gql(tok, "mutation ($input: GetDeviceViewInput!) { GetDeviceView(input: $input) { route dataItems } }", {"input": {"deviceId": did, "route": "/device/home"}})["GetDeviceView"]
+            v = gql(tok, 'mutation { GetDeviceView(input: {deviceId: %s, route: "/device/home"}) { route dataItems } }' % json.dumps(did))["GetDeviceView"]
             regs = {}
             for it in v.get("dataItems") or []:
                 if isinstance(it, dict) and "register" in it and it.get("value") is not None:
@@ -63,6 +63,9 @@ try:
             rows.append((did, d.get("name") or did, regs))
         except Exception as e:
             print("Systemair enhet feilet:", str(e)[:200]); OUT["error"] = str(e)[:200]
+            for q in ('{ GetDeviceStatu }', 'mutation { GetDeviceVie }', '{ GetDeviceDetail(deviceId: "x") { identifier } }'):
+                try: gql(tok, q)
+                except Exception as e3: print("PROBE", q[:40], "->", str(e3)[:260])
             try:
                 sc = gql(tok, "{ q: __type(name:\"Query\"){fields{name args{name type{name kind ofType{name}}}}} m: __type(name:\"Mutation\"){fields{name args{name type{name kind ofType{name}}}}} }")
                 for k in ("q", "m"):
