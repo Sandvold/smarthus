@@ -778,20 +778,9 @@ function stCard(d){const k=d.key,bz=!!BUSY[k],dis=bz?' disabled':'';
   setB.onclick=()=>{const v=cur();delete PEND[k];S.set(v)}}
  return e}
 async function refreshLive(){toast('Henter status …');await Promise.all([livePlugs().catch(()=>{}),mowerLive().catch(()=>{})]);softRender();toast('Status oppdatert '+new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}))}
-function salusTest(){const T=ST&&ST.steps?ST:null,rd=S2&&S2.devices&&S2.devices.length?S2:null;if(!T&&!rd)return null;const ic=x=>x==='ok'?'<span style="color:#8bc48a">✓</span>':x==='feil'?'<span style="color:#e08363">✗</span>':'<span class="s">…</span>';
- const steps=T?T.steps.map(x=>`<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--grid)"><b style="width:18px">${ic(x.status)}</b><div><div>${x.n}. ${esc(x.name)}</div><div class="s">${esc(x.detail||'')}</div></div></div>`).join(''):'';
- const devs=(rd?rd.devices:(T&&T.devices)||[]);
- const dv=devs.map(d=>`<tr><td>${esc(d.name||'')}</td><td class="s">${esc(d.model||'')}</td><td>${d.temp!=null?nf(d.temp,1)+' °C':'–'}</td><td>${d.setpoint!=null?nf(d.setpoint,1)+' °C':'–'}</td><td class="s">${d.connected?'tilkoblet':'frakoblet'}</td></tr>`).join('');
- const w=T&&T.write?T.write:null,done=T?T.steps.filter(x=>x.status==='ok').length:0,tot=T?T.steps.length:0;
- const html=`<div class="s" style="margin-bottom:8px">Siste lesing: ${rd?ago(new Date(rd.updated).getTime()):'–'} · ${devs.filter(d=>d.temp!=null).length} termostater</div>
- <h3>Termostater</h3><div style="overflow-x:auto"><table style="width:100%;font-size:14px;border-collapse:collapse"><tr class="s"><td>Rom</td><td>Modell</td><td>Temp</td><td>Innstilt</td><td></td></tr>${dv}</table></div>
- <h3 style="margin-top:14px">Siste skriving</h3>${T?`<div class="s" style="margin-bottom:6px">${done} av ${tot} trinn fullført · ${ago(new Date(T.updated).getTime())}${w&&w.detail?' · '+esc(w.detail):''}</div>${steps}`:'<div class="s">Ingen skriving registrert ennå. Lesingen kjører hvert kvarter og endrer ingenting.</div>'}
- <div class="s" style="margin-top:8px">Settpunkt skrives via skyplattformens innlogging og meldingskø. Salus Open API har bare lesing.</div>
- <div class="s" style="margin-top:6px">Siden viser Salus fra: <b>${esc((saDevs(),SA_SRC))}</b>. Bytter til den gamle avlesningen hvis skyen ikke har svart på ${SA_MAXH} timer.</div>`;
- return sec('salustest','Salus',T?('siste skriving: '+done+' av '+tot+' trinn'):'lesing hvert kvarter',html,{open:true})}
 function styringView(){const w=document.createElement('div'),D=devs(),pf=ls.get('sh-spl','alle');
  const hero=el(`<div class="hero" style="--pl:var(--acc)"><div class="hl"><span class="hd"></span><h1>Styring</h1><span class="chip">${D.length} enheter</span></div><div class="hi" style="text-transform:none">Status nå og knapper. Oppdateres av seg selv.</div><div class="fl">${['alle','oslo','arendal','drivhus'].map(p=>`<button class="fb ${pf===p?'on':''}" data-p="${p}">${p==='alle'?'Alle':PLACES[p]}</button>`).join('')}<button class="fb rf" id="rf">Oppdater</button></div></div>`);
- hero.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ls.set('sh-spl',b.dataset.p);render()});hero.querySelector('#rf').onclick=refreshLive;w.appendChild(hero);{const sx=salusTest();if(sx)w.appendChild(sx)}
+ hero.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ls.set('sh-spl',b.dataset.p);render()});hero.querySelector('#rf').onclick=refreshLive;w.appendChild(hero);
  const G={};D.filter(d=>pf==='alle'||d.pl===pf||d.gh===pf).forEach(d=>(G[d.grp]=G[d.grp]||[]).push(d));
  if(!Object.keys(G).length)w.appendChild(el(waiting('Ingen styrbare enheter funnet ennå.')));
  GRP.forEach(g=>{if(!G[g])return;w.appendChild(el(`<h3 class="gh">${g}</h3>`));const gr=document.createElement('div');gr.className='dg';
