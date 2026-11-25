@@ -51,7 +51,7 @@ try:
             try:
                 if field not in ITEM or not devs: raise RuntimeError("ukjent felt eller ingen enhet")
                 dev = devs[0]; typ = (dev.get("deviceType") or {}).get("type") or "TELTONIKA"
-                r = requests.post("https://homesolutions.systemair.com/gateway/remote-api/", json={"operationName": None, "query": WRITE, "variables": {"input": {"dataPoints": [{"id": ITEM[field], "value": value}]}}}, headers={"x-access-token": tok, "device-id": dev["identifier"], "device-type": str(typ)}, timeout=60)
+                r = requests.post("https://homesolutions.systemair.com/gateway/remote-api/", json={"operationName": None, "query": WRITE, "variables": {"input": {"dataPoints": [{"id": ITEM[field], "value": str(value)}]}}}, headers={"x-access-token": tok, "device-id": dev["identifier"], "device-type": str(typ)}, timeout=60)
                 j = r.json() if r.content else {}
                 if r.status_code == 200 and not j.get("errors") and (j.get("data") or {}).get("WriteDataItems") is not False:
                     st, res = "ok", "utført " + str((j.get("data") or {}).get("WriteDataItems"))[:60]
