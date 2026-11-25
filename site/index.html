@@ -432,7 +432,7 @@ function sysairBlock(){const d=SY&&(SY.devices||[])[0];if(!d||!(d.rows||[]).leng
  const MODE={0:'Auto',1:'Manuell',2:'Mange folk',3:'Lufting',4:'Peis',5:'Borte',6:'Ferie'},SPD={0:'Av',1:'Minimum',2:'Lav',3:'Normal',4:'Høy',5:'Maks'};
  const al=R['15900']===true||R['15901']===true||R['15902']===true;
  return `<h3>Ventilasjon (Systemair SAVE)</h3><div class="s ${old?'warn':''}" style="margin-bottom:6px">Målt ${ago(t)}${old?' – skyen har ikke svart på en stund':''}</div>`
-  +grid(tile('Modus',MODE[n('1164')]??'–')+tile('Luftmengde',SPD[n('1241')]??'–')+tile('Tilluft, innstilt',n('2000')==null?null:nf(n('2000')/10,0),'°C')+tile('Uteluft',n('12101')==null?null:nf(n('12101')/10,1),'°C')+tile('Alarm',al?'Aktiv (se SAVE CONNECT)':'Ingen'))
+  +`<div class="tile" style="font-size:17px;line-height:1.5">${esc(MODE[n('1164')]??'–')} · ${esc(SPD[n('1241')]??'–')} luft · tilluft ${n('2000')==null?'–':nf(n('2000')/10,0)} °C · ute ${n('12101')==null?'–':nf(n('12101')/10,1)} °C · <span class="${al?'warn':''}">${al?'⚠ alarm (se SAVE CONNECT)':'ingen alarm'}</span></div>`
   +(old?'':`<div class="tile" style="margin-top:8px"><div class="s">Styring (utføres innen ca. 15 minutter)</div>${syCtl('Modus','mode',VMODE,n('1164'))}${syCtl('Luftmengde','airflow',VFLOW,n('1241'))}${syCtl('Tilluft','temp',Array.from({length:14},(_,i)=>[12+i,(12+i)+' °C']),n('2000')==null?12:Math.round(n('2000')/10))}</div>`)}
 function secVarme(pl){let h='',sub=[],draw=null;
  const rows=pl==='arendal'?hpRows():[];
