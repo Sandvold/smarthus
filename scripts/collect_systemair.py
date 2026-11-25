@@ -38,9 +38,10 @@ try:
                 if not u: break
                 loc = ses.get(u, allow_redirects=False, timeout=30)
             code = (parse_qs(urlparse(loc.headers.get("Location", "")).query).get("code") or [None])[0]
-            print("skjema-innlogging:", "fikk kode" if code else f"ingen kode (HTTP {loc.status_code})")
+            _l = urlparse(loc.headers.get("Location", ""))
+            print("skjema-innlogging:", "fikk kode" if code else f"ingen kode (HTTP {loc.status_code})", "| mål:", _l.netloc + _l.path, "| parametre:", sorted(parse_qs(_l.query)), "| fragment:", bool(_l.fragment))
             if code:
-                t2 = requests.post(TOKEN_URL, data={"grant_type": "authorization_code", "client_id": "iot-application", "code": code, "redirect_uri": RED}, timeout=30)
+                t2 = ses.post(TOKEN_URL, data={"grant_type": "authorization_code", "client_id": "iot-application", "code": code, "redirect_uri": RED}, timeout=30)
                 j2 = t2.json() if t2.content else {}
                 tok = j2.get("access_token")
                 if not tok: print("kodebytte feilet: HTTP", t2.status_code, str(j2.get("error"))[:60], str(j2.get("error_description"))[:120]); why = "kodebytte: " + str(j2.get("error_description") or j2.get("error"))[:80]
