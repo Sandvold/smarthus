@@ -175,9 +175,10 @@ const injDk=p=>injNested(((HM&&HM.devices)||[]).find(c=>c.kind==='daikin'),p);
 const injMower=(dv,status)=>{const c=((HM&&HM.devices)||[]).find(x=>x.kind==='mower'&&(dv==='a3'?/A3/:/A1/).test(x.name));return !!c&&!!status&&injNested(c,{mower_status:String(status)})};
 function injHp(patch){const r=ALL.filter(x=>x.kind==='heatpump'),l=lastOf(r);if(!l)return false;Object.keys(patch).forEach(k=>patch[k]===undefined&&delete patch[k]);const p=l.props||{};
  if(!Object.keys(patch).length||Object.keys(patch).every(k=>p[k]===patch[k]))return false;ALL.push(Object.assign({},l,{ts:new Date().toISOString(),props:Object.assign({},p,patch)}));return true}
+let PV_CLOSED=false;
 function sec(key,title,sub,body,o={}){
  const d=document.createElement('details');d.className='sec';const k=TAB+'/'+key;
- d.open=k in OPEN?OPEN[k]:o.open!==false;
+ d.open=k in OPEN?OPEN[k]:(PV_CLOSED&&key!=='avreise'?false:o.open!==false);
  d.innerHTML=`<summary><span class="t">${title}</span><span class="sub">${sub||''}</span><span class="chev"></span></summary><div class="body"></div>`;
  const b=d.querySelector('.body');typeof body==='string'?b.innerHTML=body:b.appendChild(body);
  d._draw=o.draw;d.addEventListener('toggle',()=>{OPEN[k]=d.open;if(d.open&&d._draw)d._draw()});return d}
@@ -624,12 +625,15 @@ function secAvreise(pl){if(pl==='drivhus')return null;const C=leaveChecks(pl);if
  b.querySelector('[data-sty]').onclick=()=>{ls.set('sh-spl',pl);go('styring')};
  return sec('avreise','Før du drar',w?w+(w===1?' ting å sjekke':' ting å sjekke'):'alt klart · '+ok+' sjekket',b,{open:w>0})}
 const safe=(f,nm)=>{try{return f()}catch(e){console.error(nm,e);return el(waiting('Kunne ikke vise '+nm+' ('+esc(e.message)+')')).firstChild}};
-function placeView(pl){const w=document.createElement('div');
- w.appendChild(placeHero(pl));{const a=safe(()=>secAvreise(pl),'Før du drar');if(a)w.appendChild(a)}
- const list=[pl==='drivhus'?()=>secDrivTemp():null,pl==='drivhus'?()=>secDrivStrom():null,pl==='drivhus'?()=>secDrivDogn():null,()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secHage(pl),pl==='drivhus'?()=>secShelly():null,()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)].filter(Boolean).map((f,i)=>safe(f,'en seksjon')).filter(Boolean);if(pl!=='drivhus'){const g=safe(()=>secDrivhusIn(pl),'drivhus');if(g)list.splice(Math.min(1,list.length),0,g)};list.forEach(x=>w.appendChild(x));
+function placeView(pl){const w=document.createElement('div');PV_CLOSED=pl!=='drivhus';
+ try{w.appendChild(placeHero(pl));{const a=safe(()=>secAvreise(pl),'Før du drar');if(a)w.appendChild(a)}
+ /* lik rekkefølge på alle steder: Varme, Strøm, Klima, Drivhus, Lås, Hage, Kjøkken, Aqara; alt lukket med én linje som sammendrag */
+ const F=pl==='drivhus'?[()=>secDrivTemp(),()=>secDrivStrom(),()=>secDrivDogn(),()=>secKlima(pl),()=>secVarme(pl),()=>secStrom(pl),()=>secHage(pl),()=>secShelly(),()=>secAqara(pl),()=>secLaas(pl),()=>secKjokken(pl)]
+  :[()=>secVarme(pl),()=>secStrom(pl),()=>secKlima(pl),()=>secDrivhusIn(pl),()=>secLaas(pl),()=>secHage(pl),()=>secKjokken(pl),()=>secAqara(pl)];
+ F.map(f=>safe(f,'en seksjon')).filter(Boolean).forEach(x=>w.appendChild(x));
  if(pl==='drivhus'){w.appendChild(secPlan('inner','Innerdrivhus Arendal','Her kommer temperatur og styring fra Inkbird ITC-308 når den er koblet til Tuya-prosjektet.'));}
- 
- if(pl==='arendal')w.appendChild(secPlan('mill','Mill-ovner','Ikke koblet ennå. Trenger å vite hvilken generasjon Mill-ovnene er.'));
+ if(pl==='arendal')w.appendChild(secPlan('mill','Mill-ovner','Ikke koblet ennå. Trenger å vite hvilken generasjon Mill-ovnene er.'))}
+ finally{PV_CLOSED=false}
  return w}
 /* ---------- oversikt ---------- */
 function alerts(all){const A=[];
