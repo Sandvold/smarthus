@@ -37,6 +37,32 @@ try:
             for v in o.values(): walk(v, regs, ids)
         elif isinstance(o, list):
             for v in o: walk(v, regs, ids)
+    # --- kø: kommandoer fra siden (ventilasjon) utføres her, før avlesningen ---
+    ITEM = {"mode": 29, "airflow": 31, "temp": 32}
+    WRITE = "mutation ($input: WriteDataItemsInput!) { WriteDataItems(input: $input) }"
+    with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as qc:
+        qc.execute("create table if not exists systemair_queue (id bigserial primary key, created_at timestamptz not null default now(), field text not null, value int not null, status text not null default 'ny', result text, done_at timestamptz)")
+        qc.execute("update systemair_queue set status = 'utløpt', done_at = now() where status = 'ny' and created_at < now() - interval '3 hours'")
+        pend = qc.execute("select id, field, value from systemair_queue where status = 'ny' order by id").fetchall()
+        for qid, field, value in pend:
+            qc.execute("update systemair_queue set status = 'kjører' where id = %s", (qid,))
+            qc.commit()
+            res, st = "", "feil"
+            try:
+                if field not in ITEM or not devs: raise RuntimeError("ukjent felt eller ingen enhet")
+                dev = devs[0]; typ = (dev.get("deviceType") or {}).get("type") or "TELTONIKA"
+                r = requests.post("https://homesolutions.systemair.com/gateway/remote-api/", json={"operationName": None, "query": WRITE, "variables": {"input": {"dataPoints": [{"id": ITEM[field], "value": value}]}}}, headers={"x-access-token": tok, "device-id": dev["identifier"], "device-type": str(typ)}, timeout=60)
+                j = r.json() if r.content else {}
+                if r.status_code == 200 and not j.get("errors") and (j.get("data") or {}).get("WriteDataItems") is not False:
+                    st, res = "ok", "utført " + str((j.get("data") or {}).get("WriteDataItems"))[:60]
+                else:
+                    res = "HTTP %s %s" % (r.status_code, str((j.get("errors") or [{}])[0].get("message") or j)[:200])
+            except Exception as e:
+                res = (type(e).__name__ + ": " + str(e))[:200]
+            print("Systemair skriving", field, value, "->", st, res)
+            qc.execute("update systemair_queue set status = %s, result = %s, done_at = now() where id = %s", (st, res, qid))
+            qc.commit()
+        if pend: import time; time.sleep(8)
     rows = []
     for d in devs:
         did = d["identifier"]; dt = d.get("deviceType") or {}

@@ -331,6 +331,7 @@ async function actMicrotemp(b: any): Promise<Out> {
 }
 
 async function actDispatch(email: string, b: any): Promise<Out> {
+  if (b.act === 'ventilasjon') { try { const m = await ventQueue(email, String(b.field || ''), Number(b.value)); return [m.startsWith('✓') ? { ok: true, message: m } : { error: m }, m.startsWith('✓') ? 200 : 400]; } catch (e: any) { return [{ error: 'ventilasjon: ' + String(e?.message || e).slice(0, 80) }, 500]; } }
   if (b.act === 'salus') { try { const m = await salusQueue(email, Number(b.value), String(b.device || 'alle')); return [m.startsWith('✓') ? { ok: true, message: m } : { error: m }, m.startsWith('✓') ? 200 : 400]; } catch (e: any) { return [{ error: 'salus: ' + String(e?.message || e).slice(0, 80) }, 502]; } }
   const key = b.act === 'shelly' ? 'shelly:' + b.ch : b.act === 'adax' ? 'adax:' + b.room : b.act === 'gardena' ? 'gardena:' + b.id : b.act === 'zaptec' ? 'zaptec:' + b.id : b.act === 'homey' ? 'homey:' + b.dev : b.act === 'tuya' ? 'tuya:hp' : b.act === 'microtemp' ? 'microtemp:' + String(b.serial).slice(0, 20) : '';
   if (!key) return [{ error: 'ukjent handling' }, 400];
@@ -369,6 +370,21 @@ async function salusQueue(who: string, value: number, device = 'alle'): Promise<
   await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
   await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [who, 'salus:' + dev, 'kø ' + value, 0, null]);
   return '✓ Salus ' + (dev === 'alle' ? 'alle' : dev) + ' til ' + value + ' °C lagt i kø (utføres av Actions, normalt innen 15 minutter)';
+}
+// Systemair SAVE (skyen) styres via GitHub Actions: kommandoen legges i systemair_queue og utføres av innsamlingen (hvert kvarter).
+const VENT_LABEL: Record<string, string> = { '0': 'Auto', '1': 'Manuell', '2': 'Mange folk', '3': 'Lufting', '5': 'Borte' };
+async function ventQueue(who: string, field: string, value: number): Promise<string> {
+  await sql("create table if not exists systemair_queue (id bigserial primary key, created_at timestamptz not null default now(), field text not null, value int not null, status text not null default 'ny', result text, done_at timestamptz)");
+  let v = value, txt = '';
+  if (field === 'mode') { if (!(String(value) in VENT_LABEL)) return '✗ Ventilasjon: ugyldig modus'; txt = 'modus ' + VENT_LABEL[String(value)]; }
+  else if (field === 'airflow') { if (![1, 2, 3, 4].includes(value)) return '✗ Ventilasjon: ugyldig luftmengde (1-4)'; txt = 'luftmengde ' + ['', 'Minimum', 'Lav', 'Normal', 'Høy'][value] + ' (virker bare i Manuell)'; }
+  else if (field === 'temp') { if (!(value >= 12 && value <= 25)) return '✗ Ventilasjon: tilluft må være 12-25 °C'; v = Math.round(value * 10); txt = 'tilluft ' + value + ' °C'; }
+  else return '✗ Ventilasjon: ukjent felt';
+  await sql("update systemair_queue set status = 'erstattet', done_at = now() where status = 'ny' and field = $1", [field]);
+  await sql('insert into systemair_queue (field, value) values ($1, $2)', [field, v]);
+  await sql('create table if not exists ctl_log (ts timestamptz not null default now(), email text, did text, action text, code int, message text)');
+  await sql('insert into ctl_log (email, did, action, code, message) values ($1,$2,$3,$4,$5)', [who, 'systemair:' + field, 'kø ' + v, 0, null]);
+  return '✓ Ventilasjon ' + txt + ' lagt i kø (utføres av Actions, normalt innen 15 minutter)';
 }
 async function runScene(scene: string, place: string): Promise<Out> {
   const c = SCENES[scene]?.[place];
