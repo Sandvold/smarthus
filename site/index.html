@@ -447,9 +447,11 @@ function secBil(){if(!VWD)return null;
   +chartBlock('vw')+`<div class="s" style="margin-top:6px">Data fra VWs EU Data Act-portal, skrivebeskyttet og omtrent 15 minutter forsinket.</div>`);
  const draw=()=>drawLine('ch-vw','leg-vw','tb-vw',[{name:'Ladenivå',color:PAL[0],pts:R.filter(r=>r.soc!=null).map(r=>({t:r.t.getTime(),v:r.soc}))}],'hum','%',null,2);
  return sec('bil','Elbil (ID.4)',`${nf(l.soc,0)} % · ${vwState(l.cs).toLowerCase()}`,b,{open:true,draw})}
-function heatShare(h){const st=pwStats(h),pl=placeOf(h.site,h.name),t1=st.tmax,t0=t1-168*3600000;let heat=null,src='';
+function heatShare(h){const st=pwStats(h),pl=placeOf(h.site,h.name),t1=st.tmax,t0=t1-168*3600000;let heat=null,src='',ax=0,axn=0;
+ ((AX&&AX.rooms)||[]).filter(r=>placeOf(r.home,r.name)===pl||(r.home||'').toLowerCase().includes(pl)).forEach(r=>{const E=(r.energy||[]).filter(e=>e[0]>=t0-36e5&&e[1]<=t1+36e5);if(E.length>=5){ax+=E.reduce((a,e)=>a+e[2],0);axn++}});
  if(pl==='arendal'&&HPW&&(HPW.hourly||[]).length){const hr=HPW.hourly;if(hr[0][0]<=t0+3600000){heat=hr.filter(r=>r[0]>=t0&&r[0]<t1).reduce((a,r)=>a+r[1],0);src='varmepumpen (anslag)'}}
  else if(pl==='oslo'){const dk=hmList('oslo','daikin')[0];if(dk){const R=dk.rows.map(r=>({t:new Date(r.t).getTime(),k:(r.d||{}).meter_power})).filter(r=>r.k!=null),a=R.find(r=>r.t>=t0),b=[...R].reverse().find(r=>r.t<=t1);if(a&&b&&b.t-a.t>0.8*168*3600000&&b.k>=a.k){heat=b.k-a.k;src='Daikin'}}}
+ if(axn){heat=(heat||0)+ax;src=src?src+' og Adax':'Adax'}
  if(heat==null||!st.k7)return null;return{heat,total:st.k7,pct:heat/st.k7*100,src}}
 function secStrom(pl){const hs=pwList(pl);if(!hs.length)return null;const hm=hs[0],st=pwStats(hm),id='cd'+pl,pb=pulseBlock(pl,pl),zb=zaptecBlock(pl,pl);
  const b=el((zb?`<h3>Elbillader (Zaptec)</h3>`+zb.html+`<div class="s">Husforbruk uten bil siste 24 t: <b>${nf(Math.max(0,st.k24-zb.k24),1)} kWh</b> av ${nf(st.k24,1)} kWh totalt.</div>`:'')+(pb?`<h3>Sanntid (Tibber Pulse)</h3>`+pb.html:'')+`<h3>Forbruk (Tibber)</h3>`+grid(tile('Siste 24 timer',nf(st.k24,1),'kWh')+tile('Siste 7 dager',nf(st.k7,1),'kWh')+tile('Mot forrige 7 dager',st.ch==null?null:(st.ch>0?'+':'')+st.ch,'%')+tile('Snitt per døgn (7 d)',nf(st.k7/7,1),'kWh')+tile('Estimert kostnad 24 t',nf(st.k24*RATE,0),'kr')+(()=>{const q=heatShare(hm);return q?tile('Oppvarming (7 d)',nf(q.pct,0),'% · minst'):''})())+`<h3>Forbruk per døgn, siste 30 dager (kWh)</h3><div class="chart" id="${id}"></div>`);

@@ -26,5 +26,14 @@ for rid, home, room, ts, temp, target, heating in rows:
     if rid in IGNORE: continue
     d = out.setdefault(rid, {"id": str(rid), "home": NAMES.get(home, home), "name": room, "rows": []})
     d["rows"].append({"t": ts.isoformat(), "temp": None if temp is None else float(temp), "target": None if target is None else float(target), "on": heating})
+import time
+hdr = {"Authorization": "Bearer " + t.json()["access_token"]}
+now = int(time.time() * 1000)
+for rid, d in out.items():
+    try:
+        q = requests.get(f"{API}/rest/v1/energy_log/{rid}?fromTime={now - 15 * 86400000}&toTime={now}", headers=hdr, timeout=30)
+        d["energy"] = [[p["fromTime"], p["toTime"], round(p["energyWh"] / 1000, 3)] for p in (q.json().get("points") or []) if p.get("energyWh") is not None] if q.status_code == 200 else []
+    except Exception as e:
+        d["energy"] = []; print("Adax energi feilet", rid, type(e).__name__)
 json.dump({"rooms": list(out.values())}, open("site/adax.json", "w"), ensure_ascii=False)
 print("Adax: rom", len(out), "rader", len(rows))
