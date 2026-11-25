@@ -32,10 +32,9 @@ try:
         p1 = ses.get(au, timeout=30); m = re.search(r'id="kc-form-login"[^>]*action="([^"]+)"', p1.text) or re.search(r'action="([^"]+)"[^>]*id="kc-form-login"', p1.text)
         if m:
             loc = ses.post(H.unescape(m.group(1)), data={"username": EMAIL, "password": PW, "rememberMe": "on", "credentialId": ""}, allow_redirects=False, timeout=30)
-            for _ in range(5):
+            for _ in range(12):
                 u = loc.headers.get("Location", "")
-                if "code=" in u: break
-                if not u: break
+                if u.startswith(RED) or not u: break
                 loc = ses.get(u, allow_redirects=False, timeout=30)
             code = (parse_qs(urlparse(loc.headers.get("Location", "")).query).get("code") or [None])[0]
             _l = urlparse(loc.headers.get("Location", ""))
