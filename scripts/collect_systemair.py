@@ -2,7 +2,7 @@
 import json, os, sys
 import requests, psycopg
 
-EMAIL, PW = os.environ.get("SYSTEMAIR_EMAIL"), os.environ.get("SYSTEMAIR_PASSWORD")
+EMAIL, PW = (os.environ.get("SYSTEMAIR_EMAIL") or "").strip(), (os.environ.get("SYSTEMAIR_PASSWORD") or "").strip()
 if not (EMAIL and PW):
     print("SYSTEMAIR_EMAIL/PASSWORD mangler, hopper over Systemair"); sys.exit(0)
 TOKEN_URL = "https://sso.systemair.com/auth/realms/iot/protocol/openid-connect/token"
@@ -25,7 +25,7 @@ try:
     j = r.json() if r.content else {}
     tok = j.get("access_token")
     if not tok:
-        OUT["error"] = "Innlogging avvist: " + str(j.get("error_description") or j.get("error") or r.status_code)[:120] + " (sett eget passord på kontoen hos Systemair?)"
+        OUT["error"] = "Innlogging avvist: " + str(j.get("error_description") or j.get("error") or r.status_code)[:120] + " (sett eget passord på kontoen hos Systemair?)"; print("e-post har @:", "@" in EMAIL, "| passord tomt:", not PW)
         done(); print(OUT["error"]); sys.exit(0)
     devs = gql(tok, "{ GetAccountDevices { identifier name } }")["GetAccountDevices"] or []
     rows = []
