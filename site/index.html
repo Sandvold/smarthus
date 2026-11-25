@@ -122,7 +122,7 @@ const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<2?'nå
 const ls={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PLACES={oslo:'Oslo',arendal:'Arendal',drivhus:'Drivhus',bil:'Bil',alle:'Alle steder'};
 const placeOf=(site,name)=>/drivhus|oppvarmet/i.test((site||'')+' '+(name||''))?'drivhus':/oslo/i.test(site||'')?'oslo':'arendal';
-let GDALL=null,ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null,ST=null,S2=null,HPW=null,SA_SRC='';
+let GDALL=null,ALL=[],hours=168,PW=null,SH=null,AX=null,GD=null,HM=null,PU=null,ZP=null,MT=null,LG=null,MI=null,AQ=null,SA=null,ST=null,S2=null,HPW=null,SY=null,SA_SRC='';
 let TAB=(location.hash||'#oversikt').slice(1);const OPEN={};
 const tile=(l,v,u)=>{const e=v==null||v==='–';return `<div class="tile"><div class="s">${l}</div><div class="n">${e?'–':v}${e||!u?'':' '+u}</div></div>`};
 const grid=h=>`<div class="cards">${h}</div>`;
@@ -422,6 +422,12 @@ function hpKwh(since){const host=document.getElementById('ch-hpk');if(!host)retu
   tip.style.display='block';tip.style.left=Math.min(Math.max(X(b.t)/W*r.width+10,0),r.width-tip.offsetWidth)+'px';tip.style.top='8px'});
  svg.addEventListener('pointerleave',()=>{xl.style.display='none';tip.style.display='none'});
  document.getElementById('tb-hpk').innerHTML='<table><tr><th>Døgn</th><th>kWh (anslag)</th></tr>'+days.slice().reverse().map(x=>`<tr><td>${x.d}</td><td>${nf(x.v,1)}</td></tr>`).join('')+'</table>'}
+function sysairBlock(){const d=SY&&(SY.devices||[])[0];if(!d||!(d.rows||[]).length)return SY&&SY.error?`<h3>Ventilasjon (Systemair)</h3><div class="s warn">Ingen data: ${esc(SY.error)}</div>`:'';
+ const l=d.rows[d.rows.length-1],R=l.r||{},t=new Date(l.t),old=Date.now()-t>3*3600000,n=k=>R[k]==null?null:Number(R[k]);
+ const MODE={0:'Auto',1:'Manuell',2:'Mange folk',3:'Lufting',4:'Peis',5:'Borte',6:'Ferie'},SPD={0:'Av',1:'Minimum',2:'Lav',3:'Normal',4:'Høy',5:'Maks'};
+ const al=R['15900']===true||R['15901']===true||R['15902']===true;
+ return `<h3>Ventilasjon (Systemair SAVE)</h3><div class="s ${old?'warn':''}" style="margin-bottom:6px">Målt ${ago(t)}${old?' – skyen har ikke svart på en stund':''} · kun lesing</div>`
+  +grid(tile('Modus',MODE[n('1164')]??'–')+tile('Luftmengde',SPD[n('1241')]??'–')+tile('Tilluft, innstilt',n('2000')==null?null:nf(n('2000')/10,0),'°C')+tile('Uteluft',n('12101')==null?null:nf(n('12101')/10,1),'°C')+tile('Alarm',al?'Aktiv (se SAVE CONNECT)':'Ingen'))}
 function secVarme(pl){let h='',sub=[],draw=null;
  const rows=pl==='arendal'?hpRows():[];
  if(rows.length){const last=rows[rows.length-1],p=last.p,run=p.compressor_state===true,on=p.switch===true,fault=p.fault&&p.fault!==0,since=()=>Date.now()-hours*3600000;
@@ -432,6 +438,7 @@ function secVarme(pl){let h='',sub=[],draw=null;
   draw=()=>{const s=since(),HPT=[['temp_set','Innstilt','#e08363'],['temp_bottom','Retur (inn)','#7eaddb'],['temp_top','Ut','#93a877']];
    drawLine('ch-hpt','leg-hpt','tb-hpt',HPT.map(([k,n,c])=>({name:n,color:c,pts:rows.filter(r=>r.t>s&&typeof r.p[k]==='number').map(r=>({t:r.t,v:r.p[k]}))})).filter(x=>x.pts.length),'t','°C',null,2);
    hpKwh(s)}}
+ if(pl==='arendal'){const sy=sysairBlock();if(sy){h+=sy;sub.push('Ventilasjon')}}
  const dk=hmList(pl,'daikin');if(dk.length){const d=dk[0].rows[dk[0].rows.length-1].d||{};sub.push('Daikin '+nf(d.measure_temperature)+' °C');const dh=daikinHist(dk[0],pl);h+=`<h3>Daikin</h3>`+grid(dk.map(homeyCard).join('')+daikinCtl(dk[0]))+dh.html;const d0=draw;draw=()=>{d0&&d0();dh.draw()}}
  const ax=axList(pl);if(ax.length){const t=axAvg(pl).map(c=>c.rows[c.rows.length-1].temp).filter(x=>x!=null);sub.push(ax.length+' Adax-ovner'+(t.length?' · snitt '+nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C':''));h+=`<h3>Panelovner (Adax)</h3>`+grid(ax.map(adaxCard).join(''))}
  const sb=saBlock(pl);if(sb){sub.push(sb.sub);h+=`<h3>Gulvvarme (Salus)</h3>`+sb.html;const d2=draw;draw=()=>{d2&&d2();sb.draw()}}
@@ -878,7 +885,7 @@ const J=f=>Promise.resolve(FILES&&FILES[f]!=null?FILES[f]:null);
 function loginScreen(msg,out){const m=document.getElementById('main');
  m.innerHTML=`<div style="max-width:340px;margin:70px auto;text-align:center"><h2 style="margin:0 0 6px">Smarthus</h2><p class="s" style="margin:0 0 20px">${msg||'Logg inn for å se dataene.'}</p><button id="lg" style="font:inherit;padding:10px 18px;border-radius:8px;border:1px solid #444;background:#222;color:inherit;cursor:pointer">${out?'Logg ut':'Logg inn med Google'}</button></div>`;
  document.getElementById('lg').onclick=async()=>{try{if(out){await AUTHC.signOut();location.reload()}else await AUTHC.signIn.social({provider:'google',callbackURL:location.origin+location.pathname})}catch(e){loginScreen('Feil: '+(e&&e.message||e))}}}
-function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json'),J('salus2.json'),J('salustest.json'),J('hp_power.json'),J('drivhusstrom.json'),J('vw.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa,s2,st,hw,ds,vw])=>{HPW=hw;VWD=vw;STR=ds;SA=sa;S2=s2;ST=st;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GDALL=g;GD=gdHidden()?{devices:[],error:null}:g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
+function start(){Promise.all([J('homey.json'),J('gardena.json'),J('adax.json'),J('shelly.json'),J('power.json'),J('data.json'),J('pulse.json'),J('zaptec.json'),J('microtemp.json'),J('lg.json'),J('miele.json'),J('aqara.json'),J('salus.json'),J('salus2.json'),J('salustest.json'),J('hp_power.json'),J('systemair.json'),J('drivhusstrom.json'),J('vw.json')]).then(([h,g,a,s,p,d,u,z,m,lg,mi,aq,sa,s2,st,hw,sy,ds,vw])=>{HPW=hw;SY=sy;VWD=vw;STR=ds;SA=sa;S2=s2;ST=st;AQ=aq;LG=lg;MI=mi;MT=m;ZP=z;PU=u;HM=h;GDALL=g;GD=gdHidden()?{devices:[],error:null}:g;AX=a;SH=s;PW=p;ALL=d||[];render();livePlugs().catch(()=>{});mowerLive().catch(()=>{});setInterval(()=>{if(!document.hidden)mowerLive().catch(()=>{})},120000);setInterval(()=>{if(!document.hidden)livePlugs().catch(()=>{})},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)livePlugs().catch(()=>{})})}).catch(()=>{document.getElementById('main').textContent='Kunne ikke laste data'});
  const lo=document.createElement('p');lo.className='s';lo.style.textAlign='center';lo.innerHTML='<a href="#" id="lo">Logg ut</a>';document.body.appendChild(lo);document.getElementById('lo').onclick=async e=>{e.preventDefault();try{await AUTHC.signOut()}catch(x){}location.reload()}}
 (async()=>{const m=document.getElementById('main');m.textContent='Laster …';
  try{AUTHC=(await import('https://esm.sh/@neon/auth@0.8.2')).createAuthClient(AUTH_URL)}catch(e){loginScreen('Kunne ikke laste innloggingen. Prøv igjen senere.');return}
