@@ -49,33 +49,34 @@ try:
     if not tok:
         OUT["error"] = "Innlogging avvist: " + why + " (passord, eller kontoen bruker Google/Apple?)"
         done(); print(OUT["error"]); sys.exit(0)
-    devs = gql(tok, "{ GetAccountDevices { identifier name } }")["GetAccountDevices"] or []
+    devs = gql(tok, "{ GetAccountDevices { identifier name deviceType { entry module scope type } } }")["GetAccountDevices"] or []
+    VIEW = "query GetView($input: GetViewInputType!) { GetView(input: $input) { id title route children { type properties feature } error } }"
+    def walk(o, regs, ids):
+        if isinstance(o, dict):
+            di = o.get("dataItem") if isinstance(o.get("dataItem"), dict) else None
+            if di and isinstance(di.get("extension"), dict) and "modbusRegister" in di["extension"] and di.get("value") is not None:
+                regs[str(di["extension"]["modbusRegister"])] = di["value"]
+            for v in o.values(): walk(v, regs, ids)
+        elif isinstance(o, list):
+            for v in o: walk(v, regs, ids)
     rows = []
     for d in devs:
-        did = d["identifier"]
-        try:
-            v = gql(tok, 'mutation { GetDeviceView(input: {deviceId: %s, route: "/device/home"}) { route dataItems } }' % json.dumps(did))["GetDeviceView"]
-            regs = {}
-            for it in v.get("dataItems") or []:
-                if isinstance(it, dict) and "register" in it and it.get("value") is not None:
-                    regs[str(it["register"])] = it["value"]
-            print(f"Systemair {d.get('name')}: {len(regs)} registre:", ",".join(sorted(regs, key=int))[:400])
-            rows.append((did, d.get("name") or did, regs))
-        except Exception as e:
-            print("Systemair enhet feilet:", str(e)[:200]); OUT["error"] = str(e)[:200]
-            for q in ('{ GetDeviceStatu }', 'mutation { GetDeviceVie }', '{ GetDeviceDetail(deviceId: "x") { identifier } }'):
-                try: gql(tok, q)
-                except Exception as e3: print("PROBE", q[:40], "->", str(e3)[:260])
-            try:
-                sc = gql(tok, "{ q: __type(name:\"Query\"){fields{name args{name type{name kind ofType{name}}}}} m: __type(name:\"Mutation\"){fields{name args{name type{name kind ofType{name}}}}} }")
-                for k in ("q", "m"):
-                    fl = (sc[k] or {}).get("fields") or []
-                    print("SKJEMA", k, "felt:", len(fl), ",".join(f["name"] for f in fl)[:1500])
-                    for f in fl:
-                        if re.search(r"device|data|status|view|value|read|latest", f["name"], re.I):
-                            print("SKJEMA", k, f["name"], [(a["name"], (a["type"].get("name") or (a["type"].get("ofType") or {}).get("name"))) for a in f["args"]])
-            except Exception as e2:
-                print("introspeksjon feilet:", str(e2)[:150])
+        did = d["identifier"]; dt = d.get("deviceType") or {}
+        print("Systemair enhet:", d.get("name"), "| type:", {k: dt.get(k) for k in ("entry", "module", "scope", "type")})
+        regs = {}
+        for typ in [t for t in (dt.get("module"), dt.get("type"), dt.get("entry"), "TELTONIKA") if t]:
+            for route in ("/home", "/unit_information", "/week_schedule"):
+                try:
+                    r = requests.post("https://homesolutions.systemair.com/gateway/remote-api/", json={"operationName": "GetView", "query": VIEW, "variables": {"input": {"route": route, "viewId": ""}}}, headers={"x-access-token": tok, "device-id": did, "device-type": str(typ)}, timeout=60)
+                    j = r.json() if r.content else {}
+                    v = (j.get("data") or {}).get("GetView")
+                    if v and not v.get("error"): walk(v.get("children"), regs, None)
+                    else: print("  ", typ, route, "HTTP", r.status_code, str((j.get("errors") or [{}])[0].get("message") or (v or {}).get("error"))[:120])
+                except Exception as e:
+                    print("  ", typ, route, "feil", str(e)[:100])
+            if regs: break
+        print(f"Systemair {d.get('name')}: {len(regs)} registre:", ",".join(sorted(regs, key=int))[:500])
+        rows.append((did, d.get("name") or did, regs))
     with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
         con.execute("create table if not exists systemair_readings (ts timestamptz not null default now(), device_id text, name text, regs jsonb)")
         con.execute("create index if not exists systemair_ts on systemair_readings (ts)")
