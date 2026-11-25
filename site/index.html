@@ -431,9 +431,9 @@ function sysairBlock(){const d=SY&&(SY.devices||[])[0];if(!d||!(d.rows||[]).leng
  const l=d.rows[d.rows.length-1],R=l.r||{},t=new Date(l.t),old=Date.now()-t>3*3600000,n=k=>R[k]==null?null:Number(R[k]);
  const MODE={0:'Auto',1:'Manuell',2:'Mange folk',3:'Lufting',4:'Peis',5:'Borte',6:'Ferie'},SPD={0:'Av',1:'Minimum',2:'Lav',3:'Normal',4:'Høy',5:'Maks'};
  const al=R['15900']===true||R['15901']===true||R['15902']===true;
- return `<h3>Ventilasjon (Systemair SAVE)</h3><div class="s ${old?'warn':''}" style="margin-bottom:6px">Målt ${ago(t)}${old?' – skyen har ikke svart på en stund':''}</div>`
-  +`<div class="tile" style="font-size:17px;line-height:1.5">${esc(MODE[n('1164')]??'–')} · ${esc(SPD[n('1241')]??'–')} luft · tilluft ${n('2000')==null?'–':nf(n('2000')/10,0)} °C · ute ${n('12101')==null?'–':nf(n('12101')/10,1)} °C · <span class="${al?'warn':''}">${al?'⚠ alarm (se SAVE CONNECT)':'ingen alarm'}</span></div>`
-  +(old?'':`<div class="tile" style="margin-top:8px"><div class="s">Styring (utføres innen ca. 15 minutter)</div>${syCtl('Modus','mode',VMODE,n('1164'))}${syCtl('Luftmengde','airflow',VFLOW,n('1241'))}${syCtl('Tilluft','temp',Array.from({length:14},(_,i)=>[12+i,(12+i)+' °C']),n('2000')==null?12:Math.round(n('2000')/10))}</div>`)}
+ const line=`${esc(MODE[n('1164')]??'–')} · ${esc(SPD[n('1241')]??'–')} luft · tilluft ${n('2000')==null?'–':nf(n('2000')/10,0)} °C · ute ${n('12101')==null?'–':nf(n('12101')/10,1)} °C · <span class="${al?'warn':''}">${al?'⚠ alarm':'ingen alarm'}</span>`;
+ return `<h3>Ventilasjon (Systemair SAVE)</h3><details class="mini"><summary>${line}</summary><div class="s ${old?'warn':''}" style="margin:6px 0">Målt ${ago(t)}${old?' – skyen har ikke svart på en stund':''}${al?' · alarm aktiv, se SAVE CONNECT':''}</div>`
+  +(old?'':`<div class="s">Styring (utføres innen ca. 15 minutter)</div>${syCtl('Modus','mode',VMODE,n('1164'))}${syCtl('Luftmengde','airflow',VFLOW,n('1241'))}${syCtl('Tilluft','temp',Array.from({length:14},(_,i)=>[12+i,(12+i)+' °C']),n('2000')==null?12:Math.round(n('2000')/10))}`)+`</details>`}
 function secVarme(pl){let h='',sub=[],draw=null;
  const rows=pl==='arendal'?hpRows():[];
  if(rows.length){const last=rows[rows.length-1],p=last.p,run=p.compressor_state===true,on=p.switch===true,fault=p.fault&&p.fault!==0,since=()=>Date.now()-hours*3600000;
@@ -800,6 +800,7 @@ function styringView(){const w=document.createElement('div'),D=devs(),pf=ls.get(
  if(!Object.keys(G).length)w.appendChild(el(waiting('Ingen styrbare enheter funnet ennå.')));
  GRP.forEach(g=>{if(!G[g])return;w.appendChild(el(`<h3 class="gh">${g}</h3>`));const gr=document.createElement('div');gr.className='dg';
   G[g].sort((a,b)=>(!!a.off-!!b.off)||(PLORD[a.pl]-PLORD[b.pl])||a.name.localeCompare(b.name,'nb')).forEach(d=>gr.appendChild(stCard(d)));w.appendChild(gr)});
+ if((pf==='alle'||pf==='arendal')&&typeof sysairBlock==='function'){const sb=sysairBlock();if(sb)w.appendChild(el('<div>'+sb+'</div>'))}
  return w}
 function placeHero(pl){const A=alerts().filter(a=>a.pl===pl&&a.lvl!=='info'),S=sensors(pl),chips=[],LW=pl==='drivhus'?0:(()=>{try{return leaveChecks(pl).filter(c=>c.lvl==='warn').length}catch(e){return 0}})();
  const t=S.map(s=>lastOf(s.rows).temp).filter(x=>x!=null);if(t.length)chips.push(['Snitt temperatur',nf(t.reduce((a,b)=>a+b,0)/t.length)+' °C']);

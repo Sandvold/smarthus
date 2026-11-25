@@ -350,7 +350,7 @@ async function actDispatch(email: string, b: any): Promise<Out> {
 // Åpne Arendal finnes ikke: der kan bare Adax styres, og det er avgjort at det ikke trengs.
 const SCENES: Record<string, any> = {
   close: { oslo: { mt: 12, ax: 12, dk: 14, door: ['terrasse', 'Terrasedør'] }, arendal: { ax: 10, sa: 14, vent: { airflow: 2, temp: 12 }, door: ['inngang', 'Inngangsdør'] } },
-  open: { arendal: { ax: 20, sa: 24, vent: { temp: 20 } }, oslo: { sched: true, dk: 21, ax: { '141398': 19, '142515': 21, '161717': 18, '1487820': 10, '1676790': 16 } } },
+  open: { arendal: { ax: 20, sa: 24, vent: { airflow: 3, temp: 20 } }, oslo: { sched: true, dk: 21, ax: { '141398': 19, '142515': 21, '161717': 18, '1487820': 10, '1676790': 16 } } },
 };
 const placeOf = (site: string, name: string) => /drivhus|oppvarmet/i.test((site || '') + ' ' + (name || '')) ? 'drivhus' : /oslo/i.test(site || '') ? 'oslo' : 'arendal';
 async function siteJson(name: string): Promise<any> { const r = (await sql('select body from site_files where name = $1', [name]))[0]; return r ? JSON.parse(r.body) : {}; }
