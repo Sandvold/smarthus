@@ -1,0 +1,16 @@
+name: Undersøk Systemair
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install requests
+      - run: python scripts/probe_systemair.py
+        env:
+          SYSTEMAIR_EMAIL: ${{ secrets.SYSTEMAIR_EMAIL }}
+          SYSTEMAIR_PASSWORD: ${{ secrets.SYSTEMAIR_PASSWORD }}
