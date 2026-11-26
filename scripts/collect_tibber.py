@@ -1,5 +1,5 @@
 """Henter forbruk og strømpris fra Tibber, lagrer i Neon og skriver site/power.json."""
-import json, os, sys
+import datetime as dt, json, os, sys
 import requests, psycopg
 
 TOKEN = os.environ.get("TIBBER_TOKEN")
@@ -36,9 +36,13 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
     out = []
     for i, h in enumerate(homes):
         c = home_cfg(h["id"], i)
+        last = con.execute("select max(ts_from) from power_hourly where home_id=%s", (h["id"],)).fetchone()[0]
+        skip_before = (last - dt.timedelta(days=3)) if last else None
         for n in ((h.get("consumption") or {}).get("nodes") or []):
             if n.get("consumption") is None:
                 continue
+            if skip_before and dt.datetime.fromisoformat(n["from"]) < skip_before:
+                continue  # eldre timer er allerede lagret; sparer ca. 2000 spørringer per kjøring
             con.execute("""insert into power_hourly (home_id,site,ts_from,kwh,cost,unit_price)
                 values (%s,%s,%s,%s,%s,%s) on conflict (home_id, ts_from) do update
                 set kwh=excluded.kwh, cost=excluded.cost, unit_price=excluded.unit_price""",
