@@ -1,6 +1,7 @@
 """Henter Aqara-enheter (stikk, temp/fukt) via Aqara Cloud. Skriver site/aqara.json."""
 import hashlib, json, os, sys, time, uuid
 import requests, psycopg
+import incr
 
 if not os.environ.get("AQARA_APP_ID"):
     print("Aqara-secrets mangler"); sys.exit(0)
@@ -55,10 +56,12 @@ for d in (r.get("result") or {}).get("data", []):
                 (d["did"], name, model, site, num("0.1.85", 100), num("0.2.85", 100), num("0.12.85"), num("0.13.85", 1000), on))
 f = lambda x: None if x is None else float(x)
 out = {}
-for did, n, m, s, ts, t, h, p, e, o in con.execute("select did,name,model,site,ts,temp,hum,power,energy,on_off from aqara_readings where ts > now() - interval '30 days' order by ts").fetchall():
+prev, since = incr.prev_entities("site/aqara.json", "devices", lambda e: e.get("did"))
+for did, n, m, s, ts, t, h, p, e, o in con.execute("select did,name,model,site,ts,temp,hum,power,energy,on_off from aqara_readings where ts > %s order by ts", (since or incr.window(30),)).fetchall():
     x = out.setdefault(did, {"name": n, "model": m, "site": s, "rows": []})
     x["name"], x["site"] = n, s
     x["rows"].append({"t": ts.isoformat(), "temp": f(t), "hum": f(h), "power": f(p), "kwh": f(e), "on": o})
+out = incr.merge(out, prev, 30)
 NAMES = {"lumi.54ef441000760552": "Lys drivhus", "lumi.54ef441000a0c5c6": "Ventilasjon drivhus",
          "lumi.54ef441000efb484": "Varme drivhus", "lumi.158d000253f9f4": "Drivhus Oslo"}
 for did, x in out.items():

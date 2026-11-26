@@ -1,5 +1,6 @@
 """Henter Gardena-sensorer og ventiler, lagrer i Neon og skriver site/gardena.json."""
 import json, os, sys, requests, psycopg
+import incr
 ACCOUNTS = [(os.environ.get("GARDENA_CLIENT_ID", "").strip(), os.environ.get("GARDENA_CLIENT_SECRET", "").strip()),
             (os.environ.get("GARDENA_CLIENT_ID_2", "").strip(), os.environ.get("GARDENA_CLIENT_SECRET_2", "").strip())]
 ACCOUNTS = [a for a in ACCOUNTS if a[0] and a[1]]
@@ -42,11 +43,13 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
         if d.get("name"): con.execute("update gardena_readings set name=%s where device_id=%s and name is null", (d["name"], did))
     for did, d in devs.items():
         con.execute("update gardena_readings set site=%s where device_id=%s and site is distinct from %s", (d.get("site"), did, d.get("site")))
-    rows = con.execute("select device_id,name,kind,ts,soil_hum,soil_temp,activity,battery,link from gardena_readings where ts > now() - interval '14 days' order by ts").fetchall()
+    prev, since = incr.prev_entities("site/gardena.json", "devices", lambda e: e.get("id"))
+    rows = con.execute("select device_id,name,kind,ts,soil_hum,soil_temp,activity,battery,link from gardena_readings where ts > %s order by ts", (since or incr.window(14),)).fetchall()
 out = {}
 for did, name, kind, ts, sh, st, act, b, link in rows:
     if not name: continue
     d = out.setdefault(did, {"id": did, "name": name, "kind": kind, "site": (devs.get(did) or {}).get("site"), "rows": []})
     d["rows"].append({"t": ts.isoformat(), "hum": None if sh is None else float(sh), "temp": None if st is None else float(st), "act": act, "batt": b, "link": link})
+out = incr.merge(out, prev, 14)
 json.dump({"devices": list(out.values())}, open("site/gardena.json", "w"), ensure_ascii=False)
 print("Gardena: enheter", len(out), "rader", len(rows))

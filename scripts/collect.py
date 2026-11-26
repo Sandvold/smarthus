@@ -1,6 +1,7 @@
 """Henter målinger fra Tuya-skyen, lagrer i Neon og skriver site/data.json."""
 import hashlib, hmac, json, os, time, uuid
 import requests, psycopg
+import incr
 
 HOST = os.environ.get("TUYA_HOST") or "https://openapi.tuyaeu.com"
 CID, SECRET = os.environ["TUYA_ACCESS_ID"], os.environ["TUYA_ACCESS_SECRET"]
@@ -46,15 +47,17 @@ def main():
         con.execute("create index if not exists readings_ts on readings (ts)")
         for r in rows:
             con.execute("insert into readings (device_id,name,site,temp,hum,battery,kind,props) values (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)", r)
+        old, since = incr.prev_list("site/data.json")
         out = con.execute("""select ts, name, site, temp, hum, battery, kind, props from readings
-            where ts > now() - interval '14 days' order by ts""").fetchall()
+            where ts > %s order by ts""", (since or incr.window(14),)).fetchall()
     os.makedirs("site", exist_ok=True)
-    json.dump([{"ts": a.isoformat(), "name": b, "site": c,
-                "temp": None if d is None else float(d),
-                "hum": None if e is None else float(e),
-                "battery": None if f is None else float(f),
-                "kind": g or "sensor", "props": h} for a, b, c, d, e, f, g, h in out],
-              open("site/data.json", "w"))
+    cutoff = incr.window(14).isoformat()
+    new = [{"ts": a.isoformat(), "name": b, "site": c,
+            "temp": None if d is None else float(d),
+            "hum": None if e is None else float(e),
+            "battery": None if f is None else float(f),
+            "kind": g or "sensor", "props": h} for a, b, c, d, e, f, g, h in out]
+    json.dump([r for r in old if r["ts"] >= cutoff] + new, open("site/data.json", "w"))
 
 if __name__ == "__main__":
     main()

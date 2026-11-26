@@ -1,5 +1,6 @@
 """Henter romtemperatur og innstilt temperatur fra Adax, lagrer i Neon og skriver site/adax.json."""
 import json, os, sys, requests, psycopg
+import incr
 ID, PW = os.environ.get("ADAX_ACCOUNT_ID", "").strip(), os.environ.get("ADAX_PASSWORD", "").strip()
 if not ID or not PW:
     print("Adax-secrets mangler, hopper over"); sys.exit(0)
@@ -20,12 +21,14 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
              r["temperature"] / 100 if r.get("temperature") is not None else None,
              r["targetTemperature"] / 100 if r.get("targetTemperature") is not None else None,
              r.get("heatingEnabled")))
-    rows = con.execute("select room_id, home, room, ts, temp, target, heating from adax_readings where ts > now() - interval '14 days' order by ts").fetchall()
+    prev, since = incr.prev_entities("site/adax.json", "rooms", lambda e: int(e["id"]) if str(e.get("id", "")).isdigit() else None)
+    rows = con.execute("select room_id, home, room, ts, temp, target, heating from adax_readings where ts > %s order by ts", (since or incr.window(14),)).fetchall()
 out = {}
 for rid, home, room, ts, temp, target, heating in rows:
     if rid in IGNORE: continue
     d = out.setdefault(rid, {"id": str(rid), "home": NAMES.get(home, home), "name": room, "rows": []})
     d["rows"].append({"t": ts.isoformat(), "temp": None if temp is None else float(temp), "target": None if target is None else float(target), "on": heating})
+out = {k: v for k, v in incr.merge(out, prev, 14).items() if k not in IGNORE}
 import time
 hdr = {"Authorization": "Bearer " + t.json()["access_token"]}
 now = int(time.time() * 1000)

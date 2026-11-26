@@ -17,6 +17,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests "psycopg[binary]"
+      - name: Hent forrige eksport (sparer Neon-trafikk)
+        uses: actions/cache@v4
+        with:
+          path: site/*.json
+          key: site-json-${{ github.run_id }}
+          restore-keys: site-json-
       - run: python scripts/collect.py
         continue-on-error: true
         env:

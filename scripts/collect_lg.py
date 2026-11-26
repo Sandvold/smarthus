@@ -1,6 +1,7 @@
 """Henter LG ThinQ-apparater (ovn m.m.) via ThinQ Connect API med personlig token. Skriver site/lg.json."""
 import json, os, sys, uuid, secrets
 import requests, psycopg
+import incr
 
 PAT = os.environ.get("LG_THINQ_PAT")
 if not PAT:
@@ -55,8 +56,10 @@ with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as con:
     for did, n, t, s in rows:
         con.execute("insert into lg_readings (device_id,name,type,state) values (%s,%s,%s,%s::jsonb)", (did, n, t, json.dumps(s)))
     out = {}
-    for did, n, t, ts, s in con.execute("select device_id,name,type,ts,state from lg_readings where ts > now() - interval '30 days' order by ts").fetchall():
-        o = out.setdefault(did, {"name": n, "type": t, "site": site_of(t), "rows": []})
+    prev, since = incr.prev_entities("site/lg.json", "devices", lambda e: e.get("id"), 36)
+    for did, n, t, ts, s in con.execute("select device_id,name,type,ts,state from lg_readings where ts > %s order by ts", (since or incr.window(30),)).fetchall():
+        o = out.setdefault(did, {"id": did, "name": n, "type": t, "site": site_of(t), "rows": []})
         o["rows"].append({"t": ts.isoformat(), "s": s})
+    out = incr.merge(out, prev, 30)
 OUT["devices"] = list(out.values()); OUT["tried"] = OUT["tried"][-1:]
 done(); print("LG: enheter", len(rows))
